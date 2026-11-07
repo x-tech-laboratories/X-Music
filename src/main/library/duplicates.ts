@@ -75,7 +75,7 @@ const NOISE = new RegExp(
   'gi'
 )
 
-const FEATURED = /[\(\[]\s*(?:feat|ft|featuring|with)\.?\s[^)\]]*[\)\]]/gi
+const FEATURED = /[([]\s*(?:feat|ft|featuring|with)\.?\s[^)\]]*[)\]]/gi
 
 const norm = (s: string | null): string =>
   (s ?? '')

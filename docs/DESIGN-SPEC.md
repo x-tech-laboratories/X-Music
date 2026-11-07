@@ -47,7 +47,7 @@ X-Music keeps the model and replaces the substrate:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Renderer (Chromium)  —  TypeScript · Preact + signals · Vite       │
+│  Renderer (Chromium)  —  TypeScript · React · Vite                  │
 │  Deliberately thin: it maps state to pixels and nothing else.       │
 │                                                                     │
 │  ┌───────────────┐  ┌──────────────┐  ┌────────────────────────┐    │
@@ -60,7 +60,7 @@ X-Music keeps the model and replaces the substrate:
 │  src/shared/  —  imported by BOTH sides, framework-free, no DOM     │
 │                                                                     │
 │  field descriptors · filter AST · format strings · view state       │
-│  (selection, sort, filter stack, virtualization maths) · IPC types   │
+│  filter stack · IPC types; selection, sort, panes, prefs from X-Libs │
 └──────────────────────────────┬──────────────────────────────────────┘
 ┌──────────────────────────────┴──────────────────────────────────────┐
 │  Main process (Node)                                                │
@@ -96,20 +96,17 @@ The honest cost: ~150 MB install and ~350–500 MB resident for an app people le
 core (worst packaging story, and the UI is TypeScript regardless, so it buys two languages for one
 benefit), pure web/PWA (no tag writing, no gapless, no filesystem watch).
 
-### 2.2 Renderer: TypeScript + Preact + signals + Vite
+### 2.2 Renderer: TypeScript + React + Vite
 
-Preact because it is the React programming model — JSX, function components, hooks — which is the
-most widely known way to write a web UI, in a 4 KB runtime. `@preact/signals` carries the view-model
-stores: a component that reads a signal during render subscribes to it, and only that component
-re-renders when it changes. That keeps the two hot paths — the song list and the playback position
-tick — from re-rendering the tree above them. The song list's rows are memoized, so a selection
-change re-renders the rows whose state changed rather than every row.
+React 19, as the X-Tech Application Standard sets for every app, so X-Music shares its widgets with
+the other X-apps. The view-model stores are plain classes that bump a change counter, and a component
+watches one through `useSyncExternalStore`, so only the components that read a store re-render when
+it changes. That keeps the two hot paths — the song list and the playback position tick — from
+re-rendering the tree above them: the position has its own counter, which only the time bar watches.
 
 Styles are CSS Modules: each component has a `Foo.module.css` beside it, with class names scoped at
 build time. Element selectors are not scoped by CSS Modules, so component stylesheets select on
 classes only.
-
-`preact/compat` makes most React libraries usable, including `dnd-kit` for the M7 layout editor.
 
 **This choice is deliberately made cheap to reverse.** See §2.4: everything that is expensive to
 rewrite lives outside the renderer.
@@ -124,7 +121,8 @@ Three execution contexts, and the split is not optional:
   not an optimization: a blocked main thread stalls playback *control* and the UI simultaneously.
 - **Renderer** — presentation. No Node integration, `contextIsolation` on, and a strict CSP.
 
-IPC is `contextBridge` over the contract in `src/shared/ipc.ts`. Because both sides import the same
+IPC is `contextBridge` over the contract in `src/shared/ipc.ts`, built by the X-Libs `define_bridge` and
+`define_events` from one method table. Because both sides import the same
 module, the boundary is typechecked end to end with no codegen step.
 
 **One hazard is worth writing down, because it cost a wrong fix.** `contextBridge` clones
@@ -154,7 +152,7 @@ Two decisions worth recording:
   the default forever — which is exactly the bug that made the first version silently drop every
   renderer debug line.
 
-The parsing lives in `src/shared/log.ts`, apart from any transport, because the behaviour worth
+The parsing lives in the X-Libs `log` module, apart from any transport, because the behaviour worth
 testing is what a malformed specification does: it falls back rather than silencing logging, and one
 bad entry does not discard the rest.
 
@@ -171,14 +169,14 @@ access. It holds:
 | `fields.ts` | Field descriptors: storage, filter operators, tag mappings, stable numeric ids |
 | `filter.ts` | The filter AST, its operators, composition and cycle detection |
 | `format.ts` | The format-string language (§5.5) — labels, tray text, the file renamer |
-| `view.ts` | Selection model, sort state, filter stack, virtualization arithmetic |
+| `view.ts` | The filter stack |
 | `ipc.ts` | The IPC contract |
 
-`view.ts` deserves the emphasis. Anchored range selection, multi-key sort with shift-click
-semantics, the filter stack that collapses to an AST, and the arithmetic deciding which rows a
-viewport needs are all framework-neutral logic that every list widget shares. Implementing that
-correctly is days of work; expressing it in a UI framework is hours. Keeping it in `shared/` means a
-framework change — or a second front end, such as a remote web UI — re-does the hours, not the days.
+Anchored range selection, multi-key sort with shift-click semantics and the arithmetic deciding
+which rows a viewport needs are framework-neutral logic every list widget shares, and every X-app
+too, so they live in X-Libs (`web/selection`, `web/tables`, `web/virtual`) beside the table, split
+panes, prefs and logging. The filter stack that collapses to an AST is X-Music's own and stays in
+`shared/`. Either way a framework change, or a second front end, re-does the hours, not the days.
 
 The renderer is therefore expected to stay small: a widget registry, a layout tree renderer, thin
 reactive wrappers over `shared/` classes, and CSS.
@@ -612,9 +610,9 @@ A smart playlist = filter AST + sort spec + optional limit + refresh policy.
 
 ### 4.3.1 Multi-key sort, and sorting as a way to build a playlist
 
-**The mechanism exists today.** `SortState` in `shared/view.ts` holds an ordered list of sort keys,
-shift-clicking a column header appends one rather than replacing it, and the header shows its
-position in the order. `compileFilter` emits every key into the `ORDER BY`, with NULLs last in both
+**The mechanism exists today.** The library store holds an ordered list of sort keys; the X-Libs
+table's headers append one on shift-click rather than replacing it, flip it on a second click and
+drop it on a third, and show each key's position in the order. `compileFilter` emits every key into the `ORDER BY`, with NULLs last in both
 directions. Sorting by album, then disc, then track is the default view.
 
 What follows is the part still to build.
@@ -788,12 +786,12 @@ validates everything restored against the current field catalogue and drops what
 recognise, and restored filters are rebuilt **as visible chips** rather than applied invisibly — the
 user can see why the library is narrowed, and clear it.
 
-The parsing lives in `src/shared/prefs.ts`, apart from any framework, because the interesting case
+The parsing lives in the X-Libs `web/prefs` module, apart from any framework, because the interesting case
 is not the happy path — it is a stored value that is corrupt, left over from an older version, or of
 the wrong shape. **A bad stored value must never break the view it belongs to**, so every read falls
 back to the default when the JSON is unparseable, fails its validator, or no longer matches the
-default's type. Storage being unavailable entirely is handled the same way. `test/unit/prefs.test.ts`
-covers each of those cases.
+default's type. Storage being unavailable entirely is handled the same way. X-Libs'
+`tests/prefs.test.tsx` covers each of those cases.
 
 These are deliberately *not* in the library database. They are per-machine view state, not library
 data, and putting them in SQLite would mean they travelled with a library export where they do not
@@ -802,7 +800,8 @@ database.
 
 ### 5.4 Theming
 
-Themes are **token documents**, not stylesheets. Halon's `tokens.json` is the reference input and its
+Themes are **token documents**, not stylesheets. Halon's tokens, from `@x-tech-laboratories/halon`
+(`halon-tokens.css`, with `halon.css` styling the shared widgets), are the reference and their
 schema is X-Music's schema — same names, same light/dark split:
 
 ```
@@ -829,8 +828,8 @@ only — a lint rule (borrowed in spirit from Halon's `scripts/lint-gtk.mjs`) fa
 in a component stylesheet.
 
 Themes ship as a directory: `theme.json` (tokens) + optional `theme.css` (overrides) + optional
-assets. Halon-Light and Halon-Dark ship in-tree, generated from Halon's own `tokens.json` so they
-stay in sync with the upstream repo at `Coding/TechNet/Halon`.
+assets. Halon's light and dark come from the package, and the player layer above is derived from
+them in `src/renderer/app.css`.
 
 Metric tokens (spacing scale, radii, control heights, density modes) follow Halon's
 `THEME-DESIGN-GUIDE.md` §4 rather than being reinvented — including its three density levels, which
@@ -1550,7 +1549,7 @@ x-music/
 │   │   ├── fields.ts         # field descriptors
 │   │   ├── filter.ts         # the filter AST
 │   │   ├── format.ts         # the format-string language
-│   │   ├── view.ts           # selection, sort, filter stack, virtualization maths
+│   │   ├── view.ts           # the filter stack
 │   │   └── ipc.ts            # the IPC contract
 │   └── workers/              # (planned) scan, hash, replaygain
 ├── test/
@@ -1558,8 +1557,6 @@ x-music/
 │   ├── property/             # the AST-agreement test
 │   └── unit/
 ├── bench/                    # performance budget benchmarks
-├── themes/halon/             # tokens.json + generated halon.css
-├── scripts/build-theme.mjs   # tokens → CSS custom properties
 ├── layouts/  fields/  docs/  cli/
 ├── flake.nix                 # pins node, electron and mpv
 └── electron.vite.config.ts
@@ -1628,7 +1625,7 @@ visualizer library, multi-library support.
 | **Audio content hash for file identity; AcoustID as a hint only** (§3.5) | None. AcoustID's many-to-many mapping to recordings rules it out as a key regardless of collision rate. |
 | **Two-valued filter logic** (§13.1) | User reports that "not X" excluding unknowns is expected; unlikely |
 | **50k target, and no in-memory index** (§3.5.3, §12) | A real library misses a §12 budget. The trigger is a measurement, not a hunch; `evaluate.ts` already exists to be fed by an index. |
-| Preact + signals over Svelte and React | A needed React library fails under `preact/compat`, or signals stop keeping the hot paths local. Cheap by construction (§2.4). |
+| React, per the X-Tech Application Standard | The standard changes its UI framework. Cheap by construction (§2.4). |
 | libmpv default engine | Packaging friction on Windows/macOS → promote a Web Audio or native fallback |
 | `node-taglib-sharp` for tags | Golden-file failures it cannot fix → swap the `TagIO` implementation for a mutagen sidecar (Appendix A.5) |
 | JSON layouts, not a DSL | Users find JSON hostile → add a friendlier surface *above* JSON, never replace it |

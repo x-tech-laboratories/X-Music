@@ -1,6 +1,8 @@
 // The IPC contract. Both the main process and the renderer import this module, so the boundary is
-// type-checked end to end with no codegen step.
+// type-checked end to end with no codegen step, and the X-Libs bridge builds both ends from it.
 
+import { define_bridge } from '@x-tech-laboratories/x-libs/electron/bridge'
+import { define_events } from '@x-tech-laboratories/x-libs/electron/events'
 import type { FilterNode, SortKey, Limit } from './filter'
 import type { FieldDescriptor } from './fields'
 
@@ -329,7 +331,7 @@ export interface XMusicApi {
 }
 
 /** Pushed from the main process; the renderer subscribes rather than polling. */
-export interface XMusicEvents {
+export type XMusicEvents = {
   'scan:progress': ScanProgress
   /** Batched, because one message per file would flood the bridge on a large library. */
   'scan:files': FileResult[]
@@ -340,24 +342,6 @@ export interface XMusicEvents {
 }
 
 export type EventName = keyof XMusicEvents
-export const EVENT_CHANNEL = 'x-music:event'
-
-/**
- * A value that structured clone rejects, such as a Proxy, cannot cross Electron's IPC boundary —
- * it fails with "An object could not be cloned". Rather than making every call site
- * remember to unwrap, the bridge enforces its own contract: a value that already survives
- * structured cloning passes through untouched, and anything else is flattened to plain JSON.
- * Every argument in this contract is JSON-shaped, so nothing is lost.
- */
-export function toCloneable(value: unknown): unknown {
-  if (value === null || typeof value !== 'object') return value
-  try {
-    structuredClone(value)
-    return value
-  } catch {
-    return JSON.parse(JSON.stringify(value))
-  }
-}
 
 export type Channel = keyof XMusicApi
 export type ApiArgs<C extends Channel> = Parameters<XMusicApi[C]>
@@ -375,3 +359,7 @@ export const CHANNELS: readonly Channel[] = [
   'player:stop', 'player:seek', 'player:volume', 'player:enqueue', 'player:dequeue',
   'player:clearQueue', 'player:repeat', 'player:shuffle'
 ]
+
+// The page reaches these as window.xMusic and window.xMusicEvents.
+export const x_music_bridge = define_bridge<XMusicApi>('xMusic', CHANNELS)
+export const x_music_events = define_events<XMusicEvents>('xMusicEvents')

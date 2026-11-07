@@ -1,21 +1,21 @@
 // View-model state for the library.
 //
-// The filter stack and sort state come from shared/view.ts, which is framework-free; this class is
-// only the thin reactive wrapper that a component can observe. Replacing the UI framework
-// means rewriting this file, not the logic inside it.
+// The filter stack comes from shared/view.ts and the selection from X-Libs, both framework-free; this
+// class only tells watching components when to re-read.
 
-import { signal } from '@preact/signals'
-import type { FilterNode } from '@shared/filter'
+import { browser_storage, read_pref, write_pref } from '@x-tech-laboratories/x-libs/web/prefs'
+import { intent_for, Selection } from '@x-tech-laboratories/x-libs/web/selection'
+import type { Sorting } from '@x-tech-laboratories/x-libs/web/tables'
+import { create_watch } from '@x-tech-laboratories/x-libs/web/watch'
+import type { FilterNode, SortKey } from '@shared/filter'
 import { leaf, or } from '@shared/filter'
-import { FilterStack, Selection, SortState } from '@shared/view'
+import { FilterStack } from '@shared/view'
 import type { GroupRow, LibraryStats, TrackRow } from '@shared/ipc'
 import { field } from '@shared/fields'
-import { readPref, writePref } from '@shared/prefs'
 import { sanitizePaneValues, sanitizeSortKeys } from '@shared/viewstate'
 import { ipc } from '../lib/ipc'
 
-const storage = (): Storage | undefined =>
-  typeof localStorage === 'undefined' ? undefined : localStorage
+const storage = browser_storage
 
 const KEY_SORT = 'x-music.pref.library.sort'
 const KEY_PANES = 'x-music.pref.library.panes'
@@ -24,63 +24,64 @@ const KEY_SEARCH = 'x-music.pref.library.search'
 const PAGE = 500
 
 class LibraryStore {
-  private readonly statsSig = signal<LibraryStats | null>(null)
-  private readonly tracksSig = signal<TrackRow[]>([])
-  private readonly lastSqlSig = signal('')
-  private readonly errorSig = signal<string | null>(null)
-  private readonly searchSig = signal('')
+  // Bumped when the results, stats, filters or error change.
+  readonly data = create_watch()
+  // Bumped when the selection changes, so a click does not re-render what only reads the results.
+  readonly selection_changes = create_watch()
 
-  /** Bumped whenever the result set changes, so panes can re-read without deep watching. */
-  private readonly versionSig = signal(0)
+  private statsValue: LibraryStats | null = null
+  private tracksValue: TrackRow[] = []
+  private lastSqlValue = ''
+  private errorValue: string | null = null
+  private searchValue = ''
+  // Counts the times the search was cleared from outside the box, so the box can start empty again.
+  private searchResetsValue = 0
 
   private readonly stack = new FilterStack()
-  private readonly sort = new SortState()
+  private sort: SortKey[] = []
   /** Field id → selected values. Several values in one pane mean OR, as gmusicbrowser does. */
   private readonly paneValues = new Map<string, string[]>()
   /** Last clicked row per pane, so shift can extend from it. */
   private readonly paneAnchor = new Map<string, number>()
-  private readonly selection = new Selection()
+  private readonly selection = new Selection<number>()
 
-  /** Bumped on selection changes, for the same reason `version` exists. */
-  private readonly selectionVersionSig = signal(0)
+  get stats(): LibraryStats | null { return this.statsValue }
+  set stats(v: LibraryStats | null) { this.statsValue = v; this.data.bump() }
+  get tracks(): TrackRow[] { return this.tracksValue }
+  set tracks(v: TrackRow[]) { this.tracksValue = v; this.data.bump() }
+  get lastSql(): string { return this.lastSqlValue }
+  set lastSql(v: string) { this.lastSqlValue = v; this.data.bump() }
+  get error(): string | null { return this.errorValue }
+  set error(v: string | null) { this.errorValue = v; this.data.bump() }
+  get search(): string { return this.searchValue }
+  get searchResets(): number { return this.searchResetsValue }
+  set search(v: string) { this.searchValue = v; this.data.bump() }
 
-  get stats(): LibraryStats | null { return this.statsSig.value }
-  set stats(v: LibraryStats | null) { this.statsSig.value = v }
-  get tracks(): TrackRow[] { return this.tracksSig.value }
-  set tracks(v: TrackRow[]) { this.tracksSig.value = v }
-  get lastSql(): string { return this.lastSqlSig.value }
-  set lastSql(v: string) { this.lastSqlSig.value = v }
-  get error(): string | null { return this.errorSig.value }
-  set error(v: string | null) { this.errorSig.value = v }
-  get search(): string { return this.searchSig.value }
-  set search(v: string) { this.searchSig.value = v }
-  get version(): number { return this.versionSig.value }
-  set version(v: number) { this.versionSig.value = v }
-  get selectionVersion(): number { return this.selectionVersionSig.value }
-  set selectionVersion(v: number) { this.selectionVersionSig.value = v }
+  // Changes whenever the result set does, so panes can re-read without deep watching.
+  get version(): number { return this.data.version() }
 
   constructor() {
-    const saved = sanitizeSortKeys(readPref<unknown>(storage(), KEY_SORT, null))
-    this.sort.set(saved.length > 0
+    const saved = sanitizeSortKeys(read_pref<unknown>(storage(), KEY_SORT, null))
+    this.sort = saved.length > 0
       ? saved
-      : [{ field: 'album' }, { field: 'disc_number' }, { field: 'track_number' }])
+      : [{ field: 'album' }, { field: 'disc_number' }, { field: 'track_number' }]
 
     // Pane selections and the search term are rebuilt into the filter stack, so the chips show up
     // and the user can see why the library is narrowed rather than wondering.
     for (const [fieldId, values] of Object.entries(
-      sanitizePaneValues(readPref<unknown>(storage(), KEY_PANES, null))
+      sanitizePaneValues(read_pref<unknown>(storage(), KEY_PANES, null))
     )) {
       this.applyPane(fieldId, values)
     }
 
-    const search = readPref(storage(), KEY_SEARCH, '')
+    const search = read_pref(storage(), KEY_SEARCH, '')
     if (typeof search === 'string' && search.trim() !== '') this.applySearch(search)
   }
 
   private persist(): void {
-    writePref(storage(), KEY_SORT, this.sort.list())
-    writePref(storage(), KEY_PANES, Object.fromEntries(this.paneValues))
-    writePref(storage(), KEY_SEARCH, this.search)
+    write_pref(storage(), KEY_SORT, this.sort)
+    write_pref(storage(), KEY_PANES, Object.fromEntries(this.paneValues))
+    write_pref(storage(), KEY_SEARCH, this.search)
   }
 
   private filter(): FilterNode {
@@ -88,8 +89,6 @@ class LibraryStore {
   }
 
   chips(): readonly { id: string; label: string }[] {
-    // FilterStack is a plain class, so reading `version` is what ties this to the reactive graph.
-    void this.version
     return this.stack.list().filter((c) => c.removable).map((c) => ({ id: c.id, label: c.label }))
   }
 
@@ -98,19 +97,16 @@ class LibraryStore {
    * back rather than keeping a private copy that could drift from the chips.
    */
   selectionFor(fieldId: string): readonly string[] {
-    void this.version
     return this.paneValues.get(fieldId) ?? []
   }
 
   isPaneSelected(fieldId: string, value: string | null): boolean {
-    void this.version
     const values = this.paneValues.get(fieldId)
     if (!values || values.length === 0) return value === null
     return value !== null && values.includes(value)
   }
 
   hasFilters(): boolean {
-    void this.version
     return this.stack.list().some((c) => c.removable)
   }
 
@@ -119,50 +115,43 @@ class LibraryStore {
     this.paneValues.clear()
     this.paneAnchor.clear()
     this.search = ''
+    this.searchResetsValue += 1
     this.persist()
     await this.refresh()
   }
 
   // ── selection ──────────────────────────────────────────────────────────
   isSelected(id: number): boolean {
-    void this.selectionVersion
     return this.selection.has(id)
   }
 
   selectedIds(): number[] {
-    void this.selectionVersion
     return this.selection.ids()
   }
 
   selectedCount(): number {
-    void this.selectionVersion
     return this.selection.size
   }
 
   /** Selection internals, for diagnostics only. */
   inspectSelection(): { size: number; anchor: number | null } {
-    void this.selectionVersion
     return this.selection.inspect()
   }
 
   clickRow(index: number, modifiers: { shift?: boolean; ctrl?: boolean }): void {
     const ordered = this.tracks.map((t) => t.id)
-    const intent = modifiers.shift
-      ? (modifiers.ctrl ? 'range-add' : 'range')
-      : modifiers.ctrl ? 'toggle' : 'replace'
-
-    this.selection.apply(ordered, index, intent)
-    this.selectionVersionSig.value = this.selectionVersionSig.peek() + 1
+    this.selection.apply(ordered, index, intent_for(modifiers))
+    this.selection_changes.bump()
   }
 
   selectAll(): void {
-    this.selection.selectAll(this.tracks.map((t) => t.id))
-    this.selectionVersionSig.value = this.selectionVersionSig.peek() + 1
+    this.selection.select_all(this.tracks.map((t) => t.id))
+    this.selection_changes.bump()
   }
 
   clearSelection(): void {
     this.selection.clear()
-    this.selectionVersionSig.value = this.selectionVersionSig.peek() + 1
+    this.selection_changes.bump()
   }
 
   async refresh(): Promise<void> {
@@ -170,14 +159,14 @@ class LibraryStore {
       this.error = null
       this.stats = await ipc('library:stats')
 
-      const req = { filter: this.filter(), sort: [...this.sort.list()], limit: { count: PAGE } }
+      const req = { filter: this.filter(), sort: [...this.sort], limit: { count: PAGE } }
       this.tracks = await ipc('library:query', req)
       this.lastSql = (await ipc('library:explain', req)).sql
 
       // A narrowed result set must not leave selections pointing at rows nobody can see.
       this.selection.retain(this.tracks.map((t) => t.id))
-      this.selectionVersionSig.value = this.selectionVersionSig.peek() + 1
-      this.versionSig.value = this.versionSig.peek() + 1
+      this.selection_changes.bump()
+      this.data.bump()
     } catch (err) {
       this.error = (err as Error).message
     }
@@ -281,25 +270,23 @@ class LibraryStore {
       this.paneValues.delete(fieldId)
       this.paneAnchor.delete(fieldId)
     }
-    if (id === 'search') this.search = ''
+    if (id === 'search') {
+      this.search = ''
+      this.searchResetsValue += 1
+    }
     this.persist()
     await this.refresh()
   }
 
-  async toggleSort(fieldId: string, additive: boolean): Promise<void> {
-    this.sort.toggle(fieldId, additive)
+  // The sort keys as the table shows them, first deciding first.
+  sorting(): Sorting[] {
+    return this.sort.map((k) => ({ key: k.field, descending: k.dir === 'desc' }))
+  }
+
+  async setSorting(sorting: readonly Sorting[]): Promise<void> {
+    this.sort = sorting.map((k) => ({ field: k.key, dir: k.descending ? 'desc' : 'asc' }))
     this.persist()
     await this.refresh()
-  }
-
-  sortPriority(fieldId: string): number {
-    void this.version
-    return this.sort.priority(fieldId)
-  }
-
-  sortDir(fieldId: string): 'asc' | 'desc' | null {
-    void this.version
-    return this.sort.list().find((k) => k.field === fieldId)?.dir ?? null
   }
 }
 

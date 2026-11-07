@@ -35,6 +35,11 @@ describe('read-only mode', () => {
     }
   })
 
+  it('lets the window remember its place in X-Music data and nowhere else', () => {
+    expect(() => assertWritable('window-state', '/home/u/.config/x-music/window.json')).not.toThrow()
+    expect(() => assertWritable('window-state', '/music/window.json')).toThrow(ReadOnlyError)
+  })
+
   it('still allows X-Music to maintain its own database', () => {
     expect(() => assertWritable('playlist-write', '/home/u/.config/x-music/library.db')).not.toThrow()
     expect(() => assertWritable('playlist-write', '/home/u/.config/x-music/art/ab.webp')).not.toThrow()

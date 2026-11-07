@@ -13,7 +13,7 @@
 
         # Pinned so the better-sqlite3 native build and the runtime agree on one ABI.
         electron = pkgs.electron_43;
-        nodejs = pkgs.nodejs_22;
+        nodejs = pkgs.nodejs_24;
 
         # Shared libraries the Electron binary and the better-sqlite3 prebuild dlopen at runtime.
         runtimeLibs = with pkgs; [
@@ -29,7 +29,7 @@
           version = (builtins.fromJSON (builtins.readFile ./package.json)).version;
           src = self;
 
-          npmDepsHash = "sha256-jhF1Hf7kyELU3xFyHB9FAHaogdEERIsU5PEK7GisCwM=";
+          npmDepsHash = "sha256-THqCcdvBG0vCxw5q2FXeSj4Y8az1n8pjiOM/1w/Re1s=";
           inherit nodejs;
 
           nativeBuildInputs = with pkgs; [ makeWrapper copyDesktopItems autoPatchelfHook ];

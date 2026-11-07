@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useState } from 'react'
+import { Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { ipc } from '../../lib/ipc'
 import { cx } from '../../lib/cx'
 import type { GmbPreview, ImportReport } from '@shared/ipc'
@@ -75,72 +76,73 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
   }
 
   return (
-    <section class={s.import}>
-      <header class={s.header}>
-        <h2 class={s.heading}>gmusicbrowser</h2>
-        <p class={s.lead}>
+    <section className={s.import}>
+      <header className={s.header}>
+        <h3 className={s.heading}>gmusicbrowser</h3>
+        <p className={s.lead}>
           Imports ratings, play counts, full play history, genres, groupings, labels and saved lists.
           Your music files are only ever read.
         </p>
       </header>
 
-      <div class={s.row}>
-        <label class={s.label} for="gmbrc">Configuration file</label>
-        <input class={s.input} id="gmbrc" value={path} spellcheck={false}
-               onInput={(e) => setPath((e.currentTarget as HTMLInputElement).value)}
-               onChange={(e) => void check((e.currentTarget as HTMLInputElement).value)} />
-        <button class={s.button} onClick={browse}>Browse…</button>
+      <div className={s.row}>
+        <label className={s.label} htmlFor="gmbrc">Configuration file</label>
+        <input id="gmbrc" value={path} spellCheck={false}
+               onChange={(e) => setPath(e.currentTarget.value)}
+               onBlur={(e) => void check(e.currentTarget.value)}
+               onKeyDown={(e) => { if (e.key === 'Enter') void check(e.currentTarget.value) }} />
+        <button onClick={browse}>Browse…</button>
       </div>
 
       {preview && !preview.exists ? (
-        <p class={cx(s.note, s.warn)}>No file at that path. gmusicbrowser keeps it at{' '}
-          <code class={s.code}>~/.config/gmusicbrowser/gmbrc</code> by default.</p>
+        <p className={cx(s.note, s.warn)}>No file at that path. gmusicbrowser keeps it at{' '}
+          <code className={s.code}>~/.config/gmusicbrowser/gmbrc</code> by default.</p>
       ) : preview?.error ? (
-        <p class={cx(s.note, s.err)}>Could not parse: {preview.error}</p>
+        <p className={cx(s.note, s.err)}>Could not parse: {preview.error}</p>
       ) : preview && (
         <>
-          <div class={s.preview}>
-            <div><strong>{preview.songs.toLocaleString()}</strong><span>songs</span></div>
-            <div><strong>{preview.playHistoryEntries.toLocaleString()}</strong><span>play events</span></div>
-            <div><strong>{preview.savedLists}</strong><span>saved lists</span></div>
-            <div><strong>{preview.savedFilters}</strong><span>saved filters</span></div>
-          </div>
+          <Tiles>
+            <Tile label="songs" value={preview.songs.toLocaleString()} value_first />
+            <Tile label="play events" value={preview.playHistoryEntries.toLocaleString()} value_first />
+            <Tile label="saved lists" value={preview.savedLists} value_first />
+            <Tile label="saved filters" value={preview.savedFilters} value_first />
+          </Tiles>
           {preview.baseFolder && (
-            <p class={s.note}>Music root: <code class={s.code}>{preview.baseFolder}</code>{preview.version && <> · gmbrc {preview.version}</>}</p>
+            <p className={s.note}>Music root: <code className={s.code}>{preview.baseFolder}</code>{preview.version && <> · gmbrc {preview.version}</>}</p>
           )}
           {preview.unmappedColumns.length > 0 && (
-            <p class={cx(s.note, s.warn)}>Unrecognised columns will be ignored: {preview.unmappedColumns.join(', ')}</p>
+            <p className={cx(s.note, s.warn)}>Unrecognised columns will be ignored: {preview.unmappedColumns.join(', ')}</p>
           )}
 
-          <div class={s.opts}>
-            <label class={s.label}>
-              <input class={s.check} type="checkbox" checked={statistics}
+          <div className={s.opts}>
+            <label className={s.label}>
+              <input type="checkbox" checked={statistics}
                      onChange={(e) => setStatistics((e.currentTarget as HTMLInputElement).checked)} /> Ratings, play counts and history
             </label>
-            <label class={s.label}>
-              <input class={s.check} type="checkbox" checked={labels}
+            <label className={s.label}>
+              <input type="checkbox" checked={labels}
                      onChange={(e) => setLabels((e.currentTarget as HTMLInputElement).checked)} /> Genres, groupings and labels
             </label>
-            <label class={s.label}>
-              <input class={s.check} type="checkbox" checked={playlists}
+            <label className={s.label}>
+              <input type="checkbox" checked={playlists}
                      onChange={(e) => setPlaylists((e.currentTarget as HTMLInputElement).checked)} /> Saved lists as playlists
             </label>
           </div>
 
-          <div class={s.actions}>
-            <button class={cx(s.button, s.primary)} disabled={busy || preview.songs === 0} onClick={run}>
+          <div className={s.actions}>
+            <button className="accent solid" disabled={busy || preview.songs === 0} onClick={run}>
               {busy ? 'Importing…' : `Import ${preview.songs.toLocaleString()} songs`}
             </button>
-            <button class={s.button} disabled={busy} onClick={reset}>Clear library</button>
-            <span class={s.readonly}>Reads only — your music files are never modified.</span>
+            <button className="danger" disabled={busy} onClick={reset}>Clear library</button>
+            <span className={s.readonly}>Reads only — your music files are never modified.</span>
           </div>
         </>
       )}
 
-      {error && <p class={cx(s.note, s.err)}>{error}</p>}
+      {error && <p className={cx(s.note, s.err)}>{error}</p>}
 
       {report && (
-        <div class={s.report}>
+        <div className={s.report}>
           <p>
             Imported <strong>{report.tracksCreated.toLocaleString()}</strong> tracks and{' '}
             <strong>{report.mediaCreated.toLocaleString()}</strong> files,
@@ -148,10 +150,10 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
             <strong>{report.playlistsCreated}</strong> playlists.
           </p>
           {report.notes.map((note) => (
-            <p key={note} class={s.note}>{note}</p>
+            <p key={note} className={s.note}>{note}</p>
           ))}
 
-          <button class={cx(s.button, s.primary, s.big)} onClick={ondone}>Show my library →</button>
+          <button className="accent solid" onClick={ondone}>Show my library →</button>
         </div>
       )}
     </section>

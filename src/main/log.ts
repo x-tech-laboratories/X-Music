@@ -6,14 +6,14 @@
 
 import { appendFileSync } from 'node:fs'
 import {
-  createLogger, formatRecord, parseLevelSpec, type Level, type Logger, type LogRecord
-} from '@shared/log'
+  create_logger, format_record, parse_level_spec, type Level, type Logger, type LogRecord
+} from '@x-tech-laboratories/x-libs/log'
 
-const spec = parseLevelSpec(process.env.X_MUSIC_LOG)
+const spec = parse_level_spec(process.env.X_MUSIC_LOG)
 const file = process.env.X_MUSIC_LOG_FILE
 
 const toConsole = (record: LogRecord): void => {
-  const line = formatRecord(record)
+  const line = format_record(record)
   // Warnings and worse go to stderr so they survive stdout redirection.
   if (record.level === 'info' || record.level === 'debug') console.log(line)
   else console.error(line)
@@ -23,19 +23,19 @@ const sink = (record: LogRecord): void => {
   toConsole(record)
   if (!file) return
   try {
-    appendFileSync(file, `${formatRecord(record)}\n`)
+    appendFileSync(file, `${format_record(record)}\n`)
   } catch {
     // A log that cannot be written must not take the app down with it.
   }
 }
 
-export const log = createLogger('app', spec, sink)
+export const log = create_logger('app', spec, sink)
 
-export const logger = (scope: string): Logger => createLogger(scope, spec, sink)
+export const logger = (scope: string): Logger => create_logger(scope, spec, sink)
 
 /** Records arriving from the renderer, already levelled and scoped there. */
 export function logFromRenderer(level: Level, scope: string, message: string, data?: unknown): void {
-  createLogger(`ui:${scope}`, spec, sink)[level](message, data)
+  create_logger(`ui:${scope}`, spec, sink)[level](message, data)
 }
 
 export const describeLogging = (): string =>

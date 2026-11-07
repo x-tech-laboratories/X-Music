@@ -117,7 +117,7 @@ class Upserter {
   private readonly s: Record<string, Statement>
   private readonly valueCache = new Map<string, number>()
 
-  constructor(private readonly db: Db) {
+  constructor(db: Db) {
     this.s = {
       mediaByUri: db.prepare(
         'SELECT id, track_id FROM media WHERE uri = ? AND subtrack_index = ?'),

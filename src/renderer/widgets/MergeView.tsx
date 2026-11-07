@@ -1,15 +1,17 @@
 // Sources side by side, one column each, one row per field — so a disagreement reads as a diff
 // rather than as a list of options. Resolution stays per field, following Thunderbird CardBook.
 
-import { Fragment } from 'preact'
-import { useEffect, useState } from 'preact/hooks'
+import { Fragment } from 'react'
+import { useEffect, useState } from 'react'
 import type { MergePreview, MergeResult, Resolution } from '@shared/ipc'
-import { isBoolean } from '@shared/prefs'
+import { Badge } from '@x-tech-laboratories/x-libs/web/react/badges'
+import { Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
+import { is_boolean } from '@x-tech-laboratories/x-libs/web/prefs'
 import { ipc } from '../lib/ipc'
 import { cx } from '../lib/cx'
-import { usePref } from '../lib/prefs'
 import { library } from '../stores/library'
-import { Page } from '../lib/Page'
+import { PageView } from './PageView'
 import s from './MergeView.module.css'
 
 function show(v: unknown): string {
@@ -26,7 +28,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<MergeResult | null>(null)
   const [undoing, setUndoing] = useState(false)
-  const onlyDifferences = usePref('merge.onlyDifferences', false, isBoolean)
+  const [onlyDifferences, setOnlyDifferences] = use_pref('x-music.pref.merge.onlyDifferences', false, is_boolean)
 
   useEffect(() => {
     void (async () => {
@@ -92,7 +94,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
     setSurvivor(from)
   }
 
-  const visibleFields = (preview?.fields ?? []).filter((f) => !onlyDifferences.value || f.conflict)
+  const visibleFields = (preview?.fields ?? []).filter((f) => !onlyDifferences || f.conflict)
 
   const conflictCount = (preview?.fields ?? []).filter((f) => f.conflict).length
 
@@ -133,21 +135,21 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
 
   const actions = !result && preview && (
     <>
-      <label class={s.toggle}>
+      <label className="check">
         <input
           type="checkbox"
-          checked={onlyDifferences.value}
-          onChange={(e) => (onlyDifferences.value = (e.currentTarget as HTMLInputElement).checked)}
+          checked={onlyDifferences}
+          onChange={(e) => setOnlyDifferences(e.currentTarget.checked)}
         /> Only differences
       </label>
-      <button class={s.primary} onClick={apply} disabled={busy || survivor === null}>
+      <button className="accent solid" onClick={apply} disabled={busy || survivor === null}>
         {busy ? 'Merging…' : 'Merge'}
       </button>
     </>
   )
 
   return (
-    <Page
+    <PageView
       title={`Merge ${ids.length} tracks into one`}
       subtitle={conflictCount > 0
         ? `${conflictCount} field${conflictCount === 1 ? '' : 's'} disagree — pick which value to keep`
@@ -155,111 +157,111 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
       onclose={() => onclose?.(false)}
       actions={actions}
     >
-      {error && <p class={cx(s.note, s.err)}>{error}</p>}
+      {error && <p className={cx(s.note, s.err)}>{error}</p>}
 
       {result ? (
-        <div class={s.done}>
-          <h2 class={s.h2}>Merged</h2>
-          <p class={s.doneText}>
+        <div className={s.done}>
+          <h3 className={s.h2}>Merged</h3>
+          <p className={s.doneText}>
             One track now holds <strong>{result.mediaMoved + 1}</strong>
             {' '}{result.mediaMoved + 1 === 1 ? 'file' : 'files'}.
             {result.playlistEntriesRepointed > 0 && (
               <> {result.playlistEntriesRepointed} playlist entries repointed.</>
             )}
           </p>
-          <div class={s.rowActions}>
-            <button class={s.rowButton} onClick={undo} disabled={undoing}>{undoing ? 'Undoing…' : 'Undo this merge'}</button>
-            <button class={cx(s.rowButton, s.primary)} onClick={() => onclose?.(true)}>Done</button>
+          <div className={s.rowActions}>
+            <button onClick={undo} disabled={undoing}>{undoing ? 'Undoing…' : 'Undo this merge'}</button>
+            <button className="accent solid" onClick={() => onclose?.(true)}>Done</button>
           </div>
         </div>
       ) : preview ? (
         <>
           {preview.pinnedSources.length > 0 && (
-            <p class={cx(s.note, s.warn)}>
+            <p className={cx(s.note, s.warn)}>
               {preview.pinnedSources.length} of these was merged or split by hand before. Merging replaces
               that decision.
             </p>
           )}
 
-          <div class={s.grid} style={{ gridTemplateColumns: columns }}>
+          <div className={s.grid} style={{ gridTemplateColumns: columns }}>
             {/* header: one column per source, plus the result */}
-            <div class={cx(s.cell, s.head, s.corner)}>Field</div>
+            <div className={cx(s.cell, s.head, s.corner)}>Field</div>
             {preview.ids.map((id) => (
-              <div key={id} class={cx(s.cell, s.head, s.source, survivor === id && s.survivor)}>
-                <div class={s.shead}>
-                  <button class={cx(s.pickSurvivor, survivor === id && s.on)} onClick={() => setSurvivor(id)}>
+              <div key={id} className={cx(s.cell, s.head, s.source, survivor === id && s.survivor)}>
+                <div className={s.shead}>
+                  <button className={cx(s.pickSurvivor, survivor === id && s.on)} onClick={() => setSurvivor(id)}>
                     {survivor === id ? '● Survivor' : '○ Make survivor'}
                   </button>
-                  <span class={s.sname}>Source {sourceIndex(id)}</span>
+                  <span className={s.sname}>Source {sourceIndex(id)}</span>
                 </div>
-                <div class={s.smeta}>
+                <div className={s.smeta}>
                   {mediaFor(id)} file{mediaFor(id) === 1 ? '' : 's'}
                 </div>
-                <button class={s.takeall} onClick={() => takeAll(id)}>Take all from this</button>
+                <button className={s.takeall} onClick={() => takeAll(id)}>Take all from this</button>
               </div>
             ))}
-            <div class={cx(s.cell, s.head, s.result)}>Result</div>
+            <div className={cx(s.cell, s.head, s.result)}>Result</div>
 
             {visibleFields.map((f) => (
               <Fragment key={f.field}>
-                <div class={cx(s.cell, s.label, f.conflict && s.conflict)}>{f.name}</div>
+                <div className={cx(s.cell, s.label, f.conflict && s.conflict)}>{f.name}</div>
 
                 {preview.ids.map((id) => {
                   const text = show(valueFor(f.field, id))
                   return f.conflict ? (
                     <button
                       key={id}
-                      class={cx(s.cell, s.value, s.clickable, isChosen(f.field, id) && s.chosen, text === '' && s.empty)}
+                      className={cx(s.cell, s.value, s.clickable, isChosen(f.field, id) && s.chosen, text === '' && s.empty)}
                       onClick={() => pick(f.field, id)}
                       title={text || 'empty'}
                     >{text || '—'}</button>
                   ) : (
-                    <div key={id} class={cx(s.cell, s.value, s.same)} title={text}>{text || '—'}</div>
+                    <div key={id} className={cx(s.cell, s.value, s.same)} title={text}>{text || '—'}</div>
                   )
                 })}
 
-                <div class={cx(s.cell, s.resultCell)}>
+                <div className={cx(s.cell, s.resultCell)}>
                   {f.conflict && f.multi && (
-                    <button class={cx(s.union, unionChosen(f.field) && s.on)} onClick={() => pickUnion(f.field)}>
+                    <button className={cx(s.union, unionChosen(f.field) && s.on)} onClick={() => pickUnion(f.field)}>
                       Keep all
                     </button>
                   )}
-                  <span class={s.rval}>{show(resultFor(f.field)) || '—'}</span>
+                  <span className={s.rval}>{show(resultFor(f.field)) || '—'}</span>
                 </div>
               </Fragment>
             ))}
           </div>
 
           <section>
-            <h2 class={s.h2}>Combined statistics</h2>
-            <p class={s.hint}>
+            <h3 className={s.h2}>Combined statistics</h3>
+            <p className={s.hint}>
               These are not a choice: plays and skips are summed, the highest rating wins, and play
               history is merged and deduplicated.
             </p>
-            <div class={s.statgrid}>
-              <div class={s.stat}><strong class={s.statValue}>{preview.statistics.playCount}</strong><span class={s.statLabel}>plays</span></div>
-              <div class={s.stat}><strong class={s.statValue}>{preview.statistics.skipCount}</strong><span class={s.statLabel}>skips</span></div>
-              <div class={s.stat}><strong class={s.statValue}>{preview.statistics.rating ?? '—'}</strong><span class={s.statLabel}>rating</span></div>
-            </div>
+            <Tiles>
+              <Tile label="plays" value={preview.statistics.playCount} value_first />
+              <Tile label="skips" value={preview.statistics.skipCount} value_first />
+              <Tile label="rating" value={preview.statistics.rating ?? '—'} value_first />
+            </Tiles>
           </section>
 
-          <section class={s.files}>
-            <h2 class={s.h2}>Files the surviving track will hold</h2>
-            <ul class={s.fileList}>
+          <section className={s.files}>
+            <h3 className={s.h2}>Files the surviving track will hold</h3>
+            <ul className={s.fileList}>
               {preview.media.map((m) => (
-                <li key={m.id} class={s.file}>
-                  <span class={s.codec}>{m.codec ?? '?'}</span>
-                  <span class={s.uri} title={m.uri}>{m.uri}</span>
-                  <span class={s.src}>Source {sourceIndex(m.from)}</span>
-                  {!m.present && <span class={s.missing}>missing</span>}
+                <li key={m.id} className={s.file}>
+                  <span className={s.codec}>{m.codec ?? '?'}</span>
+                  <span className={s.uri} title={m.uri}>{m.uri}</span>
+                  <span className={s.src}>Source {sourceIndex(m.from)}</span>
+                  {!m.present && <Badge tone="bad">missing</Badge>}
                 </li>
               ))}
             </ul>
           </section>
         </>
       ) : (
-        <p class={s.note}>Loading…</p>
+        <p className={s.note}>Loading…</p>
       )}
-    </Page>
+    </PageView>
   )
 }

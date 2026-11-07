@@ -1,50 +1,37 @@
-import { app, BrowserWindow, nativeTheme, protocol, shell, net } from 'electron'
+import { app, BrowserWindow, nativeTheme, protocol, screen, shell, net } from 'electron'
 import { pathToFileURL } from 'node:url'
 import { join } from 'node:path'
+import { create_window } from '@x-tech-laboratories/x-libs/electron/window'
 
 import { openLibrary, libraryPath } from './db'
 import { registerIpc } from './ipc'
-import { initSafety, safetyStatus } from './safety'
+import { assertWritable, initSafety, safetyStatus } from './safety'
 import { describeLogging, log } from './log'
 import { artCacheDir } from './artcache'
 
 const isDev = !app.isPackaged
 
 function createWindow(): BrowserWindow {
-  const win = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: 900,
-    minHeight: 560,
-    show: false,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#060b14' : '#f1f5f9',
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    webPreferences: {
-      // electron-vite emits an ESM preload as .mjs; loading .js here silently yields no bridge.
-      preload: join(__dirname, '../preload/index.mjs'),
-      sandbox: false,
-      contextIsolation: true,
-      nodeIntegration: false,
-      // A player must keep ticking when its window is hidden or occluded; Chromium otherwise
-      // throttles timers to about once a minute, stalling position updates and queue advances.
-      backgroundThrottling: false
-    }
+  return create_window(BrowserWindow, {
+    title: 'X-Music',
+    // electron-vite emits an ESM preload as .mjs; loading .js here silently yields no bridge.
+    preload: join(__dirname, '../preload/index.mjs'),
+    file: join(__dirname, '../renderer/index.html'),
+    dev_url: isDev ? process.env.ELECTRON_RENDERER_URL : undefined,
+    default_size: { width: 1400, height: 900 },
+    min_size: { width: 900, height: 560 },
+    state_file: join(app.getPath('userData'), 'window.json'),
+    // The window's size and place are X-Music's own data, so the write guard lets them through.
+    before_write: (path) => assertWritable('window-state', path),
+    native_theme: nativeTheme,
+    shell,
+    screen,
+    // Halon's root surface, shown before the page paints.
+    background: { light: '#f1f5f9', dark: '#060b14' },
+    // A player must keep ticking when its window is hidden, so Chromium may not throttle its timers.
+    background_throttling: false,
+    title_bar_style: process.platform === 'darwin' ? 'hiddenInset' : 'default'
   })
-
-  win.once('ready-to-show', () => win.show())
-
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url)
-    return { action: 'deny' }
-  })
-
-  if (isDev && process.env.ELECTRON_RENDERER_URL) {
-    void win.loadURL(process.env.ELECTRON_RENDERER_URL)
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'))
-  }
-
-  return win
 }
 
 // Cached covers cannot be served over file:// under the renderer's CSP, so they get their own

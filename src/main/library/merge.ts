@@ -222,7 +222,7 @@ export function mergePreview(db: Db, ids: readonly number[]): MergePreview {
       : { field: fieldId, name: d.name, multi: false, conflict: false, value: first })
   }
 
-  for (const fieldId of [...MULTI_FIELDS]) {
+  for (const fieldId of MULTI_FIELDS) {
     const d = field(fieldId)
     const options = rows.map((r) => ({ from: r.id, value: sets.get(r.id)?.get(fieldId) ?? [] }))
     const union = [...new Set(options.flatMap((o) => o.value as string[]))]
@@ -319,7 +319,6 @@ export function mergeTracks(db: Db, req: MergeRequest): MergeResult {
   if (!ids.includes(req.survivor)) throw new Error('the survivor must be one of the merged tracks')
 
   const absorbed = ids.filter((id) => id !== req.survivor)
-  const ph = ids.map(() => '?').join(',')
   const absorbedPh = absorbed.map(() => '?').join(',')
 
   const preview = mergePreview(db, ids)

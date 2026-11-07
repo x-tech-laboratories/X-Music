@@ -1,93 +1,68 @@
-// gmb's VolumeIcon: a button that reveals a slider, rather than a slider taking up bar space
-// permanently. Scrolling the button adjusts volume without opening anything, which is how most
-// players behave and is the fastest path for small changes.
+// gmb's VolumeIcon: a button that reveals a slider in a popover; scrolling it adjusts the volume and a middle-click mutes.
 
-import { useEffect, useRef, useState } from 'preact/hooks'
-import { cx } from '../lib/cx'
+import { useEffect, useRef, useState } from 'react'
+import { Popover } from '@x-tech-laboratories/x-libs/web/react/menus'
 import s from './VolumeButton.module.css'
 
-export function VolumeButton({
-  volume = 80,
-  onchange
-}: { volume?: number; onchange?: (v: number) => void }) {
-  const [open, setOpen] = useState(false)
-  const wrapper = useRef<HTMLDivElement>(null)
-  /** Remembers the level before muting, so unmuting returns to it. */
-  const beforeMute = useRef(80)
+const STEP = 5
+
+export function VolumeButton({ volume = 80, onchange }: { volume?: number; onchange?: (volume: number) => void }) {
+  const [open, set_open] = useState(false)
+  const trigger = useRef<HTMLButtonElement>(null)
+  // The level before muting, so unmuting returns to it.
+  const before_mute = useRef(80)
+  // The click that closed the popover by landing on its button must not open it again.
+  const closed_at = useRef(0)
+  const latest_volume = useRef(volume)
+  latest_volume.current = volume
 
   const icon = volume === 0 ? '🔇' : volume < 34 ? '🔈' : volume < 67 ? '🔉' : '🔊'
 
-  function set(v: number): void {
-    onchange?.(Math.max(0, Math.min(100, Math.round(v))))
+  function set(next: number): void {
+    onchange?.(Math.max(0, Math.min(100, Math.round(next))))
   }
 
-  function onWheel(e: WheelEvent): void {
-    e.preventDefault()
-    set(volume + (e.deltaY < 0 ? 5 : -5))
-  }
-
-  function toggleMute(): void {
+  function toggle_mute(): void {
     if (volume > 0) {
-      beforeMute.current = volume
+      before_mute.current = volume
       set(0)
     } else {
-      set(beforeMute.current || 80)
+      set(before_mute.current || 80)
     }
   }
 
-  // The keys only act while the popover is open, so the listener exists only then.
+  // React's wheel listener is passive and cannot stop the page scrolling, so this one is attached by hand.
   useEffect(() => {
-    if (!open) return
-    const onKeydown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        setOpen(false)
-        return
-      }
-      if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { e.preventDefault(); set(volume + 5) }
-      if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { e.preventDefault(); set(volume - 5) }
+    const on_wheel = (event: WheelEvent): void => {
+      event.preventDefault()
+      set(latest_volume.current + (event.deltaY < 0 ? STEP : -STEP))
     }
-    window.addEventListener('keydown', onKeydown)
-    return () => window.removeEventListener('keydown', onKeydown)
-  }, [open, volume, onchange])
-
-  // Clicking anywhere else dismisses the popover, which is what makes it feel like a menu.
-  useEffect(() => {
-    if (!open) return
-    const onPointerDown = (e: PointerEvent): void => {
-      const el = wrapper.current
-      if (el && !el.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open])
+    const button = trigger.current!
+    button.addEventListener('wheel', on_wheel, { passive: false })
+    return () => button.removeEventListener('wheel', on_wheel)
+  })
 
   return (
-    <div class={s.wrap} ref={wrapper}>
+    <>
       <button
-        class={cx(s.trigger, open && s.open)}
+        ref={trigger}
+        className="icon"
         aria-label={`Volume ${volume}%`}
         aria-expanded={open}
         title={`Volume ${volume}% — scroll to adjust, middle-click to mute`}
-        onClick={() => setOpen(!open)}
-        onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); toggleMute() } }}
-        onWheel={onWheel}
+        onClick={() => { if (Date.now() - closed_at.current > 300) set_open(!open) }}
+        onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); toggle_mute() } }}
       >{icon}</button>
 
       {open && (
-        <div class={s.popover} role="group" aria-label="Volume">
-          <button class={s.mute} onClick={toggleMute} title={volume === 0 ? 'Unmute' : 'Mute'}>
-            {volume === 0 ? '🔇' : '🔊'}
-          </button>
-          <input
-            class={s.range}
-            type="range" min="0" max="100"
-            value={volume}
-            aria-label="Volume"
-            onInput={(e) => set(Number((e.currentTarget as HTMLInputElement).value))}
-          />
-          <span class={s.pct}>{volume}%</span>
-        </div>
+        <Popover anchor={trigger.current} label="Volume" on_close={() => { closed_at.current = Date.now(); set_open(false) }}>
+          <div className={s.volume}>
+            <button className="icon" onClick={toggle_mute} aria-label={volume === 0 ? 'Unmute' : 'Mute'}>{volume === 0 ? '🔇' : '🔊'}</button>
+            <input className={s.range} type="range" min="0" max="100" step={STEP} value={volume} aria-label="Volume" onChange={(event) => set(Number(event.currentTarget.value))} />
+            <span className={s.percent}>{volume}%</span>
+          </div>
+        </Popover>
       )}
-    </div>
+    </>
   )
 }

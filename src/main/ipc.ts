@@ -3,7 +3,11 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 
 import { BUILTIN_FIELDS } from '@shared/fields'
-import type { XMusicApi, Channel, GroupRow, TrackRow } from '@shared/ipc'
+import type { Implementation } from '@x-tech-laboratories/x-libs/electron/bridge'
+import {
+  x_music_bridge, x_music_events,
+  type XMusicApi, type XMusicEvents, type EventName, type FileResult, type GroupRow, type Root, type TrackRow
+} from '@shared/ipc'
 import { compileFilter, compileGroupBy } from './query/compile'
 import { stats, type DB } from './db'
 import { safetyStatus } from './safety'
@@ -19,9 +23,6 @@ import { logFromRenderer, logger } from './log'
 import { Player } from './play/player'
 import { MpvEngine, findMpv } from './play/mpv'
 import { NullEngine } from './play/engine'
-import {
-  EVENT_CHANNEL, type XMusicEvents, type EventName, type FileResult, type Root
-} from '@shared/ipc'
 
 // Album lives on the albums table and artist in track_values, so the row projection has to
 // resolve both rather than reading columns that no longer exist on tracks.
@@ -31,12 +32,10 @@ const TRACK_COLUMNS = `
   (SELECT vv.value FROM track_values tv JOIN values_ vv ON vv.id = tv.value_id
     WHERE tv.track_id = t.id AND tv.field_id = 1 ORDER BY tv.ordinal LIMIT 1) AS artist`
 
-type Handlers = { [C in Channel]: (...args: Parameters<XMusicApi[C]>) => ReturnType<XMusicApi[C]> }
+type Handlers = Implementation<XMusicApi>
 
 function emit<E extends EventName>(name: E, payload: XMusicEvents[E]): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send(EVENT_CHANNEL, { name, payload })
-  }
+  x_music_events.emit(BrowserWindow.getAllWindows(), name, payload)
 }
 
 export function registerIpc(db: DB): void {
@@ -175,44 +174,40 @@ export function registerIpc(db: DB): void {
       return { cancelled: scanning !== null }
     },
 
-    'library:scan': (() => {
-      // Declared async so the handler returns a promise to the renderer's invoke().
-      const run = async (): Promise<never> => {
-        if (scanning) throw new Error('a scan is already running')
+    'library:scan': async () => {
+      if (scanning) throw new Error('a scan is already running')
 
-        const roots = (db.prepare('SELECT path FROM roots WHERE enabled = 1').all() as
-          { path: string }[]).map((r) => r.path)
-        if (roots.length === 0) throw new Error('no music folders configured')
+      const roots = (db.prepare('SELECT path FROM roots WHERE enabled = 1').all() as
+        { path: string }[]).map((r) => r.path)
+      if (roots.length === 0) throw new Error('no music folders configured')
 
-        scanning = { aborted: false }
+      scanning = { aborted: false }
 
-        // One IPC message per file would flood the bridge; flush in batches instead.
-        let pending: FileResult[] = []
-        const flush = (): void => {
-          if (pending.length === 0) return
-          emit('scan:files', pending)
-          pending = []
-        }
-
-        try {
-          const report = await scanRoots(db as never, roots, {
-            signal: scanning,
-            onProgress: (p) => emit('scan:progress', p),
-            onFile: (r) => {
-              pending.push(r)
-              if (pending.length >= 40) flush()
-            }
-          })
-          flush()
-          db.prepare('UPDATE roots SET last_scan = ? WHERE enabled = 1').run(Date.now())
-          emit('scan:done', report)
-          return report as never
-        } finally {
-          scanning = null
-        }
+      // One IPC message per file would flood the bridge; flush in batches instead.
+      let pending: FileResult[] = []
+      const flush = (): void => {
+        if (pending.length === 0) return
+        emit('scan:files', pending)
+        pending = []
       }
-      return run as never
-    })(),
+
+      try {
+        const report = await scanRoots(db as never, roots, {
+          signal: scanning,
+          onProgress: (p) => emit('scan:progress', p),
+          onFile: (r) => {
+            pending.push(r)
+            if (pending.length >= 40) flush()
+          }
+        })
+        flush()
+        db.prepare('UPDATE roots SET last_scan = ? WHERE enabled = 1').run(Date.now())
+        emit('scan:done', report)
+        return report
+      } finally {
+        scanning = null
+      }
+    },
 
     'app:log': (record) => {
       logFromRenderer(record.level, record.scope, record.message, record.data)
@@ -223,7 +218,7 @@ export function registerIpc(db: DB): void {
 
     'tracks:details': (trackId) => trackDetails(db as never, trackId) as never,
 
-    'art:forTrack': (async (req: { trackId: number; size?: number }) => {
+    'art:forTrack': async (req) => {
       const options = { cacheDir: artCacheDir(), resize: resizeImage }
       const art = await resolveArtwork(db as never, req.trackId, options)
       const path = req.size ? thumbnail(options, art, req.size) : art.path
@@ -232,7 +227,7 @@ export function registerIpc(db: DB): void {
         url: path ? `x-music-art://local${encodeURI(path)}` : null,
         source: art.source
       }
-    }) as never,
+    },
 
     'art:rescan': () => ({ forgotten: forgetMisses(db as never) }),
 
@@ -283,7 +278,5 @@ export function registerIpc(db: DB): void {
     }
   }
 
-  for (const [channel, handler] of Object.entries(handlers)) {
-    ipcMain.handle(channel, (_event, ...args) => (handler as (...a: unknown[]) => unknown)(...args))
-  }
+  x_music_bridge.handle(ipcMain, handlers)
 }

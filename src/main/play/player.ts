@@ -122,11 +122,14 @@ export class Player {
   private settled = false
   private seed = 1
 
-  constructor(
-    private readonly db: Db,
-    private readonly engine: PlaybackEngine,
-    private readonly opts: PlayerOptions = {}
-  ) {
+  private readonly db: Db
+  private readonly engine: PlaybackEngine
+  private readonly opts: PlayerOptions
+
+  constructor(db: Db, engine: PlaybackEngine, opts: PlayerOptions = {}) {
+    this.db = db
+    this.engine = engine
+    this.opts = opts
     this.unsubscribe = engine.subscribe((event, payload) => {
       if (event === 'position') {
         const p = payload as PlayerEvents['position']

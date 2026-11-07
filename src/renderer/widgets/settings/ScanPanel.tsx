@@ -1,21 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 import { ipc } from '../../lib/ipc'
 import { cx } from '../../lib/cx'
 import type { FileOutcome, FileResult, Root, ScanProgress, ScanReport } from '@shared/ipc'
 import { library } from '../../stores/library'
-import { virtualWindow } from '@shared/view'
+import { Badge, type Tone } from '@x-tech-laboratories/x-libs/web/react/badges'
+import { virtual_window } from '@x-tech-laboratories/x-libs/web/virtual'
 import s from './ScanPanel.module.css'
 
 const ROW = 24
 
-const OUTCOMES: { id: FileOutcome; label: string }[] = [
-  { id: 'new', label: 'New' },
-  { id: 'matched', label: 'Matched' },
-  { id: 'moved', label: 'Moved' },
-  { id: 'unchanged', label: 'Unchanged' },
-  { id: 'missing', label: 'Missing' },
-  { id: 'error', label: 'Failed' }
+const OUTCOMES: { id: FileOutcome; label: string; tone: Tone }[] = [
+  { id: 'new', label: 'New', tone: 'good' },
+  { id: 'matched', label: 'Matched', tone: 'none' },
+  { id: 'moved', label: 'Moved', tone: 'info' },
+  { id: 'unchanged', label: 'Unchanged', tone: 'none' },
+  { id: 'missing', label: 'Missing', tone: 'warn' },
+  { id: 'error', label: 'Failed', tone: 'bad' }
 ]
+
+const tone_of = (outcome: FileOutcome): Tone => OUTCOMES.find((each) => each.id === outcome)?.tone ?? 'none'
 
 const short = (p: string | undefined): string =>
   p ? (p.length > 72 ? `…${p.slice(-71)}` : p) : ''
@@ -48,7 +51,7 @@ export function ScanPanel() {
     () => (filter === 'all' ? results : results.filter((r) => r.outcome === filter)),
     [results, filter]
   )
-  const win = virtualWindow(shown.length, ROW, scrollTop, viewport)
+  const win = virtual_window(shown.length, ROW, scrollTop, viewport)
   const slice = shown.slice(win.start, win.end)
 
   useEffect(() => {
@@ -129,50 +132,50 @@ export function ScanPanel() {
       ? Math.round((progress.processed / progress.found) * 100)
       : 0
 
-  const onScroll = (e: Event): void => {
-    const el = e.currentTarget as HTMLDivElement
+  const onScroll = (e: UIEvent<HTMLDivElement>): void => {
+    const el = e.currentTarget
     setScrollTop(el.scrollTop)
     // Scrolling up by hand means the user wants to read, not chase the tail.
     if (scanning && el.scrollTop + el.clientHeight < el.scrollHeight - 8) setFollow(false)
   }
 
   return (
-    <section class={s.scan}>
-      <header class={s.header}>
-        <h2 class={s.heading}>Music folders</h2>
-        <p class={s.lead}>
+    <section className={s.scan}>
+      <header className={s.header}>
+        <h3 className={s.heading}>Music folders</h3>
+        <p className={s.lead}>
           X-Music reads these folders to build the library. Files are only ever read, never modified.
         </p>
       </header>
 
       {roots.length ? (
-        <ul class={s.roots}>
+        <ul className={s.roots}>
           {roots.map((r) => (
             <li key={r.id}>
-              <code class={s.code}>{r.path}</code>
-              <span class={s.when}>
+              <code className={s.code}>{r.path}</code>
+              <span className={s.when}>
                 {r.lastScan ? `scanned ${new Date(r.lastScan).toLocaleString()}` : 'never scanned'}
               </span>
-              <button class={cx(s.button, s.remove)} onClick={() => remove(r.id)} disabled={scanning}>Remove</button>
+              <button className="danger" onClick={() => remove(r.id)} disabled={scanning}>Remove</button>
             </li>
           ))}
         </ul>
       ) : (
-        <p class={s.note}>No folders yet. Add one to scan, or import from gmusicbrowser instead.</p>
+        <p className={s.note}>No folders yet. Add one to scan, or import from gmusicbrowser instead.</p>
       )}
 
-      <div class={s.actions}>
-        <button class={s.button} onClick={add} disabled={scanning}>Add folder…</button>
-        <button class={cx(s.button, s.primary)} onClick={scan} disabled={scanning || roots.length === 0}>
+      <div className={s.actions}>
+        <button onClick={add} disabled={scanning}>Add folder…</button>
+        <button className="accent solid" onClick={scan} disabled={scanning || roots.length === 0}>
           {scanning ? 'Scanning…' : 'Scan now'}
         </button>
-        {scanning && <button class={s.button} onClick={cancel}>Cancel</button>}
+        {scanning && <button onClick={cancel}>Cancel</button>}
       </div>
 
       {progress && (
-        <div class={s.progress}>
-          <div class={s.bar}><div class={s.fill} style={{ width: `${pct}%` }}></div></div>
-          <div class={s.detail}>
+        <div className={s.progress}>
+          <div className={s.bar}><div className={s.fill} style={{ width: `${pct}%` }}></div></div>
+          <div className={s.detail}>
             {progress.phase === 'walking'
               ? `Finding files… ${progress.found.toLocaleString()}`
               : progress.phase === 'finishing'
@@ -183,34 +186,34 @@ export function ScanPanel() {
       )}
 
       {hasResults && (
-        <div class={s.results}>
-          <div class={s.filters}>
-            <button class={cx(s.button, filter === 'all' && s.sel)} onClick={() => setFilter('all')}>
-              All <span class={s.n}>{results.length.toLocaleString()}</span>
+        <div className={s.results}>
+          <div className={s.filters}>
+            <button aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
+              All <span className={s.n}>{results.length.toLocaleString()}</span>
             </button>
             {OUTCOMES.map((o) =>
               tally[o.id] ? (
-                <button key={o.id} class={cx(s.button, s[o.id], filter === o.id && s.sel)}
+                <button key={o.id} aria-pressed={filter === o.id}
                         onClick={() => setFilter(o.id)}>
-                  {o.label} <span class={s.n}>{tally[o.id]!.toLocaleString()}</span>
+                  {o.label} <span className={s.n}>{tally[o.id]!.toLocaleString()}</span>
                 </button>
               ) : null
             )}
-            <span class={s.grow}></span>
-            <label class={s.follow}>
+            <span className={s.grow}></span>
+            <label className={s.follow}>
               <input type="checkbox" checked={follow} disabled={!scanning}
                      onChange={(e) => setFollow((e.currentTarget as HTMLInputElement).checked)} /> Follow
             </label>
           </div>
 
-          <div class={s.body} ref={body} onScroll={onScroll}>
-            <div class={s.spacer} style={{ height: `${win.totalPx}px` }}>
-              <div class={s.rows} style={{ transform: `translateY(${win.offsetPx}px)` }}>
+          <div className={s.body} ref={body} onScroll={onScroll}>
+            <div className={s.spacer} style={{ height: `${win.total_px}px` }}>
+              <div className={s.rows} style={{ transform: `translateY(${win.offset_px}px)` }}>
                 {slice.map((r, i) => (
-                  <div key={win.start + i} class={s.row} style={{ height: `${ROW}px` }}>
-                    <span class={cx(s.badge, s[r.outcome])}>{r.outcome}</span>
-                    <span class={s.file} title={r.path}>{short(r.path)}</span>
-                    <span class={s.why}>{r.detail ?? ''}</span>
+                  <div key={win.start + i} className={s.row} style={{ height: `${ROW}px` }}>
+                    <Badge tone={tone_of(r.outcome)}>{r.outcome}</Badge>
+                    <span className={s.file} title={r.path}>{short(r.path)}</span>
+                    <span className={s.why}>{r.detail ?? ''}</span>
                   </div>
                 ))}
               </div>
@@ -219,10 +222,10 @@ export function ScanPanel() {
         </div>
       )}
 
-      {error && <p class={cx(s.note, s.err)}>{error}</p>}
+      {error && <p className={cx(s.note, s.err)}>{error}</p>}
 
       {report && (
-        <div class={s.report}>
+        <div className={s.report}>
           <p>
             Scanned <strong>{report.filesFound.toLocaleString()}</strong> files in{' '}
             {seconds(report.durationMs)} —{' '}
@@ -231,23 +234,23 @@ export function ScanPanel() {
             <strong>{report.filesSkipped.toLocaleString()}</strong> unchanged.
           </p>
           {report.movesDetected > 0 && (
-            <p class={s.note}>
+            <p className={s.note}>
               {report.movesDetected} moved or renamed file{report.movesDetected === 1 ? '' : 's'}{' '}
               recognised by audio content, keeping ratings and play history.
             </p>
           )}
           {report.markedMissing > 0 && (
-            <p class={cx(s.note, s.warn)}>
+            <p className={cx(s.note, s.warn)}>
               {report.markedMissing} file{report.markedMissing === 1 ? '' : 's'} no longer on disk.
               Flagged as missing; their tracks and statistics are kept.
             </p>
           )}
           {report.errors.length > 0 && (
             <>
-              <p class={cx(s.note, s.warn)}>{report.errors.length} file(s) could not be read:</p>
-              <ul class={s.errors}>
+              <p className={cx(s.note, s.warn)}>{report.errors.length} file(s) could not be read:</p>
+              <ul className={s.errors}>
                 {report.errors.slice(0, 5).map((e) => (
-                  <li key={e.path}><code class={s.code}>{short(e.path)}</code> — {e.message}</li>
+                  <li key={e.path}><code className={s.code}>{short(e.path)}</code> — {e.message}</li>
                 ))}
               </ul>
             </>

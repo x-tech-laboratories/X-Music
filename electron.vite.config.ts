@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
-import preact from '@preact/preset-vite'
+import react from '@vitejs/plugin-react'
 
 const shared = resolve('src/shared')
 
@@ -17,7 +17,7 @@ export default defineConfig({
   },
   renderer: {
     root: resolve('src/renderer'),
-    plugins: [preact()],
+    plugins: [react()],
     resolve: {
       alias: { '@shared': shared, '@renderer': resolve('src/renderer') }
     },

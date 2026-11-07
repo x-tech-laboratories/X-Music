@@ -6,11 +6,6 @@ import { freshDb, type TestDb } from '../helpers/sqlite'
 
 let db: TestDb
 
-const newTrack = (title: string): number => {
-  db.prepare('INSERT INTO tracks (title, added, modified) VALUES (?, 0, 0)').run(title)
-  return db.prepare('SELECT last_insert_rowid() AS id').get() as never as number
-}
-
 const lastId = (): number =>
   (db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id
 

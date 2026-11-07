@@ -10,10 +10,16 @@ import { resolve, sep } from 'node:path'
 
 export type WriteOperation =
   | 'tag-write' | 'file-rename' | 'file-move' | 'file-delete' | 'artwork-embed' | 'playlist-write'
+  | 'window-state'
 
 export class ReadOnlyError extends Error {
-  constructor(readonly operation: WriteOperation, readonly path: string) {
+  readonly operation: WriteOperation
+  readonly path: string
+
+  constructor(operation: WriteOperation, path: string) {
     super(`refused ${operation} on ${path}: X-Music is in read-only mode`)
+    this.operation = operation
+    this.path = path
     this.name = 'ReadOnlyError'
   }
 }

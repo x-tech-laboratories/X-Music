@@ -69,8 +69,8 @@ function evalSet(t: IndexedTrack, d: FieldDescriptor, node: LeafNode): boolean {
   const want = (Array.isArray(node.value) ? node.value : [node.value]) as string[]
 
   switch (node.op) {
-    case 'any':     return want.length > 0 && want.some((v) => have.includes(v))
-    case 'all':     return want.length === 0 || want.every((v) => have.includes(v))
+    case 'any':     return want.some((v) => have.includes(v))
+    case 'all':     return want.every((v) => have.includes(v))
     case 'none':    return want.length === 0 || !want.some((v) => have.includes(v))
     case 'count':   return have.length === Number(node.value)
     case 'empty':   return have.length === 0
