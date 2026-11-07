@@ -10,6 +10,7 @@ import { resolve, sep } from 'node:path'
 
 export type WriteOperation =
   | 'tag-write' | 'file-rename' | 'file-move' | 'file-delete' | 'artwork-embed' | 'playlist-write'
+  | 'window-state'
 
 export class ReadOnlyError extends Error {
   readonly operation: WriteOperation

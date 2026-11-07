@@ -121,7 +121,8 @@ Three execution contexts, and the split is not optional:
   not an optimization: a blocked main thread stalls playback *control* and the UI simultaneously.
 - **Renderer** — presentation. No Node integration, `contextIsolation` on, and a strict CSP.
 
-IPC is `contextBridge` over the contract in `src/shared/ipc.ts`. Because both sides import the same
+IPC is `contextBridge` over the contract in `src/shared/ipc.ts`, built by the X-Libs `define_bridge` and
+`define_events` from one method table. Because both sides import the same
 module, the boundary is typechecked end to end with no codegen step.
 
 **One hazard is worth writing down, because it cost a wrong fix.** `contextBridge` clones

@@ -1,11 +1,11 @@
-import type { XMusicApi, XMusicEvents, Channel, EventName } from '../shared/ipc'
+import type { Client } from '@x-tech-laboratories/x-libs/electron/bridge'
+import type { EventsClient } from '@x-tech-laboratories/x-libs/electron/events'
+import type { XMusicApi, XMusicEvents } from '../shared/ipc'
 
 declare global {
   interface Window {
-    xMusic: { [C in Channel]: (...args: Parameters<XMusicApi[C]>) => Promise<ReturnType<XMusicApi[C]>> }
-    xMusicEvents: {
-      on<E extends EventName>(name: E, handler: (payload: XMusicEvents[E]) => void): () => void
-    }
+    xMusic: Client<XMusicApi>
+    xMusicEvents: EventsClient<XMusicEvents>
   }
 }
 
