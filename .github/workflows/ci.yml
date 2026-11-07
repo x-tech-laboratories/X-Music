@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  ci:
+  test:
     runs-on: ubuntu-latest
     env:
       # Tests use node:sqlite, so neither Electron nor the native module rebuild is needed.
