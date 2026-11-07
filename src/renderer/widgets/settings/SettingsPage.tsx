@@ -1,9 +1,10 @@
-import { useState } from 'preact/hooks'
+import { useState } from 'react'
 import { ipc } from '../../lib/ipc'
 import { cx } from '../../lib/cx'
 import { Page } from '../../lib/Page'
 import type { AppInfo, SafetyStatus } from '@shared/ipc'
 import { library } from '../../stores/library'
+import { use_watch } from '../../lib/watch'
 import { GmbImport } from './GmbImport'
 import { ScanPanel } from './ScanPanel'
 import { DuplicatesPanel } from './DuplicatesPanel'
@@ -45,6 +46,7 @@ export function SettingsPage({
   onTheme?: (t: 'light' | 'dark' | 'system') => void
   onDensity?: (d: 'compact' | 'normal' | 'comfortable') => void
 }) {
+  use_watch(library.data)
   // The prop only chooses where to open; the nav owns the value from then on.
   const [section, setSection] = useState<Section>(initialSection)
   const [clearing, setClearing] = useState(false)
@@ -60,7 +62,7 @@ export function SettingsPage({
   }
 
   const nav = sections.map((sec) => (
-    <button key={sec.id} class={cx(s.navButton, section === sec.id && s.active)}
+    <button key={sec.id} className={cx(s.navButton, section === sec.id && s.active)}
             onClick={() => setSection(sec.id)}>{sec.label}</button>
   ))
 
@@ -69,16 +71,16 @@ export function SettingsPage({
   return (
     <Page title="Settings" onclose={onclose} nav={nav}>
       {section === 'library' ? (
-        <section class={s.section}>
-          <h2 class={s.heading}>Library</h2>
+        <section className={s.section}>
+          <h2 className={s.heading}>Library</h2>
 
-          <div class={s.field}>
-            <span class={s.label}>Database</span>
-            <code class={s.code}>{stats?.path ?? '—'}</code>
+          <div className={s.field}>
+            <span className={s.label}>Database</span>
+            <code className={s.code}>{stats?.path ?? '—'}</code>
           </div>
 
-          <div class={s.field}>
-            <span class={s.label}>Contents</span>
+          <div className={s.field}>
+            <span className={s.label}>Contents</span>
             <span>
               {stats ? (
                 <>
@@ -92,19 +94,19 @@ export function SettingsPage({
             </span>
           </div>
 
-          <div class={s.field}>
-            <span class={s.label}>File safety</span>
+          <div className={s.field}>
+            <span className={s.label}>File safety</span>
             <span>
               {safety ? (
                 <>
-                  <strong class={cx(safety.readOnly && s.ok)}>{safety.readOnly ? 'Read-only' : 'Writes enabled'}</strong>
-                  <span class={s.hint}>{safety.reason}</span>
+                  <strong className={cx(safety.readOnly && s.ok)}>{safety.readOnly ? 'Read-only' : 'Writes enabled'}</strong>
+                  <span className={s.hint}>{safety.reason}</span>
                   {safety.pinned ? (
-                    <span class={s.hint}>
-                      Pinned by the environment. Unset <code class={s.code}>X_MUSIC_FORCE_READ_ONLY</code> to change it.
+                    <span className={s.hint}>
+                      Pinned by the environment. Unset <code className={s.code}>X_MUSIC_FORCE_READ_ONLY</code> to change it.
                     </span>
                   ) : (
-                    <span class={s.hint}>
+                    <span className={s.hint}>
                       X-Music cannot write tags yet, so this is a guarantee rather than a preference.
                     </span>
                   )}
@@ -113,13 +115,13 @@ export function SettingsPage({
             </span>
           </div>
 
-          <div class={s.field}>
-            <span class={s.label}>Danger zone</span>
+          <div className={s.field}>
+            <span className={s.label}>Danger zone</span>
             <span>
-              <button class={s.danger} disabled={clearing} onClick={clearLibrary}>
+              <button className={s.danger} disabled={clearing} onClick={clearLibrary}>
                 {clearing ? 'Clearing…' : 'Clear library database'}
               </button>
-              <span class={s.hint}>Removes every track, playlist and statistic. Files are untouched.</span>
+              <span className={s.hint}>Removes every track, playlist and statistic. Files are untouched.</span>
             </span>
           </div>
         </section>
@@ -130,50 +132,50 @@ export function SettingsPage({
       ) : section === 'duplicates' ? (
         <DuplicatesPanel />
       ) : section === 'appearance' ? (
-        <section class={s.section}>
-          <h2 class={s.heading}>Appearance</h2>
+        <section className={s.section}>
+          <h2 className={s.heading}>Appearance</h2>
 
-          <div class={s.field}>
-            <span class={s.label}>Theme</span>
-            <div class={s.choices}>
+          <div className={s.field}>
+            <span className={s.label}>Theme</span>
+            <div className={s.choices}>
               {(['system', 'light', 'dark'] as const).map((t) => (
-                <button key={t} class={cx(s.choice, theme === t && s.sel)} onClick={() => onTheme?.(t)}>{t}</button>
+                <button key={t} className={cx(s.choice, theme === t && s.sel)} onClick={() => onTheme?.(t)}>{t}</button>
               ))}
             </div>
           </div>
 
-          <div class={s.field}>
-            <span class={s.label}>Density</span>
-            <div class={s.choices}>
+          <div className={s.field}>
+            <span className={s.label}>Density</span>
+            <div className={s.choices}>
               {(['compact', 'normal', 'comfortable'] as const).map((d) => (
-                <button key={d} class={cx(s.choice, density === d && s.sel)} onClick={() => onDensity?.(d)}>{d}</button>
+                <button key={d} className={cx(s.choice, density === d && s.sel)} onClick={() => onDensity?.(d)}>{d}</button>
               ))}
             </div>
           </div>
 
-          <p class={s.hint}>
+          <p className={s.hint}>
             Colours come from the Halon token set; density maps onto the row-height scale, so both
             apply everywhere without a component knowing about them.
           </p>
         </section>
       ) : (
-        <section class={s.section}>
-          <h2 class={s.heading}>About</h2>
-          <div class={s.field}>
-            <span class={s.label}>X-Music</span>
+        <section className={s.section}>
+          <h2 className={s.heading}>About</h2>
+          <div className={s.field}>
+            <span className={s.label}>X-Music</span>
             <span>{info?.version ?? '—'}</span>
           </div>
-          <div class={s.field}>
-            <span class={s.label}>Runtime</span>
+          <div className={s.field}>
+            <span className={s.label}>Runtime</span>
             <span>
               {info
                 ? `Electron ${info.electron} · Chromium ${info.chrome} · Node ${info.node} · ${info.platform}`
                 : '—'}
             </span>
           </div>
-          <div class={s.field}>
-            <span class={s.label}>Last query</span>
-            <code class={cx(s.code, s.sql)}>{library.lastSql || '—'}</code>
+          <div className={s.field}>
+            <span className={s.label}>Last query</span>
+            <code className={cx(s.code, s.sql)}>{library.lastSql || '—'}</code>
           </div>
         </section>
       )}

@@ -47,7 +47,7 @@ X-Music keeps the model and replaces the substrate:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Renderer (Chromium)  —  TypeScript · Preact + signals · Vite       │
+│  Renderer (Chromium)  —  TypeScript · React · Vite                  │
 │  Deliberately thin: it maps state to pixels and nothing else.       │
 │                                                                     │
 │  ┌───────────────┐  ┌──────────────┐  ┌────────────────────────┐    │
@@ -96,20 +96,17 @@ The honest cost: ~150 MB install and ~350–500 MB resident for an app people le
 core (worst packaging story, and the UI is TypeScript regardless, so it buys two languages for one
 benefit), pure web/PWA (no tag writing, no gapless, no filesystem watch).
 
-### 2.2 Renderer: TypeScript + Preact + signals + Vite
+### 2.2 Renderer: TypeScript + React + Vite
 
-Preact because it is the React programming model — JSX, function components, hooks — which is the
-most widely known way to write a web UI, in a 4 KB runtime. `@preact/signals` carries the view-model
-stores: a component that reads a signal during render subscribes to it, and only that component
-re-renders when it changes. That keeps the two hot paths — the song list and the playback position
-tick — from re-rendering the tree above them. The song list's rows are memoized, so a selection
-change re-renders the rows whose state changed rather than every row.
+React 19, as the X-Tech Application Standard sets for every app, so X-Music shares its widgets with
+the other X-apps. The view-model stores are plain classes that bump a change counter, and a component
+watches one through `useSyncExternalStore`, so only the components that read a store re-render when
+it changes. That keeps the two hot paths — the song list and the playback position tick — from
+re-rendering the tree above them: the position has its own counter, which only the time bar watches.
 
 Styles are CSS Modules: each component has a `Foo.module.css` beside it, with class names scoped at
 build time. Element selectors are not scoped by CSS Modules, so component stylesheets select on
 classes only.
-
-`preact/compat` makes most React libraries usable, including `dnd-kit` for the M7 layout editor.
 
 **This choice is deliberately made cheap to reverse.** See §2.4: everything that is expensive to
 rewrite lives outside the renderer.
@@ -1628,7 +1625,7 @@ visualizer library, multi-library support.
 | **Audio content hash for file identity; AcoustID as a hint only** (§3.5) | None. AcoustID's many-to-many mapping to recordings rules it out as a key regardless of collision rate. |
 | **Two-valued filter logic** (§13.1) | User reports that "not X" excluding unknowns is expected; unlikely |
 | **50k target, and no in-memory index** (§3.5.3, §12) | A real library misses a §12 budget. The trigger is a measurement, not a hunch; `evaluate.ts` already exists to be fed by an index. |
-| Preact + signals over Svelte and React | A needed React library fails under `preact/compat`, or signals stop keeping the hot paths local. Cheap by construction (§2.4). |
+| React, per the X-Tech Application Standard | The standard changes its UI framework. Cheap by construction (§2.4). |
 | libmpv default engine | Packaging friction on Windows/macOS → promote a Web Audio or native fallback |
 | `node-taglib-sharp` for tags | Golden-file failures it cannot fix → swap the `TagIO` implementation for a mutagen sidecar (Appendix A.5) |
 | JSON layouts, not a DSL | Users find JSON hostile → add a friendlier surface *above* JSON, never replace it |

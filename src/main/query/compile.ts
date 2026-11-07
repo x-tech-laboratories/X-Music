@@ -23,7 +23,11 @@ const MS: Record<RelativeDate['unit'], number> = {
 class Compiler {
   readonly params: unknown[] = []
 
-  constructor(readonly now: number) {}
+  readonly now: number
+
+  constructor(now: number) {
+    this.now = now
+  }
 
   private p(v: unknown): string {
     this.params.push(v)
@@ -168,7 +172,7 @@ class Compiler {
   }
 }
 
-function orderBy(sort: readonly SortKey[] | undefined, c: Compiler): string {
+function orderBy(sort: readonly SortKey[] | undefined): string {
   if (!sort?.length) return ''
   const keys = sort.map((k) => {
     if (k.field === 'random') return 'RANDOM()'
@@ -196,7 +200,7 @@ export function compileFilter(
   const select = opts.select ?? 't.id'
 
   let sql = `SELECT ${select} FROM tracks t WHERE ${where}`
-  sql += orderBy(opts.sort, c)
+  sql += orderBy(opts.sort)
 
   if (opts.limit && (opts.limit.by ?? 'tracks') === 'tracks') {
     sql += ` LIMIT ${c.params.push(opts.limit.count) && '?'}`

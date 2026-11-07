@@ -2,7 +2,7 @@
 // permanently. Scrolling the button adjusts volume without opening anything, which is how most
 // players behave and is the fastest path for small changes.
 
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useRef, useState } from 'react'
 import { cx } from '../lib/cx'
 import s from './VolumeButton.module.css'
 
@@ -21,10 +21,19 @@ export function VolumeButton({
     onchange?.(Math.max(0, Math.min(100, Math.round(v))))
   }
 
-  function onWheel(e: WheelEvent): void {
-    e.preventDefault()
-    set(volume + (e.deltaY < 0 ? 5 : -5))
-  }
+  // React's wheel listener is passive and cannot stop the page scrolling, so this one is attached by hand.
+  const trigger = useRef<HTMLButtonElement>(null)
+  const latestVolume = useRef(volume)
+  latestVolume.current = volume
+  useEffect(() => {
+    const onWheel = (e: WheelEvent): void => {
+      e.preventDefault()
+      set(latestVolume.current + (e.deltaY < 0 ? 5 : -5))
+    }
+    const el = trigger.current!
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  })
 
   function toggleMute(): void {
     if (volume > 0) {
@@ -62,30 +71,30 @@ export function VolumeButton({
   }, [open])
 
   return (
-    <div class={s.wrap} ref={wrapper}>
+    <div className={s.wrap} ref={wrapper}>
       <button
-        class={cx(s.trigger, open && s.open)}
+        ref={trigger}
+        className={cx(s.trigger, open && s.open)}
         aria-label={`Volume ${volume}%`}
         aria-expanded={open}
         title={`Volume ${volume}% — scroll to adjust, middle-click to mute`}
         onClick={() => setOpen(!open)}
         onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); toggleMute() } }}
-        onWheel={onWheel}
       >{icon}</button>
 
       {open && (
-        <div class={s.popover} role="group" aria-label="Volume">
-          <button class={s.mute} onClick={toggleMute} title={volume === 0 ? 'Unmute' : 'Mute'}>
+        <div className={s.popover} role="group" aria-label="Volume">
+          <button className={s.mute} onClick={toggleMute} title={volume === 0 ? 'Unmute' : 'Mute'}>
             {volume === 0 ? '🔇' : '🔊'}
           </button>
           <input
-            class={s.range}
+            className={s.range}
             type="range" min="0" max="100"
             value={volume}
             aria-label="Volume"
-            onInput={(e) => set(Number((e.currentTarget as HTMLInputElement).value))}
+            onChange={(e) => set(Number((e.currentTarget as HTMLInputElement).value))}
           />
-          <span class={s.pct}>{volume}%</span>
+          <span className={s.pct}>{volume}%</span>
         </div>
       )}
     </div>

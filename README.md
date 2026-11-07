@@ -70,6 +70,7 @@ otherwise makes Electron run as bare node and die on the ESM entry point.
 | `npm run test:watch` | Watch mode |
 | `npm run bench` | Performance budget benchmarks |
 | `npm run typecheck` | `tsc` for main/preload and for the renderer |
+| `npm run lint` | `oxlint` |
 | `npm run theme` | Regenerate `themes/halon/halon.css` from `tokens.json` |
 | `npm run app` | Build if needed and launch, read-only |
 | `npm run rebuild:electron` | Rebuild `better-sqlite3` against Electron's ABI |

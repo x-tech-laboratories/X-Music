@@ -2,13 +2,18 @@
 // interpolates the position between ticks so the seek bar moves smoothly without a 60 Hz IPC feed.
 
 import type { PlayerStatus, RepeatMode } from '@shared/ipc'
-import { signal } from '@preact/signals'
 import { ipc } from '../lib/ipc'
+import { create_watch } from '../lib/watch'
 
 class PlayerStore {
-  private readonly statusSig = signal<PlayerStatus | null>(null)
-  /** Interpolated locally between position events. */
-  private readonly positionSig = signal(0)
+  // Bumped when the status changes.
+  readonly status_changes = create_watch()
+  // Bumped on every clock tick, which only the time bar watches.
+  readonly position_changes = create_watch()
+
+  private statusValue: PlayerStatus | null = null
+  // Interpolated locally between position events.
+  private positionValue = 0
   private lastTickAt = 0
   private timer: ReturnType<typeof setInterval> | null = null
 
@@ -25,7 +30,7 @@ class PlayerStore {
       this.positionMs = p.positionMs
       this.lastTickAt = performance.now()
       // Replacing status re-renders everything that reads it, so only do it when the duration moved.
-      const s = this.statusSig.peek()
+      const s = this.statusValue
       if (s && p.durationMs !== null && p.durationMs !== s.durationMs) {
         this.status = { ...s, durationMs: p.durationMs }
       }
@@ -33,9 +38,9 @@ class PlayerStore {
 
     // Between ticks, advance the clock locally rather than asking the main process every frame.
     this.timer = setInterval(() => {
-      if (this.statusSig.peek()?.state !== 'playing') return
+      if (this.statusValue?.state !== 'playing') return
       const elapsed = performance.now() - this.lastTickAt
-      if (elapsed > 0 && elapsed < 2000) this.positionMs = this.positionSig.peek() + elapsed
+      if (elapsed > 0 && elapsed < 2000) this.positionMs = this.positionValue + elapsed
       this.lastTickAt = performance.now()
     }, 250)
 
@@ -75,10 +80,10 @@ class PlayerStore {
   async setRepeat(mode: RepeatMode): Promise<void> { this.apply(await ipc('player:repeat', mode)) }
   async setShuffle(on: boolean): Promise<void> { this.apply(await ipc('player:shuffle', on)) }
 
-  get status(): PlayerStatus | null { return this.statusSig.value }
-  set status(s: PlayerStatus | null) { this.statusSig.value = s }
-  get positionMs(): number { return this.positionSig.value }
-  set positionMs(ms: number) { this.positionSig.value = ms }
+  get status(): PlayerStatus | null { return this.statusValue }
+  set status(s: PlayerStatus | null) { this.statusValue = s; this.status_changes.bump() }
+  get positionMs(): number { return this.positionValue }
+  set positionMs(ms: number) { this.positionValue = ms; this.position_changes.bump() }
 
   get playing(): boolean { return this.status?.state === 'playing' }
   get currentId(): number | null { return this.status?.track?.id ?? null }

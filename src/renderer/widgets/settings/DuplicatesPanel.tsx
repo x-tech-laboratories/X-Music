@@ -1,10 +1,10 @@
-import { useState } from 'preact/hooks'
+import { useState } from 'react'
 import { ipc } from '../../lib/ipc'
 import { cx } from '../../lib/cx'
 import type { DuplicateGroup, DuplicateReason, MergeResult } from '@shared/ipc'
 import { MergeView } from '../MergeView'
 import { library } from '../../stores/library'
-import { usePref } from '../../lib/prefs'
+import { use_pref } from '../../lib/prefs'
 import { isNumberIn } from '@shared/prefs'
 import s from './DuplicatesPanel.module.css'
 
@@ -29,15 +29,15 @@ export function DuplicatesPanel() {
   const [ran, setRan] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [merging, setMerging] = useState<number[] | null>(null)
-  const tolerance = usePref('duplicates.toleranceSeconds', 3, isNumberIn(0, 60))
+  const [tolerance, setTolerance] = use_pref('duplicates.toleranceSeconds', 3, isNumberIn(0, 60))
 
   // Fuzzy is off by default: on a real library it proposes far more than anyone can review.
-  const enabled = usePref<Record<DuplicateReason, boolean>>('duplicates.reasons', {
+  const [enabled, setEnabled] = use_pref<Record<DuplicateReason, boolean>>('duplicates.reasons', {
     audio_hash: true, mb_recording_id: true, tags: true, fuzzy: false
   })
 
   function toggleReason(id: DuplicateReason): void {
-    enabled.value = { ...enabled.value, [id]: !enabled.value[id] }
+    setEnabled({ ...enabled, [id]: !enabled[id] })
   }
 
   // Per-group outcome, so a quick merge reports in place rather than reshuffling the list.
@@ -90,8 +90,8 @@ export function DuplicatesPanel() {
     setError(null)
     try {
       setGroups(await ipc('tracks:duplicates', {
-        reasons: REASONS.map((r) => r.id).filter((r) => enabled.value[r]),
-        lengthToleranceMs: tolerance.value * 1000,
+        reasons: REASONS.map((r) => r.id).filter((r) => enabled[r]),
+        lengthToleranceMs: tolerance * 1000,
         limit: MAX_SHOWN
       }))
       setRan(true)
@@ -106,102 +106,102 @@ export function DuplicatesPanel() {
 
   return (
     <>
-      <section class={s.dupes}>
-        <header class={s.header}>
-          <h2 class={s.heading}>Find duplicates</h2>
-          <p class={s.lead}>
+      <section className={s.dupes}>
+        <header className={s.header}>
+          <h2 className={s.heading}>Find duplicates</h2>
+          <p className={s.lead}>
             X-Music never merges automatically. This proposes groups with its reasoning; you decide.
           </p>
         </header>
 
-        <div class={s.opts}>
+        <div className={s.opts}>
           {REASONS.map((r) => (
-            <label key={r.id} class={s.label} title={r.hint}>
-              <input type="checkbox" checked={enabled.value[r.id]} onChange={() => toggleReason(r.id)} />
+            <label key={r.id} className={s.label} title={r.hint}>
+              <input type="checkbox" checked={enabled[r.id]} onChange={() => toggleReason(r.id)} />
               {r.label}
-              {r.id === 'fuzzy' && <span class={s.warnish}>noisy</span>}
+              {r.id === 'fuzzy' && <span className={s.warnish}>noisy</span>}
             </label>
           ))}
-          <label class={cx(s.label, s.tol)}>
+          <label className={cx(s.label, s.tol)}>
             Length tolerance
-            <input type="number" min="0" max="60" value={tolerance.value}
-                   onInput={(e) => {
+            <input type="number" min="0" max="60" value={tolerance}
+                   onChange={(e) => {
                      const v = (e.currentTarget as HTMLInputElement).value
-                     if (v !== '') tolerance.value = +v
+                     if (v !== '') setTolerance(+v)
                    }} /> s
           </label>
         </div>
 
-        <div class={s.actions}>
-          <button class={cx(s.button, s.primary)} onClick={find} disabled={busy}>
+        <div className={s.actions}>
+          <button className={cx(s.button, s.primary)} onClick={find} disabled={busy}>
             {busy ? 'Searching…' : 'Find duplicates'}
           </button>
           {ran && !busy && (
-            <span class={s.hint}>
+            <span className={s.hint}>
               {groups.length} group{groups.length === 1 ? '' : 's'} · {total} tracks
               {groups.length >= MAX_SHOWN && <> (showing the first {MAX_SHOWN})</>}
             </span>
           )}
         </div>
 
-        {error && <p class={cx(s.note, s.err)}>{error}</p>}
+        {error && <p className={cx(s.note, s.err)}>{error}</p>}
 
         {ran && groups.length === 0 && !busy && (
-          <p class={s.note}>No duplicates found with these settings.</p>
+          <p className={s.note}>No duplicates found with these settings.</p>
         )}
 
-        <div class={s.groups}>
+        <div className={s.groups}>
           {groups.map((g) => (
-            <article key={g.key} class={cx(s.group, s[g.confidence], done[g.key] && s.merged)}>
-              <div class={s.ghead}>
-                <span class={cx(s.conf, s[g.confidence])}>{g.confidence}</span>
-                <span class={s.why}>
+            <article key={g.key} className={cx(s.group, s[g.confidence], done[g.key] && s.merged)}>
+              <div className={s.ghead}>
+                <span className={cx(s.conf, s[g.confidence])}>{g.confidence}</span>
+                <span className={s.why}>
                   {done[g.key] ? (
                     `Merged into one track holding ${done[g.key]!.mediaMoved + 1} files.`
                   ) : groupError[g.key] ? (
-                    <span class={s.gerr}>{groupError[g.key]}</span>
+                    <span className={s.gerr}>{groupError[g.key]}</span>
                   ) : (
                     g.explanation
                   )}
                 </span>
 
                 {done[g.key] ? (
-                  <button class={cx(s.button, s.undo)} disabled={working[g.key]} onClick={() => undoGroup(g.key)}>
+                  <button className={cx(s.button, s.undo)} disabled={working[g.key]} onClick={() => undoGroup(g.key)}>
                     {working[g.key] ? 'Undoing…' : 'Undo'}
                   </button>
                 ) : (
-                  <div class={s.gactions}>
+                  <div className={s.gactions}>
                     <button
-                      class={cx(s.button, s.quick)}
+                      className={cx(s.button, s.quick)}
                       disabled={working[g.key]}
                       title={'Merge now using the defaults: richest source survives, genres and labels are\ncombined, plays and ratings are combined. Undoable.'}
                       onClick={() => quickMerge(g)}
                     >{working[g.key] ? 'Merging…' : 'Quick merge'}</button>
-                    <button class={cx(s.button, s.merge)} onClick={() => setMerging(g.members.map((m) => m.trackId))}>
+                    <button className={cx(s.button, s.merge)} onClick={() => setMerging(g.members.map((m) => m.trackId))}>
                       Review
                     </button>
                   </div>
                 )}
               </div>
-              <table class={s.table}>
+              <table className={s.table}>
                 <thead>
                   <tr>
-                    <th class={s.th}>Title</th><th class={s.th}>Artist</th><th class={s.th}>Album</th>
-                    <th class={cx(s.th, s.num)}>Length</th><th class={cx(s.th, s.num)}>Rating</th>
-                    <th class={cx(s.th, s.num)}>Plays</th><th class={cx(s.th, s.num)}>Files</th><th class={s.th}>Formats</th>
+                    <th className={s.th}>Title</th><th className={s.th}>Artist</th><th className={s.th}>Album</th>
+                    <th className={cx(s.th, s.num)}>Length</th><th className={cx(s.th, s.num)}>Rating</th>
+                    <th className={cx(s.th, s.num)}>Plays</th><th className={cx(s.th, s.num)}>Files</th><th className={s.th}>Formats</th>
                   </tr>
                 </thead>
-                <tbody class={s.tbody}>
+                <tbody className={s.tbody}>
                   {g.members.map((m) => (
                     <tr key={m.trackId}>
-                      <td class={s.td}>{m.title ?? '—'}</td>
-                      <td class={s.td}>{m.artist ?? '—'}</td>
-                      <td class={s.td}>{m.album ?? '—'}</td>
-                      <td class={cx(s.td, s.num)}>{mmss(m.lengthMs)}</td>
-                      <td class={cx(s.td, s.num)}>{m.rating ?? '—'}</td>
-                      <td class={cx(s.td, s.num)}>{m.playCount}</td>
-                      <td class={cx(s.td, s.num)}>{m.mediaCount}</td>
-                      <td class={s.td}>{m.codecs ?? '—'}</td>
+                      <td className={s.td}>{m.title ?? '—'}</td>
+                      <td className={s.td}>{m.artist ?? '—'}</td>
+                      <td className={s.td}>{m.album ?? '—'}</td>
+                      <td className={cx(s.td, s.num)}>{mmss(m.lengthMs)}</td>
+                      <td className={cx(s.td, s.num)}>{m.rating ?? '—'}</td>
+                      <td className={cx(s.td, s.num)}>{m.playCount}</td>
+                      <td className={cx(s.td, s.num)}>{m.mediaCount}</td>
+                      <td className={s.td}>{m.codecs ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>

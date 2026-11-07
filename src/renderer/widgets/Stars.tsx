@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks'
+import { useState } from 'react'
 import { ratingToStars, starsToRating } from '@shared/fields'
 import { cx } from '../lib/cx'
 import s from './Stars.module.css'
@@ -13,7 +13,7 @@ export function Stars({
 
   return (
     <div
-      class={s.stars}
+      className={s.stars}
       role="slider"
       tabIndex={0}
       aria-label="Rating"
@@ -25,7 +25,7 @@ export function Stars({
       {[1, 2, 3, 4, 5].map((n) => (
         <button
           key={n}
-          class={cx(s.star, n <= stars && s.on)}
+          className={cx(s.star, n <= stars && s.on)}
           onMouseEnter={() => setHover(n)}
           onClick={() => onchange?.(starsToRating(n))}
           aria-label={`${n} star${n === 1 ? '' : 's'}`}

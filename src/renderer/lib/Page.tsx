@@ -4,8 +4,8 @@
 // missing way out. So the exit is structural here rather than left to each caller: a persistent
 // close control in the header, and Escape.
 
-import type { ComponentChildren } from 'preact'
-import { useEffect } from 'preact/hooks'
+import type { ReactNode } from 'react'
+import { useEffect } from 'react'
 import { cx } from './cx'
 import s from './Page.module.css'
 
@@ -21,10 +21,10 @@ export function Page({
   subtitle?: string
   onclose?: () => void
   /** Buttons for the header's right side. */
-  actions?: ComponentChildren
+  actions?: ReactNode
   /** Optional left-hand navigation column. */
-  nav?: ComponentChildren
-  children: ComponentChildren
+  nav?: ReactNode
+  children: ReactNode
 }) {
   useEffect(() => {
     const onKeydown = (e: KeyboardEvent): void => {
@@ -35,22 +35,22 @@ export function Page({
   }, [onclose])
 
   return (
-    <div class={s.page} role="dialog" aria-modal="true" aria-label={title}>
-      <header class={s.header}>
-        <div class={s.titles}>
-          <h1 class={s.title}>{title}</h1>
-          {subtitle && <p class={s.subtitle}>{subtitle}</p>}
+    <div className={s.page} role="dialog" aria-modal="true" aria-label={title}>
+      <header className={s.header}>
+        <div className={s.titles}>
+          <h1 className={s.title}>{title}</h1>
+          {subtitle && <p className={s.subtitle}>{subtitle}</p>}
         </div>
 
-        <div class={s.actions}>
+        <div className={s.actions}>
           {actions}
-          <button class={s.close} onClick={onclose} title="Close (Esc)">Close</button>
+          <button className={s.close} onClick={onclose} title="Close (Esc)">Close</button>
         </div>
       </header>
 
-      <div class={cx(s.body, nav != null && s.withNav)}>
-        {nav != null && <nav class={s.nav}>{nav}</nav>}
-        <main class={s.main}>{children}</main>
+      <div className={cx(s.body, nav != null && s.withNav)}>
+        {nav != null && <nav className={s.nav}>{nav}</nav>}
+        <main className={s.main}>{children}</main>
       </div>
     </div>
   )

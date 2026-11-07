@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks'
+import { useState } from 'react'
 import { cx } from '../lib/cx'
 import s from './Sidebar.module.css'
 
@@ -13,22 +13,22 @@ export function Sidebar() {
   const [active, setActive] = useState('All tracks')
 
   return (
-    <nav class={s.sidebar} aria-label="Library navigation">
-      <div class={s.brand}>X-Music</div>
+    <nav className={s.sidebar} aria-label="Library navigation">
+      <div className={s.brand}>X-Music</div>
 
       {sections.map((section) => (
         <div key={section.title}>
-          <div class={s.sectionTitle}>{section.title}</div>
+          <div className={s.sectionTitle}>{section.title}</div>
           {section.items.length ? (
-            <ul class={s.list}>
+            <ul className={s.list}>
               {section.items.map((item) => (
                 <li key={item}>
-                  <button class={cx(s.item, active === item && s.active)} onClick={() => setActive(item)}>{item}</button>
+                  <button className={cx(s.item, active === item && s.active)} onClick={() => setActive(item)}>{item}</button>
                 </li>
               ))}
             </ul>
           ) : (
-            <div class={s.empty}>None yet</div>
+            <div className={s.empty}>None yet</div>
           )}
         </div>
       ))}

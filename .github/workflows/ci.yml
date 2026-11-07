@@ -1,27 +1,27 @@
 name: CI
 
 on:
-  pull_request:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  ci:
     runs-on: ubuntu-latest
     env:
       # Tests use node:sqlite, so neither Electron nor the native module rebuild is needed.
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Run tests
-        run: npm test
+      - run: npm run build
+      - run: npm test
+      - run: npm run lint

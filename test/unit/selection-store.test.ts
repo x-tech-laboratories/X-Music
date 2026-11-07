@@ -1,7 +1,7 @@
 // Row selection through the store, not just the Selection model underneath it — because the model
 // passing while the UI misbehaves is exactly the gap worth closing.
 
-import { describe, expect, it, beforeEach, vi } from 'vitest'
+import { describe, expect, it, beforeEach } from 'vitest'
 import { library } from '../../src/renderer/stores/library'
 import type { TrackRow } from '@shared/ipc'
 
@@ -55,9 +55,9 @@ describe('song list selection', () => {
   })
 
   it('bumps a version on every change, which is what the list re-reads', () => {
-    const before = library.selectionVersion
+    const before = library.selection_changes.version()
     library.clickRow(0, {})
-    expect(library.selectionVersion).toBeGreaterThan(before)
+    expect(library.selection_changes.version()).toBeGreaterThan(before)
   })
 
   it('reports selection through isSelected for every row in a shift range', () => {

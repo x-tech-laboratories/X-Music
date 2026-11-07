@@ -1,8 +1,7 @@
 // A resizable split. All the sizing decisions live in shared/split.ts; this component only binds
 // them to pointer and keyboard events and writes the result into a grid template.
 
-import { Fragment, type ComponentChildren } from 'preact'
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import {
   KEYBOARD_STEP, KEYBOARD_STEP_LARGE, distribute, fit, resizeAt, type PaneSpec
 } from '@shared/split'
@@ -21,7 +20,7 @@ export function Split({
   dir?: 'horizontal' | 'vertical'
   specs: PaneSpec[]
   preferred?: (number | undefined)[]
-  panes: ComponentChildren[]
+  panes: ReactNode[]
 }) {
   // The id is fixed configuration for the lifetime of the split.
   const storage = useRef(`x-music.split.${id}`).current
@@ -102,9 +101,9 @@ export function Split({
     }
   }, [])
 
-  function startDrag(index: number, event: PointerEvent): void {
+  function startDrag(index: number, event: PointerEvent<HTMLDivElement>): void {
     event.preventDefault()
-    const handle = event.currentTarget as HTMLElement
+    const handle = event.currentTarget
     handle.setPointerCapture(event.pointerId)
 
     const origin = dir === 'horizontal' ? event.clientX : event.clientY
@@ -112,7 +111,7 @@ export function Split({
     let last = before
     setDragging(index)
 
-    const move = (e: PointerEvent): void => {
+    const move = (e: globalThis.PointerEvent): void => {
       const now = dir === 'horizontal' ? e.clientX : e.clientY
       last = resizeAt(before, index, now - origin, specs)
       setSizes(last)
@@ -132,7 +131,7 @@ export function Split({
     handle.addEventListener('pointercancel', done)
   }
 
-  function onKey(index: number, event: KeyboardEvent): void {
+  function onKey(index: number, event: KeyboardEvent<HTMLDivElement>): void {
     const back = dir === 'horizontal' ? 'ArrowLeft' : 'ArrowUp'
     const forward = dir === 'horizontal' ? 'ArrowRight' : 'ArrowDown'
     if (event.key !== back && event.key !== forward) return
@@ -157,7 +156,7 @@ export function Split({
 
   return (
     <div
-      class={cx(s.split, dir === 'horizontal' ? s.horizontal : s.vertical, dragging !== null && s.dragging)}
+      className={cx(s.split, dir === 'horizontal' ? s.horizontal : s.vertical, dragging !== null && s.dragging)}
       ref={container}
       style={dir === 'horizontal' ? { gridTemplateColumns: template } : { gridTemplateRows: template }}
     >
@@ -166,7 +165,7 @@ export function Split({
           {i > 0 && (
             // A focusable role="separator" with aria-valuenow is the ARIA window-splitter pattern.
             <div
-              class={cx(s.gutter, dragging === i - 1 && s.active)}
+              className={cx(s.gutter, dragging === i - 1 && s.active)}
               role="separator"
               tabIndex={0}
               aria-orientation={dir === 'horizontal' ? 'vertical' : 'horizontal'}
@@ -174,10 +173,10 @@ export function Split({
               aria-valuenow={sizes[i - 1] ?? 0}
               onPointerDown={(e) => startDrag(i - 1, e)}
               onKeyDown={(e) => onKey(i - 1, e)}
-              onDblClick={reset}
-            ><span class={s.grip}></span></div>
+              onDoubleClick={reset}
+            ><span className={s.grip}></span></div>
           )}
-          <div class={s.pane}>{pane}</div>
+          <div className={s.pane}>{pane}</div>
         </Fragment>
       ))}
     </div>

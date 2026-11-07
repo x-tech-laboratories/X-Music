@@ -1,5 +1,4 @@
-import { useRef, useState } from 'preact/hooks'
-import { memo } from 'preact/compat'
+import { memo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { TrackRow } from '@shared/ipc'
 import { field } from '@shared/fields'
 import { library } from '../stores/library'
@@ -8,7 +7,8 @@ import { Stars } from './Stars'
 import { MergeView } from './MergeView'
 import { SongProperties } from './SongProperties'
 import { ContextMenu, type MenuItem } from '../lib/ContextMenu'
-import { usePref } from '../lib/prefs'
+import { use_pref } from '../lib/prefs'
+import { use_watch } from '../lib/watch'
 import { logger } from '../lib/log'
 import { cx } from '../lib/cx'
 import s from './SongList.module.css'
@@ -23,7 +23,7 @@ const DEFAULT_WIDTHS: Record<string, number> = {
 const MIN_WIDTH = 44
 
 const heading = (id: string): string => field(id).name
-const align = (id: string): string => field(id).align ?? 'left'
+const align = (id: string): 'left' | 'right' | 'center' => field(id).align ?? 'left'
 
 const hint = (id: string): string => {
   const dir = library.sortDir(id)
@@ -76,13 +76,13 @@ const Row = memo(function Row({
 }) {
   return (
     <div
-      class={cx(s.row, sel && s.sel, playing && s.playing)}
+      className={cx(s.row, sel && s.sel, playing && s.playing)}
       style={{ gridTemplateColumns: template }}
       role="row"
       tabIndex={focusable ? 0 : -1}
       data-row={i}
       onClick={(e) => handlers.current.click(i, e)}
-      onDblClick={() => handlers.current.play(i)}
+      onDoubleClick={() => handlers.current.play(i)}
       onContextMenu={(e) => handlers.current.menu(e, i)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' && e.altKey) { e.preventDefault(); handlers.current.inspect(t.id); return }
@@ -92,19 +92,22 @@ const Row = memo(function Row({
         handlers.current.select(i, e)
       }}
     >
-      <div class={cx(s.cell, s.num)}>{t.track_number ?? ''}</div>
-      <div class={s.cell}>{t.title ?? ''}</div>
-      <div class={s.cell}>{t.artist ?? ''}</div>
-      <div class={s.cell}>{t.album ?? ''}</div>
-      <div class={cx(s.cell, s.num)}>{t.year ?? ''}</div>
-      <div class={cx(s.cell, s.num)}>{mmss(t.length_ms)}</div>
-      <div class={s.cell}><Stars value={t.rating} /></div>
-      <div class={cx(s.cell, s.num)}>{t.play_count}</div>
+      <div className={cx(s.cell, s.num)}>{t.track_number ?? ''}</div>
+      <div className={s.cell}>{t.title ?? ''}</div>
+      <div className={s.cell}>{t.artist ?? ''}</div>
+      <div className={s.cell}>{t.album ?? ''}</div>
+      <div className={cx(s.cell, s.num)}>{t.year ?? ''}</div>
+      <div className={cx(s.cell, s.num)}>{mmss(t.length_ms)}</div>
+      <div className={s.cell}><Stars value={t.rating} /></div>
+      <div className={cx(s.cell, s.num)}>{t.play_count}</div>
     </div>
   )
 })
 
 export function SongList() {
+  use_watch(library.data)
+  use_watch(library.selection_changes)
+  use_watch(player.status_changes)
   const [merging, setMerging] = useState<number[] | null>(null)
   const [inspecting, setInspecting] = useState<number | null>(null)
 
@@ -184,7 +187,7 @@ export function SongList() {
     })
   }
 
-  function selectRow(index: number, e: MouseEvent | KeyboardEvent): void {
+  function selectRow(index: number, e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): void {
     const modifiers = { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey }
     const anchorBefore = library.inspectSelection().anchor
 
@@ -231,10 +234,13 @@ export function SongList() {
   const [columns] = useState(['track_number', 'title', 'artist', 'album', 'year', 'length', 'rating', 'play_count'])
 
   // Widths are remembered per column id, so adding or reordering columns keeps the rest intact.
-  const widths = usePref<Record<string, number>>('songlist.widths', {})
+  const [widths, setWidths] = use_pref<Record<string, number>>('songlist.widths', {})
+  // Pointer handlers outlive a render, so they read and write the latest widths through this.
+  const latestWidths = useRef(widths)
+  latestWidths.current = widths
 
   const widthOf = (id: string): number =>
-    widths.value[id] ?? DEFAULT_WIDTHS[id] ?? 120
+    widths[id] ?? DEFAULT_WIDTHS[id] ?? 120
 
   /** The last column takes the remaining space, so the row always fills the viewport. */
   const template =
@@ -242,20 +248,20 @@ export function SongList() {
 
   const [dragging, setDragging] = useState<string | null>(null)
 
-  function startResize(id: string, event: PointerEvent): void {
+  function startResize(id: string, event: PointerEvent<HTMLDivElement>): void {
     event.preventDefault()
     event.stopPropagation()
 
-    const handle = event.currentTarget as HTMLElement
+    const handle = event.currentTarget
     handle.setPointerCapture(event.pointerId)
 
     const originX = event.clientX
     const originWidth = widthOf(id)
     setDragging(id)
 
-    const move = (e: PointerEvent): void => {
+    const move = (e: globalThis.PointerEvent): void => {
       const next = Math.max(MIN_WIDTH, Math.round(originWidth + (e.clientX - originX)))
-      widths.value = { ...widths.value, [id]: next }
+      setWidths({ ...latestWidths.current, [id]: next })
     }
 
     const done = (): void => {
@@ -273,9 +279,9 @@ export function SongList() {
 
   /** Double-clicking a divider restores that column's default. */
   function resetWidth(id: string): void {
-    const next = { ...widths.value }
+    const next = { ...widths }
     delete next[id]
-    widths.value = next
+    setWidths(next)
   }
 
   const tracks = library.tracks
@@ -284,72 +290,72 @@ export function SongList() {
 
   return (
     <>
-      <section class={s.songlist} aria-label="Song list">
-        <div class={s.hbsonglist}>
+      <section className={s.songlist} aria-label="Song list">
+        <div className={s.hbsonglist}>
           <input
-            class={s.search}
+            className={s.search}
             type="search"
             placeholder="Search…"
             value={library.search}
-            onInput={(e) => library.setSearch((e.currentTarget as HTMLInputElement).value)}
+            onChange={(e) => library.setSearch((e.currentTarget as HTMLInputElement).value)}
           />
           {library.chips().map((chip) => (
-            <button key={chip.id} class={s.chip} onClick={() => library.removeChip(chip.id)} title="Remove filter">
+            <button key={chip.id} className={s.chip} onClick={() => library.removeChip(chip.id)} title="Remove filter">
               {chip.label} ✕
             </button>
           ))}
           {library.hasFilters() && (
-            <button class={s.clear} onClick={() => library.clearFilters()}>Clear all</button>
+            <button className={s.clear} onClick={() => library.clearFilters()}>Clear all</button>
           )}
           {selectedCount > 0 && (
-            <button class={s.clear} onClick={() => library.clearSelection()}>
+            <button className={s.clear} onClick={() => library.clearSelection()}>
               {selectedCount} selected ✕
             </button>
           )}
           {selectedCount > 0 && (
-            <button class={s.clear} onClick={() => player.enqueue(library.selectedIds())}>
+            <button className={s.clear} onClick={() => player.enqueue(library.selectedIds())}>
               Queue {selectedCount}
             </button>
           )}
           {selectedCount > 1 && (
-            <button class={s.merge} onClick={() => setMerging(library.selectedIds())}>
+            <button className={s.merge} onClick={() => setMerging(library.selectedIds())}>
               Merge {selectedCount}…
             </button>
           )}
-          <span class={s.spacer}></span>
-          <span class={s.hint} title="Click a column header to sort. Shift+click another to sort by it next.">
+          <span className={s.spacer}></span>
+          <span className={s.hint} title="Click a column header to sort. Shift+click another to sort by it next.">
             ↑↓ to move · shift+↑↓ to select · double-click to play · right-click for actions
           </span>
-          <span class={s.count}>{tracks.length.toLocaleString()} shown</span>
+          <span className={s.count}>{tracks.length.toLocaleString()} shown</span>
         </div>
 
-        <div class={s.head} style={{ gridTemplateColumns: template }}>
+        <div className={s.head} style={{ gridTemplateColumns: template }}>
           {columns.map((c, i) => (
-            <div key={c} class={s.headSlot}>
+            <div key={c} className={s.headSlot}>
               <button
-                class={cx(s.cell, s.headCell, library.sortDir(c) !== null && s.sorted)}
+                className={cx(s.cell, s.headCell, library.sortDir(c) !== null && s.sorted)}
                 style={{ textAlign: align(c) }}
                 title={hint(c)}
                 onClick={(e) => library.toggleSort(c, e.shiftKey)}
-              >{heading(c)} <span class={s.arrow}>{arrow(c)}</span></button>
+              >{heading(c)} <span className={s.arrow}>{arrow(c)}</span></button>
 
               {i < columns.length - 1 && (
                 <div
-                  class={cx(s.grip, dragging === c && s.active)}
+                  className={cx(s.grip, dragging === c && s.active)}
                   role="separator"
                   aria-orientation="vertical"
                   aria-label={`Resize ${heading(c)} column`}
                   tabIndex={0}
                   onPointerDown={(e) => startResize(c, e)}
-                  onDblClick={() => resetWidth(c)}
+                  onDoubleClick={() => resetWidth(c)}
                   onKeyDown={(e) => {
                     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
                     e.preventDefault()
                     const step = e.shiftKey ? 32 : 8
-                    widths.value = {
-                      ...widths.value,
+                    setWidths({
+                      ...widths,
                       [c]: Math.max(MIN_WIDTH, widthOf(c) + (e.key === 'ArrowRight' ? step : -step))
-                    }
+                    })
                   }}
                 ></div>
               )}
@@ -357,11 +363,11 @@ export function SongList() {
           ))}
         </div>
 
-        <div class={s.body} ref={bodyEl} role="rowgroup" onKeyDown={onListKeydown}>
+        <div className={s.body} ref={bodyEl} role="rowgroup" onKeyDown={onListKeydown}>
           {tracks.length === 0 ? (
-            <div class={s.empty}>
+            <div className={s.empty}>
               <p>No tracks match.</p>
-              <p class={s.hint}>
+              <p className={s.hint}>
                 Import your gmusicbrowser library from the Library menu, or clear the active filters.
               </p>
             </div>

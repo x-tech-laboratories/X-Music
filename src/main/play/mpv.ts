@@ -64,7 +64,10 @@ export class MpvEngine implements PlaybackEngine {
   /** Set while a load is in flight, so mpv going idle mid-swap is not read as the track ending. */
   private swapping = false
 
-  constructor(private readonly opts: MpvOptions = {}) {
+  private readonly opts: MpvOptions
+
+  constructor(opts: MpvOptions = {}) {
+    this.opts = opts
     this.socketPath = join(tmpdir(), `x-music-mpv-${process.pid}-${++instanceCounter}.sock`)
     // A leftover socket file stops mpv binding, so clear it before starting.
     rmSync(this.socketPath, { force: true })

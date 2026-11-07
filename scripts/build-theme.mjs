@@ -11,7 +11,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const tokens = JSON.parse(readFileSync(join(root, 'themes/halon/tokens.json'), 'utf8'))
 
 // Player-specific tokens, expressed in terms of Halon's so they stay in sync.
-const derived = (mode) => ({
+const derived = () => ({
   'media-progress': 'var(--accent)',
   'media-progress-track': 'var(--border-default)',
   'media-buffer': 'var(--border-hover)',
@@ -47,7 +47,7 @@ const metrics = {
 const block = (vars) =>
   Object.entries(vars).map(([k, v]) => `  --${k}: ${v};`).join('\n')
 
-const modeVars = (mode) => ({ ...tokens[mode], ...derived(mode) })
+const modeVars = (mode) => ({ ...tokens[mode], ...derived() })
 
 const css = `/* GENERATED FILE - do not edit. Built from themes/halon/tokens.json by scripts/build-theme.mjs. */
 

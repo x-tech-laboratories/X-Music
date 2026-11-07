@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useState } from 'react'
 import type { AppInfo, SafetyStatus } from '@shared/ipc'
 import { oneOf } from '@shared/prefs'
 import { ipc } from './lib/ipc'
 import { configureLogging, log } from './lib/log'
 import { cx } from './lib/cx'
-import { usePref } from './lib/prefs'
+import { use_pref } from './lib/prefs'
+import { use_watch } from './lib/watch'
 import { Split } from './lib/Split'
 import { library } from './stores/library'
 import { player } from './stores/player'
@@ -37,8 +38,9 @@ const duration = (ms: number): string => {
 export function App() {
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [safety, setSafety] = useState<SafetyStatus | null>(null)
-  const theme = usePref<Theme>('theme', 'system', oneOf('light', 'dark', 'system'))
-  const density = usePref<Density>('density', 'normal', oneOf('compact', 'normal', 'comfortable'))
+  const [theme, set_theme] = use_pref<Theme>('theme', 'system', oneOf('light', 'dark', 'system'))
+  const [density, set_density] = use_pref<Density>('density', 'normal', oneOf('compact', 'normal', 'comfortable'))
+  use_watch(library.data)
   const [rightTab, setRightTab] = useState<'library' | 'context'>('library')
   const [showSettings, setShowSettings] = useState(false)
   const [settingsSection, setSettingsSection] = useState<Section>('library')
@@ -79,20 +81,20 @@ export function App() {
 
   useEffect(() => {
     const root = document.documentElement
-    if (theme.value === 'system') root.removeAttribute('data-theme')
-    else root.setAttribute('data-theme', theme.value)
-  }, [theme.value])
+    if (theme === 'system') root.removeAttribute('data-theme')
+    else root.setAttribute('data-theme', theme)
+  }, [theme])
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-density', density.value)
-  }, [density.value])
+    document.documentElement.setAttribute('data-density', density)
+  }, [density])
 
   const cycleTheme = (): void => {
-    theme.value = theme.value === 'system' ? 'light' : theme.value === 'light' ? 'dark' : 'system'
+    set_theme(theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system')
   }
 
   const leftPane = (
-    <div class={s.vbleft}>
+    <div className={s.vbleft}>
       <Split
         id="vbleft"
         dir="vertical"
@@ -117,12 +119,12 @@ export function App() {
   )
 
   const rightPane = (
-    <div class={s.tbright}>
-      <div class={s.tabs}>
-        <button class={cx(s.tab, rightTab === 'library' && s.active)} onClick={() => setRightTab('library')}>
+    <div className={s.tbright}>
+      <div className={s.tabs}>
+        <button className={cx(s.tab, rightTab === 'library' && s.active)} onClick={() => setRightTab('library')}>
           Library
         </button>
-        <button class={cx(s.tab, rightTab === 'context' && s.active)} onClick={() => setRightTab('context')}>
+        <button className={cx(s.tab, rightTab === 'context' && s.active)} onClick={() => setRightTab('context')}>
           Context
         </button>
       </div>
@@ -136,7 +138,7 @@ export function App() {
           panes={[panesRow, <SongList />]}
         />
       ) : (
-        <div class={s.context}>
+        <div className={s.context}>
           <p>Context panel — lyrics, artist info and related tracks land in a later milestone.</p>
         </div>
       )}
@@ -146,33 +148,33 @@ export function App() {
   const stats = library.stats
 
   return (
-    <div class={s.vbmain}>
+    <div className={s.vbmain}>
       {showSettings && (
         <SettingsPage
           info={info}
           safety={safety}
-          theme={theme.value}
-          density={density.value}
+          theme={theme}
+          density={density}
           initialSection={settingsSection}
           onclose={() => setShowSettings(false)}
-          onTheme={(t) => (theme.value = t)}
-          onDensity={(d) => (density.value = d)}
+          onTheme={set_theme}
+          onDensity={set_density}
         />
       )}
 
-      <div class={s.hbmenu}>
-        <button class={s.menuItem}
+      <div className={s.hbmenu}>
+        <button className={s.menuItem}
                 onClick={() => { setSettingsSection('library'); setShowSettings(true) }}>Settings</button>
-        <span class={s.spacer}></span>
+        <span className={s.spacer}></span>
 
         {safety && (
-          <span class={cx(s.safety, safety.pinned && s.pinned)} title={safety.reason}>
+          <span className={cx(s.safety, safety.pinned && s.pinned)} title={safety.reason}>
             {safety.readOnly ? '🔒 Read-only' : '⚠ Writes enabled'}
           </span>
         )}
 
-        <button class={s.menuItem} onClick={cycleTheme} title={`Theme: ${theme.value}`}>
-          {theme.value === 'dark' ? '◐' : theme.value === 'light' ? '◑' : '◒'}
+        <button className={s.menuItem} onClick={cycleTheme} title={`Theme: ${theme}`}>
+          {theme === 'dark' ? '◐' : theme === 'light' ? '◑' : '◒'}
         </button>
       </div>
 
@@ -185,28 +187,28 @@ export function App() {
         panes={[leftPane, rightPane]}
       />
 
-      <footer class={s.status}>
+      <footer className={s.status}>
         {library.error ? (
-          <span class={s.err}>{library.error}</span>
+          <span className={s.err}>{library.error}</span>
         ) : stats && (
           <>
             <span>{stats.tracks.toLocaleString()} tracks</span>
-            <span class={s.sep}>·</span>
+            <span className={s.sep}>·</span>
             <span>{stats.media.toLocaleString()} files</span>
-            <span class={s.sep}>·</span>
+            <span className={s.sep}>·</span>
             <span>{stats.albums.toLocaleString()} albums</span>
             {stats.missing > 0 && (
               <>
-                <span class={s.sep}>·</span>
-                <span class={s.warn}>{stats.missing.toLocaleString()} missing</span>
+                <span className={s.sep}>·</span>
+                <span className={s.warn}>{stats.missing.toLocaleString()} missing</span>
               </>
             )}
-            <span class={s.sep}>·</span>
+            <span className={s.sep}>·</span>
             <span>{duration(stats.totalMs)}</span>
           </>
         )}
-        <span class={s.spacer}></span>
-        {info && <span class={s.dim}>Electron {info.electron} · Chromium {info.chrome}</span>}
+        <span className={s.spacer}></span>
+        {info && <span className={s.dim}>Electron {info.electron} · Chromium {info.chrome}</span>}
       </footer>
     </div>
   )

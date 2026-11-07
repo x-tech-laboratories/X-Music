@@ -1,10 +1,8 @@
 // View-model state for the library.
 //
-// The filter stack and sort state come from shared/view.ts, which is framework-free; this class is
-// only the thin reactive wrapper that a component can observe. Replacing the UI framework
-// means rewriting this file, not the logic inside it.
+// The filter stack and sort state come from shared/view.ts, which is framework-free; this class only
+// tells watching components when to re-read.
 
-import { signal } from '@preact/signals'
 import type { FilterNode } from '@shared/filter'
 import { leaf, or } from '@shared/filter'
 import { FilterStack, Selection, SortState } from '@shared/view'
@@ -13,6 +11,7 @@ import { field } from '@shared/fields'
 import { readPref, writePref } from '@shared/prefs'
 import { sanitizePaneValues, sanitizeSortKeys } from '@shared/viewstate'
 import { ipc } from '../lib/ipc'
+import { create_watch } from '../lib/watch'
 
 const storage = (): Storage | undefined =>
   typeof localStorage === 'undefined' ? undefined : localStorage
@@ -24,14 +23,16 @@ const KEY_SEARCH = 'x-music.pref.library.search'
 const PAGE = 500
 
 class LibraryStore {
-  private readonly statsSig = signal<LibraryStats | null>(null)
-  private readonly tracksSig = signal<TrackRow[]>([])
-  private readonly lastSqlSig = signal('')
-  private readonly errorSig = signal<string | null>(null)
-  private readonly searchSig = signal('')
+  // Bumped when the results, stats, filters or error change.
+  readonly data = create_watch()
+  // Bumped when the selection changes, so a click does not re-render what only reads the results.
+  readonly selection_changes = create_watch()
 
-  /** Bumped whenever the result set changes, so panes can re-read without deep watching. */
-  private readonly versionSig = signal(0)
+  private statsValue: LibraryStats | null = null
+  private tracksValue: TrackRow[] = []
+  private lastSqlValue = ''
+  private errorValue: string | null = null
+  private searchValue = ''
 
   private readonly stack = new FilterStack()
   private readonly sort = new SortState()
@@ -41,23 +42,19 @@ class LibraryStore {
   private readonly paneAnchor = new Map<string, number>()
   private readonly selection = new Selection()
 
-  /** Bumped on selection changes, for the same reason `version` exists. */
-  private readonly selectionVersionSig = signal(0)
+  get stats(): LibraryStats | null { return this.statsValue }
+  set stats(v: LibraryStats | null) { this.statsValue = v; this.data.bump() }
+  get tracks(): TrackRow[] { return this.tracksValue }
+  set tracks(v: TrackRow[]) { this.tracksValue = v; this.data.bump() }
+  get lastSql(): string { return this.lastSqlValue }
+  set lastSql(v: string) { this.lastSqlValue = v; this.data.bump() }
+  get error(): string | null { return this.errorValue }
+  set error(v: string | null) { this.errorValue = v; this.data.bump() }
+  get search(): string { return this.searchValue }
+  set search(v: string) { this.searchValue = v; this.data.bump() }
 
-  get stats(): LibraryStats | null { return this.statsSig.value }
-  set stats(v: LibraryStats | null) { this.statsSig.value = v }
-  get tracks(): TrackRow[] { return this.tracksSig.value }
-  set tracks(v: TrackRow[]) { this.tracksSig.value = v }
-  get lastSql(): string { return this.lastSqlSig.value }
-  set lastSql(v: string) { this.lastSqlSig.value = v }
-  get error(): string | null { return this.errorSig.value }
-  set error(v: string | null) { this.errorSig.value = v }
-  get search(): string { return this.searchSig.value }
-  set search(v: string) { this.searchSig.value = v }
-  get version(): number { return this.versionSig.value }
-  set version(v: number) { this.versionSig.value = v }
-  get selectionVersion(): number { return this.selectionVersionSig.value }
-  set selectionVersion(v: number) { this.selectionVersionSig.value = v }
+  // Changes whenever the result set does, so panes can re-read without deep watching.
+  get version(): number { return this.data.version() }
 
   constructor() {
     const saved = sanitizeSortKeys(readPref<unknown>(storage(), KEY_SORT, null))
@@ -88,8 +85,6 @@ class LibraryStore {
   }
 
   chips(): readonly { id: string; label: string }[] {
-    // FilterStack is a plain class, so reading `version` is what ties this to the reactive graph.
-    void this.version
     return this.stack.list().filter((c) => c.removable).map((c) => ({ id: c.id, label: c.label }))
   }
 
@@ -98,19 +93,16 @@ class LibraryStore {
    * back rather than keeping a private copy that could drift from the chips.
    */
   selectionFor(fieldId: string): readonly string[] {
-    void this.version
     return this.paneValues.get(fieldId) ?? []
   }
 
   isPaneSelected(fieldId: string, value: string | null): boolean {
-    void this.version
     const values = this.paneValues.get(fieldId)
     if (!values || values.length === 0) return value === null
     return value !== null && values.includes(value)
   }
 
   hasFilters(): boolean {
-    void this.version
     return this.stack.list().some((c) => c.removable)
   }
 
@@ -125,23 +117,19 @@ class LibraryStore {
 
   // ── selection ──────────────────────────────────────────────────────────
   isSelected(id: number): boolean {
-    void this.selectionVersion
     return this.selection.has(id)
   }
 
   selectedIds(): number[] {
-    void this.selectionVersion
     return this.selection.ids()
   }
 
   selectedCount(): number {
-    void this.selectionVersion
     return this.selection.size
   }
 
   /** Selection internals, for diagnostics only. */
   inspectSelection(): { size: number; anchor: number | null } {
-    void this.selectionVersion
     return this.selection.inspect()
   }
 
@@ -152,17 +140,17 @@ class LibraryStore {
       : modifiers.ctrl ? 'toggle' : 'replace'
 
     this.selection.apply(ordered, index, intent)
-    this.selectionVersionSig.value = this.selectionVersionSig.peek() + 1
+    this.selection_changes.bump()
   }
 
   selectAll(): void {
     this.selection.selectAll(this.tracks.map((t) => t.id))
-    this.selectionVersionSig.value = this.selectionVersionSig.peek() + 1
+    this.selection_changes.bump()
   }
 
   clearSelection(): void {
     this.selection.clear()
-    this.selectionVersionSig.value = this.selectionVersionSig.peek() + 1
+    this.selection_changes.bump()
   }
 
   async refresh(): Promise<void> {
@@ -176,8 +164,8 @@ class LibraryStore {
 
       // A narrowed result set must not leave selections pointing at rows nobody can see.
       this.selection.retain(this.tracks.map((t) => t.id))
-      this.selectionVersionSig.value = this.selectionVersionSig.peek() + 1
-      this.versionSig.value = this.versionSig.peek() + 1
+      this.selection_changes.bump()
+      this.data.bump()
     } catch (err) {
       this.error = (err as Error).message
     }
@@ -293,12 +281,10 @@ class LibraryStore {
   }
 
   sortPriority(fieldId: string): number {
-    void this.version
     return this.sort.priority(fieldId)
   }
 
   sortDir(fieldId: string): 'asc' | 'desc' | null {
-    void this.version
     return this.sort.list().find((k) => k.field === fieldId)?.dir ?? null
   }
 }

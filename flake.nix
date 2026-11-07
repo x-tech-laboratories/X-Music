@@ -13,7 +13,7 @@
 
         # Pinned so the better-sqlite3 native build and the runtime agree on one ABI.
         electron = pkgs.electron_43;
-        nodejs = pkgs.nodejs_22;
+        nodejs = pkgs.nodejs_24;
 
         # Shared libraries the Electron binary and the better-sqlite3 prebuild dlopen at runtime.
         runtimeLibs = with pkgs; [

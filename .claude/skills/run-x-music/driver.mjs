@@ -29,7 +29,8 @@ ws.onmessage = (m) => {
   const p = pending.get(msg.id)
   if (!p) return
   pending.delete(msg.id)
-  msg.error ? p.rej(new Error(JSON.stringify(msg.error))) : p.res(msg.result)
+  if (msg.error) p.rej(new Error(JSON.stringify(msg.error)))
+  else p.res(msg.result)
 }
 
 const evaluate = async (expression) => {

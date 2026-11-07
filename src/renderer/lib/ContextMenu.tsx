@@ -2,8 +2,8 @@
 // elsewhere, or choosing something. Items are data so callers describe a menu rather than build
 // one — which is what the layout system will need when menus become user-configurable (§6.1).
 
-import { Fragment } from 'preact'
-import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
+import { Fragment } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { cx } from './cx'
 import s from './ContextMenu.module.css'
 
@@ -78,7 +78,7 @@ export function ContextMenu({
 
   return (
     <div
-      class={s.menu}
+      className={s.menu}
       ref={menu}
       role="menu"
       tabIndex={-1}
@@ -86,15 +86,15 @@ export function ContextMenu({
     >
       {items.map((item) => (
         <Fragment key={item.id}>
-          {item.separatorBefore && <div class={s.sep} role="separator"></div>}
+          {item.separatorBefore && <div className={s.sep} role="separator"></div>}
           <button
             role="menuitem"
-            class={cx(s.item, item.danger && s.danger)}
+            className={cx(s.item, item.danger && s.danger)}
             disabled={item.disabled}
             onClick={() => choose(item)}
           >
-            <span class={s.label}>{item.label}</span>
-            {item.hint && <span class={s.hint}>{item.hint}</span>}
+            <span className={s.label}>{item.label}</span>
+            {item.hint && <span className={s.hint}>{item.hint}</span>}
           </button>
         </Fragment>
       ))}

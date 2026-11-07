@@ -155,7 +155,13 @@ class ChunkReader {
   private buf = Buffer.alloc(0)
   private bufStart = 0
 
-  constructor(private fh: FileHandle, private fileSize: number) {}
+  private fh: FileHandle
+  private fileSize: number
+
+  constructor(fh: FileHandle, fileSize: number) {
+    this.fh = fh
+    this.fileSize = fileSize
+  }
 
   /** The `n` bytes at `pos`, valid until the next call, or null if the file ends first. */
   async at(pos: number, n: number): Promise<Buffer | null> {

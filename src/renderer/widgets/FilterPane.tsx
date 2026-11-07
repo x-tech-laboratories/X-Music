@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useState } from 'react'
 import type { GroupRow } from '@shared/ipc'
 import { fieldsWith } from '@shared/fields'
 import { sanitizePaneField } from '@shared/viewstate'
 import { library } from '../stores/library'
-import { usePref } from '../lib/prefs'
+import { use_pref } from '../lib/prefs'
+import { use_watch } from '../lib/watch'
 import { cx } from '../lib/cx'
 import s from './FilterPane.module.css'
 
@@ -15,10 +16,10 @@ const groupable = fieldsWith('groupable')
 
 export function FilterPane({ field = 'genre', id = 'pane' }: { field?: string; id?: string }) {
   // The prop is the default; what the user last chose wins, if it still names a real field.
-  const remembered = usePref<string>(`pane.${id}.field`, field)
-  const [current, setCurrent] = useState(() => sanitizePaneField(remembered.value, field))
-
-  useEffect(() => { remembered.value = current }, [current])
+  const [remembered, remember] = use_pref<string>(`pane.${id}.field`, field)
+  const current = sanitizePaneField(remembered, field)
+  const setCurrent = remember
+  use_watch(library.data)
   const [rows, setRows] = useState<GroupRow[]>([])
 
   // Read the selection back from the filter stack so a chip removal updates the pane too.
@@ -29,7 +30,7 @@ export function FilterPane({ field = 'genre', id = 'pane' }: { field?: string; i
     void (async () => setRows(await library.groupsFor(current)))()
   }, [current, version])
 
-  async function pick(row: GroupRow, index: number, e: MouseEvent | KeyboardEvent): Promise<void> {
+  async function pick(row: GroupRow, index: number, e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): Promise<void> {
     await library.setPaneFilter(current, row.label ?? null, {
       shift: e.shiftKey,
       ctrl: e.ctrlKey || e.metaKey,
@@ -55,10 +56,10 @@ export function FilterPane({ field = 'genre', id = 'pane' }: { field?: string; i
   }
 
   return (
-    <section class={s.pane} aria-label="Filter pane">
-      <header class={s.header}>
+    <section className={s.pane} aria-label="Filter pane">
+      <header className={s.header}>
         <select
-          class={s.select}
+          className={s.select}
           value={current}
           onChange={(e) => setCurrent((e.currentTarget as HTMLSelectElement).value)}
         >
@@ -66,28 +67,28 @@ export function FilterPane({ field = 'genre', id = 'pane' }: { field?: string; i
             <option key={f.id} value={f.id}>{f.name}</option>
           ))}
         </select>
-        <span class={s.count}>
+        <span className={s.count}>
           {selectedCount > 1 ? `${selectedCount} of ${rows.length}` : rows.length}
         </span>
       </header>
 
-      <ul class={s.list}>
+      <ul className={s.list}>
         <li>
-          <button class={cx(s.row, s.all, selectedCount === 0 && s.sel)} onClick={clear}>
-            <span class={s.label}>All</span>
-            <span class={s.n}>{total.toLocaleString()}</span>
+          <button className={cx(s.row, s.all, selectedCount === 0 && s.sel)} onClick={clear}>
+            <span className={s.label}>All</span>
+            <span className={s.n}>{total.toLocaleString()}</span>
           </button>
         </li>
         {rows.length === 0 ? (
-          <li class={s.empty}>No values</li>
+          <li className={s.empty}>No values</li>
         ) : rows.map((g, i) => (
           <li key={g.gid}>
             <button
-              class={cx(s.row, library.isPaneSelected(current, g.label ?? null) && s.sel)}
+              className={cx(s.row, library.isPaneSelected(current, g.label ?? null) && s.sel)}
               onClick={(e) => pick(g, i, e)}
             >
-              <span class={s.label}>{display(g.label)}</span>
-              <span class={s.n}>{g.n}</span>
+              <span className={s.label}>{display(g.label)}</span>
+              <span className={s.n}>{g.n}</span>
             </button>
           </li>
         ))}
