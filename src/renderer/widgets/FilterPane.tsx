@@ -3,8 +3,8 @@ import type { GroupRow } from '@shared/ipc'
 import { fieldsWith } from '@shared/fields'
 import { sanitizePaneField } from '@shared/viewstate'
 import { library } from '../stores/library'
-import { use_pref } from '../lib/prefs'
-import { use_watch } from '../lib/watch'
+import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
+import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
 import { cx } from '../lib/cx'
 import s from './FilterPane.module.css'
 
@@ -16,9 +16,8 @@ const groupable = fieldsWith('groupable')
 
 export function FilterPane({ field = 'genre', id = 'pane' }: { field?: string; id?: string }) {
   // The prop is the default; what the user last chose wins, if it still names a real field.
-  const [remembered, remember] = use_pref<string>(`pane.${id}.field`, field)
+  const [remembered, remember] = use_pref<string>(`x-music.pref.pane.${id}.field`, field)
   const current = sanitizePaneField(remembered, field)
-  const setCurrent = remember
   use_watch(library.data)
   const [rows, setRows] = useState<GroupRow[]>([])
 
@@ -59,9 +58,9 @@ export function FilterPane({ field = 'genre', id = 'pane' }: { field?: string; i
     <section className={s.pane} aria-label="Filter pane">
       <header className={s.header}>
         <select
-          className={s.select}
           value={current}
-          onChange={(e) => setCurrent((e.currentTarget as HTMLSelectElement).value)}
+          aria-label="Field to browse by"
+          onChange={(e) => remember(e.currentTarget.value)}
         >
           {groupable.map((f) => (
             <option key={f.id} value={f.id}>{f.name}</option>
@@ -74,7 +73,7 @@ export function FilterPane({ field = 'genre', id = 'pane' }: { field?: string; i
 
       <ul className={s.list}>
         <li>
-          <button className={cx(s.row, s.all, selectedCount === 0 && s.sel)} onClick={clear}>
+          <button className={cx(s.row, s.all, selectedCount === 0 && s.sel)} aria-pressed={selectedCount === 0} onClick={clear}>
             <span className={s.label}>All</span>
             <span className={s.n}>{total.toLocaleString()}</span>
           </button>
@@ -85,6 +84,7 @@ export function FilterPane({ field = 'genre', id = 'pane' }: { field?: string; i
           <li key={g.gid}>
             <button
               className={cx(s.row, library.isPaneSelected(current, g.label ?? null) && s.sel)}
+              aria-pressed={library.isPaneSelected(current, g.label ?? null)}
               onClick={(e) => pick(g, i, e)}
             >
               <span className={s.label}>{display(g.label)}</span>

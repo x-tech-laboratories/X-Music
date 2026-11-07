@@ -1,67 +1,24 @@
-.vbplayer {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--border-default);
-}
+.player { display: grid; gap: var(--space-2); padding: var(--space-4); align-content: start; }
 
 .indicators { display: flex; align-items: center; gap: var(--space-2); }
 
-/* Sits before .chip so a chip's own rules win over the shared button look. */
-.button {
-  min-width: var(--control-height);
-  height: var(--control-height);
-  padding: 0 var(--space-2);
-  font-size: var(--font-size-md);
-  color: var(--text-on-navigation);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-}
+.main { display: grid; grid-template-columns: 1fr 88px; gap: var(--space-4); }
 
-.button:hover { background: var(--surface-navigation-hover); }
-
-.chip {
-  flex: 0 0 auto;
-  height: var(--control-height-sm);
-  padding: 0 var(--space-3);
-  font-size: var(--font-size-sm);
-  color: var(--text-on-navigation);
-  background: var(--surface-navigation-hover);
-  border: 0;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-}
-
-.chip.on { color: var(--text-on-fill); background: var(--accent); }
-.queued { cursor: default; }
-
-.main { display: grid; grid-template-columns: 1fr 88px; gap: var(--space-3); }
 .text { display: grid; gap: var(--space-1); min-width: 0; }
+
 .transport { display: flex; align-items: center; gap: var(--space-1); }
 
-.primary { color: var(--text-on-fill); background: var(--accent); }
-.primary:hover { background: var(--accent); filter: brightness(1.08); }
-
 .line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .title { font-weight: 600; color: var(--text-heading); }
+
 .artist { color: var(--text-secondary); }
-.album { color: var(--text-tertiary); font-size: var(--font-size-sm); }
-.err { color: var(--status-danger); font-size: var(--font-size-sm); }
 
-.time {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: var(--space-2);
-  align-items: center;
-}
+.album { color: var(--text-tertiary); font-size: var(--text-caption); }
 
-.clock {
-  font-variant-numeric: tabular-nums;
-  font-size: var(--font-size-sm);
-  color: var(--text-tertiary);
-}
+.time { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-2); align-items: center; }
+
+.clock { font-variant-numeric: tabular-nums; font-size: var(--text-caption); color: var(--text-tertiary); }
 
 .range { width: 100%; accent-color: var(--media-progress); }
 

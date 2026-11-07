@@ -1,132 +1,13 @@
-// Framework-free view state: selection, the filter stack, sort state, and virtualization maths.
-//
-// This is deliberately plain TypeScript with no reactivity primitives. Whatever UI framework sits
-// on top only needs to observe `version` and re-read; swapping the UI framework (or adding a second
-// front end, such as a remote web UI) does not touch anything in this file.
+// The filter stack, framework-free: plain TypeScript with no reactivity primitives, so a second front
+// end can reuse it unchanged. Selection, sorting and virtualization come from X-Libs.
 
-import { and, isGroup, type FilterNode, type SortKey } from './filter'
+import { and, isGroup, type FilterNode } from './filter'
 
 export interface FilterChip {
   id: string
   label: string
   node: FilterNode
   removable: boolean
-}
-
-export interface VirtualWindow {
-  /** First row index to render, including overscan. */
-  start: number
-  /** Exclusive end index. */
-  end: number
-  /** Pixel offset of `start`, for the spacer transform. */
-  offsetPx: number
-  /** Total scrollable height. */
-  totalPx: number
-}
-
-/**
- * Which rows a viewport needs. Pure arithmetic — the UI supplies numbers and applies the result;
- * no DOM measurement happens here, so it is unit-testable and framework-neutral.
- */
-export function virtualWindow(
-  totalRows: number,
-  rowHeight: number,
-  scrollTop: number,
-  viewportHeight: number,
-  overscan = 8
-): VirtualWindow {
-  if (rowHeight <= 0) throw new Error('rowHeight must be positive')
-
-  const totalPx = totalRows * rowHeight
-  const firstVisible = Math.floor(Math.max(0, scrollTop) / rowHeight)
-  const visibleCount = Math.ceil(viewportHeight / rowHeight)
-
-  const start = Math.max(0, firstVisible - overscan)
-  const end = Math.min(totalRows, firstVisible + visibleCount + overscan)
-
-  return { start, end, offsetPx: start * rowHeight, totalPx }
-}
-
-/**
- * `range` replaces the selection with anchor..index, which is what makes shift+arrow able to shrink
- * again when the direction reverses. `range-add` keeps what was already selected, for ctrl+shift.
- */
-export type SelectionIntent = 'replace' | 'toggle' | 'range' | 'range-add'
-
-/**
- * The selection model every list widget shares. Anchored ranges, toggles and inversion behave the
- * same in the song list, the queue and the filter panes because they all use this.
- */
-export class Selection {
-  private readonly set = new Set<number>()
-  private anchor: number | null = null
-  version = 0
-
-  get size(): number { return this.set.size }
-
-  /** Internal state, for diagnostics: a wrong range is usually a wrong anchor. */
-  inspect(): { size: number; anchor: number | null } {
-    return { size: this.set.size, anchor: this.anchor }
-  }
-  has(id: number): boolean { return this.set.has(id) }
-  ids(): number[] { return [...this.set] }
-
-  private bump(): void { this.version++ }
-
-  clear(): void { this.set.clear(); this.anchor = null; this.bump() }
-
-  /** Applies a click at `index` within `ordered`, honouring the modifier intent. */
-  apply(ordered: readonly number[], index: number, intent: SelectionIntent): void {
-    const id = ordered[index]
-    if (id === undefined) return
-
-    if (intent === 'replace') {
-      this.set.clear()
-      this.set.add(id)
-      this.anchor = index
-    } else if (intent === 'toggle') {
-      if (this.set.has(id)) this.set.delete(id)
-      else this.set.add(id)
-      this.anchor = index
-    } else {
-      const from = this.anchor ?? index
-      const [lo, hi] = from <= index ? [from, index] : [index, from]
-
-      // A plain range starts from nothing, so walking back with shift+arrow shrinks the selection
-      // rather than leaving a trail behind it.
-      if (intent === 'range') this.set.clear()
-
-      for (let i = lo; i <= hi; i++) {
-        const rid = ordered[i]
-        if (rid !== undefined) this.set.add(rid)
-      }
-      // The anchor deliberately stays put: every extension measures from the same origin.
-    }
-
-    this.bump()
-  }
-
-  selectAll(ordered: readonly number[]): void {
-    ordered.forEach((id) => this.set.add(id))
-    this.bump()
-  }
-
-  invert(ordered: readonly number[]): void {
-    const next = ordered.filter((id) => !this.set.has(id))
-    this.set.clear()
-    next.forEach((id) => this.set.add(id))
-    this.bump()
-  }
-
-  /** Drops ids that are no longer present, which happens after a filter narrows. */
-  retain(ordered: readonly number[]): void {
-    const keep = new Set(ordered)
-    let changed = false
-    for (const id of this.set) {
-      if (!keep.has(id)) { this.set.delete(id); changed = true }
-    }
-    if (changed) this.bump()
-  }
 }
 
 /**
@@ -156,34 +37,4 @@ export class FilterStack {
     const nodes = this.chips.map((c) => c.node).filter((n) => !(isGroup(n) && n.children.length === 0))
     return nodes.length === 1 ? nodes[0]! : and(...nodes)
   }
-}
-
-/** Multi-key sort with shift-click semantics, shared by every column header. */
-export class SortState {
-  private keys: SortKey[] = []
-  version = 0
-
-  list(): readonly SortKey[] { return this.keys }
-
-  toggle(fieldId: string, additive: boolean): void {
-    const existing = this.keys.find((k) => k.field === fieldId)
-
-    if (!additive) {
-      this.keys = [{ field: fieldId, dir: existing?.dir === 'asc' ? 'desc' : 'asc' }]
-    } else if (existing) {
-      existing.dir = existing.dir === 'asc' ? 'desc' : 'asc'
-      this.keys = [...this.keys]
-    } else {
-      this.keys = [...this.keys, { field: fieldId, dir: 'asc' }]
-    }
-
-    this.version++
-  }
-
-  /** Sort priority of a field, 1-based; 0 when the field is not a sort key. */
-  priority(fieldId: string): number {
-    return this.keys.findIndex((k) => k.field === fieldId) + 1
-  }
-
-  set(keys: readonly SortKey[]): void { this.keys = [...keys]; this.version++ }
 }

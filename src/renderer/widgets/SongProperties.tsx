@@ -4,35 +4,24 @@
 import { Fragment } from 'react'
 import { useEffect, useState } from 'react'
 import type { TrackDetails } from '@shared/ipc'
+import { Badge } from '@x-tech-laboratories/x-libs/web/react/badges'
+import { format_clock } from '@x-tech-laboratories/x-libs/durations'
+import { bytes, stamp } from '@x-tech-laboratories/x-libs/web/format'
 import { ipc } from '../lib/ipc'
 import { cx } from '../lib/cx'
-import { Page } from '../lib/Page'
+import { PageView } from './PageView'
 import { Stars } from './Stars'
 import { Cover } from './Cover'
 import s from './SongProperties.module.css'
 
 type Section = 'overview' | 'sources' | 'tags' | 'history'
 
-const when = (ms: number | null): string =>
-  ms === null || ms === 0 ? 'never' : new Date(ms).toLocaleString()
+const when = (milliseconds: number | null): string =>
+  milliseconds === null || milliseconds === 0 ? 'never' : stamp(milliseconds / 1000)
 
-const bytes = (n: number | null): string => {
-  if (n === null) return '—'
-  const units = ['B', 'KB', 'MB', 'GB']
-  let v = n
-  let u = 0
-  while (v >= 1024 && u < units.length - 1) { v /= 1024; u++ }
-  return `${v.toFixed(u === 0 ? 0 : 1)} ${units[u]}`
-}
+const size = (count: number | null): string => (count === null ? '—' : bytes(count))
 
-const mmss = (ms: number | null): string => {
-  if (ms === null) return '—'
-  const s = Math.round(ms / 1000)
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  const sec = String(s % 60).padStart(2, '0')
-  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`
-}
+const mmss = (milliseconds: number | null): string => format_clock(milliseconds, '—')
 
 /** Plain language for how this track came to be one track. */
 const identityExplanation = (source: string): string => ({
@@ -51,7 +40,7 @@ const hashExplanation = (algo: string | null): string => ({
   'sha256-file': 'Hashed over the whole file, so editing tags will change it. Weaker for move detection.'
 } as Record<string, string>)[algo ?? ''] ?? 'Not hashed yet; scan this folder to enable move detection.'
 
-export function SongProperties({ trackId, onclose }: { trackId: number; onclose?: () => void }) {
+export function SongProperties({ trackId, onclose }: { trackId: number; onclose: () => void }) {
   const [details, setDetails] = useState<TrackDetails | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [section, setSection] = useState<Section>('overview')
@@ -78,15 +67,9 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
     { id: 'history', label: 'History' }
   ]
 
-  const nav = sections.map((x) => (
-    <button key={x.id} className={section === x.id ? 'active' : undefined} onClick={() => setSection(x.id)}>
-      {x.label}
-    </button>
-  ))
-
   let body
   if (error) {
-    body = <p className={cx(s.note, s.err)}>{error}</p>
+    body = <p className="tone-bad">{error}</p>
   } else if (!details) {
     body = <p className={s.note}>Loading…</p>
   } else if (section === 'overview') {
@@ -95,7 +78,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
         <div className={s.hero}>
           <Cover trackId={details.id} size={160} />
           <div>
-            <h2 className={cx(s.h2, s.first)}>Metadata</h2>
+            <h3 className={cx(s.h2, s.first)}>Metadata</h3>
             <dl className={s.dl}>
               {details.fields.slice(0, 4).map((f) =>
                 f.value !== null && (
@@ -109,7 +92,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
           </div>
         </div>
 
-        <h2 className={s.h2}>All metadata</h2>
+        <h3 className={s.h2}>All metadata</h3>
         <dl className={s.dl}>
           {details.fields.map((f) =>
             f.value !== null && (
@@ -121,7 +104,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
           )}
         </dl>
 
-        <h2 className={s.h2}>Identity</h2>
+        <h3 className={s.h2}>Identity</h3>
         <p className={s.hint}>{identityExplanation(details.identity.source)}</p>
         <dl className={s.dl}>
           <dt className={s.dt}>Decided by</dt><dd className={s.dd}><code className={s.code}>{details.identity.source}</code></dd>
@@ -144,7 +127,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
           )}
         </dl>
 
-        <h2 className={s.h2}>Statistics</h2>
+        <h3 className={s.h2}>Statistics</h3>
         <p className={s.hint}>These belong to the track, not to any one file, so they survive a re-rip.</p>
         <dl className={s.dl}>
           <dt className={s.dt}>Rating</dt>
@@ -158,7 +141,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
 
         {(details.loudness.rgTrackGain !== null || details.loudness.rgAlbumGain !== null) && (
           <>
-            <h2 className={s.h2}>Loudness</h2>
+            <h3 className={s.h2}>Loudness</h3>
             <dl className={s.dl}>
               <dt className={s.dt}>Track gain</dt><dd className={s.dd}>{details.loudness.rgTrackGain ?? '—'} dB</dd>
               <dt className={s.dt}>Album gain</dt><dd className={s.dd}>{details.loudness.rgAlbumGain ?? '—'} dB</dd>
@@ -168,7 +151,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
 
         {details.merges.length > 0 && (
           <>
-            <h2 className={s.h2}>Merge history</h2>
+            <h3 className={s.h2}>Merge history</h3>
             {details.merges.map((m) => (
               <p key={m.batchId} className={s.hint}>
                 Absorbed {m.absorbed} track{m.absorbed === 1 ? '' : 's'} on {when(m.at)}
@@ -182,7 +165,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
   } else if (section === 'sources') {
     body = (
       <section className={s.section}>
-        <h2 className={s.h2}>Sources</h2>
+        <h3 className={s.h2}>Sources</h3>
         <p className={s.hint}>
           Every file or stream backing this track. The preferred one is what plays; the rest are kept
           so nothing is lost when formats or drives change.
@@ -196,8 +179,8 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
         ) : details.media.map((m) => (
           <article key={m.id} className={cx(s.source, !m.present && s.missing)}>
             <header className={s.header}>
-              {m.preferred && <span className={cx(s.tag, s.pref)}>plays</span>}
-              {!m.present && <span className={cx(s.tag, s.gone)}>missing</span>}
+              {m.preferred && <Badge tone="good">plays</Badge>}
+              {!m.present && <Badge tone="bad">missing</Badge>}
               <span className={s.codec}>{(m.codec ?? m.kind).toUpperCase()}</span>
               <span className={s.path} title={m.uri}>{m.uri}</span>
               <button className={s.reveal} onClick={() => ipc('tracks:reveal', m.uri)} disabled={!m.present}>
@@ -210,7 +193,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
               <dt className={s.dt}>Sample rate</dt><dd className={s.dd}>{m.samplerate ? `${m.samplerate} Hz` : '—'}</dd>
               <dt className={s.dt}>Channels</dt><dd className={s.dd}>{m.channels ?? '—'}</dd>
               <dt className={s.dt}>Bit depth</dt><dd className={s.dd}>{m.bitsPerSample ?? '—'}</dd>
-              <dt className={s.dt}>Size</dt><dd className={s.dd}>{bytes(m.filesize)}</dd>
+              <dt className={s.dt}>Size</dt><dd className={s.dd}>{size(m.filesize)}</dd>
               <dt className={s.dt}>Modified</dt><dd className={s.dd}>{when(m.mtime)}</dd>
               <dt className={s.dt}>Last seen</dt><dd className={s.dd}>{when(m.lastSeen)}</dd>
               <dt className={s.dt}>Quality rank</dt><dd className={s.dd}>{m.qualityRank}</dd>
@@ -235,7 +218,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
   } else if (section === 'tags') {
     body = (
       <section className={s.section}>
-        <h2 className={s.h2}>Raw tags, per source</h2>
+        <h3 className={s.h2}>Raw tags, per source</h3>
         <p className={s.hint}>
           What each file actually carries. Two files backing one track can disagree, and X-Music stores
           both rather than losing the disagreement.
@@ -265,7 +248,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
   } else {
     body = (
       <section className={s.section}>
-        <h2 className={s.h2}>Play history</h2>
+        <h3 className={s.h2}>Play history</h3>
         <p className={s.hint}>
           {details.historyTotal} recorded event{details.historyTotal === 1 ? '' : 's'}
           {details.historyTotal > details.history.length && (
@@ -278,7 +261,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
           <ul className={s.history}>
             {details.history.map((h, i) => (
               <li key={`${h.at}-${i}`} className={s.entry}>
-                <span className={cx(s.kind, s[h.kind])}>{h.kind}</span>
+                <Badge tone={h.kind === 'play' ? 'good' : 'warn'}>{h.kind}</Badge>
                 <span>{when(h.at)}</span>
               </li>
             ))}
@@ -291,16 +274,18 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose?
   }
 
   return (
-    <Page
+    <PageView
       title={details?.title ?? 'Track'}
       subtitle={details
         ? `${details.media.length} source${details.media.length === 1 ? '' : 's'} · ` +
           `${details.statistics.playCount} play${details.statistics.playCount === 1 ? '' : 's'}`
         : undefined}
       onclose={onclose}
-      nav={nav}
+      sections={sections}
+      section={section}
+      onSection={setSection}
     >
       {body}
-    </Page>
+    </PageView>
   )
 }

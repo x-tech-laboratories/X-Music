@@ -1,20 +1,21 @@
 // View-model state for the library.
 //
-// The filter stack and sort state come from shared/view.ts, which is framework-free; this class only
-// tells watching components when to re-read.
+// The filter stack comes from shared/view.ts and the selection from X-Libs, both framework-free; this
+// class only tells watching components when to re-read.
 
-import type { FilterNode } from '@shared/filter'
+import { browser_storage, read_pref, write_pref } from '@x-tech-laboratories/x-libs/web/prefs'
+import { intent_for, Selection } from '@x-tech-laboratories/x-libs/web/selection'
+import type { Sorting } from '@x-tech-laboratories/x-libs/web/tables'
+import { create_watch } from '@x-tech-laboratories/x-libs/web/watch'
+import type { FilterNode, SortKey } from '@shared/filter'
 import { leaf, or } from '@shared/filter'
-import { FilterStack, Selection, SortState } from '@shared/view'
+import { FilterStack } from '@shared/view'
 import type { GroupRow, LibraryStats, TrackRow } from '@shared/ipc'
 import { field } from '@shared/fields'
-import { readPref, writePref } from '@shared/prefs'
 import { sanitizePaneValues, sanitizeSortKeys } from '@shared/viewstate'
 import { ipc } from '../lib/ipc'
-import { create_watch } from '../lib/watch'
 
-const storage = (): Storage | undefined =>
-  typeof localStorage === 'undefined' ? undefined : localStorage
+const storage = browser_storage
 
 const KEY_SORT = 'x-music.pref.library.sort'
 const KEY_PANES = 'x-music.pref.library.panes'
@@ -33,14 +34,16 @@ class LibraryStore {
   private lastSqlValue = ''
   private errorValue: string | null = null
   private searchValue = ''
+  // Counts the times the search was cleared from outside the box, so the box can start empty again.
+  private searchResetsValue = 0
 
   private readonly stack = new FilterStack()
-  private readonly sort = new SortState()
+  private sort: SortKey[] = []
   /** Field id → selected values. Several values in one pane mean OR, as gmusicbrowser does. */
   private readonly paneValues = new Map<string, string[]>()
   /** Last clicked row per pane, so shift can extend from it. */
   private readonly paneAnchor = new Map<string, number>()
-  private readonly selection = new Selection()
+  private readonly selection = new Selection<number>()
 
   get stats(): LibraryStats | null { return this.statsValue }
   set stats(v: LibraryStats | null) { this.statsValue = v; this.data.bump() }
@@ -51,33 +54,34 @@ class LibraryStore {
   get error(): string | null { return this.errorValue }
   set error(v: string | null) { this.errorValue = v; this.data.bump() }
   get search(): string { return this.searchValue }
+  get searchResets(): number { return this.searchResetsValue }
   set search(v: string) { this.searchValue = v; this.data.bump() }
 
   // Changes whenever the result set does, so panes can re-read without deep watching.
   get version(): number { return this.data.version() }
 
   constructor() {
-    const saved = sanitizeSortKeys(readPref<unknown>(storage(), KEY_SORT, null))
-    this.sort.set(saved.length > 0
+    const saved = sanitizeSortKeys(read_pref<unknown>(storage(), KEY_SORT, null))
+    this.sort = saved.length > 0
       ? saved
-      : [{ field: 'album' }, { field: 'disc_number' }, { field: 'track_number' }])
+      : [{ field: 'album' }, { field: 'disc_number' }, { field: 'track_number' }]
 
     // Pane selections and the search term are rebuilt into the filter stack, so the chips show up
     // and the user can see why the library is narrowed rather than wondering.
     for (const [fieldId, values] of Object.entries(
-      sanitizePaneValues(readPref<unknown>(storage(), KEY_PANES, null))
+      sanitizePaneValues(read_pref<unknown>(storage(), KEY_PANES, null))
     )) {
       this.applyPane(fieldId, values)
     }
 
-    const search = readPref(storage(), KEY_SEARCH, '')
+    const search = read_pref(storage(), KEY_SEARCH, '')
     if (typeof search === 'string' && search.trim() !== '') this.applySearch(search)
   }
 
   private persist(): void {
-    writePref(storage(), KEY_SORT, this.sort.list())
-    writePref(storage(), KEY_PANES, Object.fromEntries(this.paneValues))
-    writePref(storage(), KEY_SEARCH, this.search)
+    write_pref(storage(), KEY_SORT, this.sort)
+    write_pref(storage(), KEY_PANES, Object.fromEntries(this.paneValues))
+    write_pref(storage(), KEY_SEARCH, this.search)
   }
 
   private filter(): FilterNode {
@@ -111,6 +115,7 @@ class LibraryStore {
     this.paneValues.clear()
     this.paneAnchor.clear()
     this.search = ''
+    this.searchResetsValue += 1
     this.persist()
     await this.refresh()
   }
@@ -135,16 +140,12 @@ class LibraryStore {
 
   clickRow(index: number, modifiers: { shift?: boolean; ctrl?: boolean }): void {
     const ordered = this.tracks.map((t) => t.id)
-    const intent = modifiers.shift
-      ? (modifiers.ctrl ? 'range-add' : 'range')
-      : modifiers.ctrl ? 'toggle' : 'replace'
-
-    this.selection.apply(ordered, index, intent)
+    this.selection.apply(ordered, index, intent_for(modifiers))
     this.selection_changes.bump()
   }
 
   selectAll(): void {
-    this.selection.selectAll(this.tracks.map((t) => t.id))
+    this.selection.select_all(this.tracks.map((t) => t.id))
     this.selection_changes.bump()
   }
 
@@ -158,7 +159,7 @@ class LibraryStore {
       this.error = null
       this.stats = await ipc('library:stats')
 
-      const req = { filter: this.filter(), sort: [...this.sort.list()], limit: { count: PAGE } }
+      const req = { filter: this.filter(), sort: [...this.sort], limit: { count: PAGE } }
       this.tracks = await ipc('library:query', req)
       this.lastSql = (await ipc('library:explain', req)).sql
 
@@ -269,23 +270,23 @@ class LibraryStore {
       this.paneValues.delete(fieldId)
       this.paneAnchor.delete(fieldId)
     }
-    if (id === 'search') this.search = ''
+    if (id === 'search') {
+      this.search = ''
+      this.searchResetsValue += 1
+    }
     this.persist()
     await this.refresh()
   }
 
-  async toggleSort(fieldId: string, additive: boolean): Promise<void> {
-    this.sort.toggle(fieldId, additive)
+  // The sort keys as the table shows them, first deciding first.
+  sorting(): Sorting[] {
+    return this.sort.map((k) => ({ key: k.field, descending: k.dir === 'desc' }))
+  }
+
+  async setSorting(sorting: readonly Sorting[]): Promise<void> {
+    this.sort = sorting.map((k) => ({ field: k.key, dir: k.descending ? 'desc' : 'asc' }))
     this.persist()
     await this.refresh()
-  }
-
-  sortPriority(fieldId: string): number {
-    return this.sort.priority(fieldId)
-  }
-
-  sortDir(fieldId: string): 'asc' | 'desc' | null {
-    return this.sort.list().find((k) => k.field === fieldId)?.dir ?? null
   }
 }
 

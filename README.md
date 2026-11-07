@@ -3,7 +3,7 @@
 [![AI readiness](https://img.shields.io/endpoint?url=https://x-tech-laboratories.github.io/badges/x-tech-laboratories/X-Music.json)](https://x-tech-laboratories.github.io/guidelines/readiness/)
 
 A desktop music player with gmusicbrowser's data model and power, a web-technology UI that users can
-re-layout and re-skin, and [Halon](https://github.com/BeatLink/Halon) as its reference theme.
+re-layout and re-skin, drawn with the shared X-Libs widgets and the Halon theme (`@x-tech-laboratories/halon`).
 
 The design is specified in full in [DESIGN-SPEC.md](docs/DESIGN-SPEC.md). This README covers only how to
 run what exists.
@@ -23,9 +23,9 @@ implemented yet. See the roadmap in DESIGN-SPEC §15.
 | Audio content hashing (move/rename detection) | working |
 | Field descriptor system | working |
 | Format-string engine | working |
-| Framework-free view state (selection, sort, virtualization) | working |
+| View state (selection, sort, virtualization, on X-Libs) | working |
 | Halon theming | working |
-| Renderer shell | placeholder widgets |
+| Renderer shell (React on the X-Libs widgets and Halon) | working |
 | Playback (mpv, queue, repeat/shuffle, play counting) | working |
 | MPRIS, media keys, crossfade | not started |
 | Tag writing | not started (read-only by default) |
@@ -71,7 +71,6 @@ otherwise makes Electron run as bare node and die on the ESM entry point.
 | `npm run bench` | Performance budget benchmarks |
 | `npm run typecheck` | `tsc` for main/preload and for the renderer |
 | `npm run lint` | `oxlint` |
-| `npm run theme` | Regenerate `themes/halon/halon.css` from `tokens.json` |
 | `npm run app` | Build if needed and launch, read-only |
 | `npm run rebuild:electron` | Rebuild `better-sqlite3` against Electron's ABI |
 
@@ -141,9 +140,10 @@ src/
 └── workers/     (planned) scan, hash, index-build, replaygain
 ```
 
-`shared/` is where the leverage is. The filter AST, field descriptors, format-string engine and view
-state (selection, sort, filter stack, virtualization maths) are plain TypeScript with no framework
-primitives and no DOM access. Replacing the UI framework touches `renderer/` only.
+`shared/` is where the leverage is. The filter AST, field descriptors, format-string engine and the
+filter stack are plain TypeScript with no framework primitives and no DOM access; the selection,
+sorting, table, panes, prefs and logging come from X-Libs. Replacing the UI framework touches
+`renderer/` only.
 
 ## Contributing
 

@@ -1,215 +1,194 @@
+// The window: the player and its lists in the sidebar, the library browser beside them, after gmusicbrowser's "Lists, Library & Context".
+
 import { useEffect, useState } from 'react'
+import { Badge } from '@x-tech-laboratories/x-libs/web/react/badges'
+import { Tabs } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { Shell } from '@x-tech-laboratories/x-libs/web/react/shell'
+import { use_shortcuts } from '@x-tech-laboratories/x-libs/web/react/shortcuts'
+import { Split } from '@x-tech-laboratories/x-libs/web/react/split'
+import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
+import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
+import { one_of } from '@x-tech-laboratories/x-libs/web/prefs'
+import { format_duration } from '@x-tech-laboratories/x-libs/durations'
+import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { AppInfo, SafetyStatus } from '@shared/ipc'
-import { oneOf } from '@shared/prefs'
 import { ipc } from './lib/ipc'
 import { configureLogging, log } from './lib/log'
-import { cx } from './lib/cx'
-import { use_pref } from './lib/prefs'
-import { use_watch } from './lib/watch'
-import { Split } from './lib/Split'
+import { theme } from './lib/theme'
 import { library } from './stores/library'
 import { player } from './stores/player'
 import { PlayerBlock } from './widgets/PlayerBlock'
 import { TabbedLists } from './widgets/TabbedLists'
 import { FilterPane } from './widgets/FilterPane'
 import { SongList } from './widgets/SongList'
-import { SettingsPage, type Section } from './widgets/settings/SettingsPage'
-import s from './App.module.css'
+import { SettingsPage, type Section, type Density } from './widgets/settings/SettingsPage'
 
-type Theme = 'light' | 'dark' | 'system'
-type Density = 'compact' | 'normal' | 'comfortable'
+// ============================================================================
+// Shortcuts
+// ============================================================================
 
-const duration = (ms: number): string => {
-  const h = Math.floor(ms / 3_600_000)
-  const d = Math.floor(h / 24)
-  return d > 0 ? `${d}d ${h % 24}h` : `${h}h`
+const SEEK_STEP_IN_MILLISECONDS = 10_000
+
+const seek_by = (step: number): void => {
+  const duration = player.status?.durationMs ?? null
+  if (duration === null) return
+  void player.seek(Math.min(duration, Math.max(0, player.positionMs + step)))
 }
 
-/*
-  Structure follows gmusicbrowser's default layout, "Lists, Library & Context":
+const focus_search = (): void => {
+  document.querySelector<HTMLInputElement>('input[type="search"][aria-label="Search the library"]')?.focus()
+}
 
-    VBmain = HBmenu _HPmain Progress
-     HPmain = VBLeft _TBRight
-      VBLeft  = VBplayer _TabbedLists(PlayList, QueueList, song info, pictures)
-      TBRight = "Library" VPRight | "Context"
-       VPRight = HPfp0(genre | artist | album) _VBSongList
-        VBSongList = HBSongList(search, filter actions) _SongList
-*/
+// ============================================================================
+// App
+// ============================================================================
+
 export function App() {
-  const [info, setInfo] = useState<AppInfo | null>(null)
-  const [safety, setSafety] = useState<SafetyStatus | null>(null)
-  const [theme, set_theme] = use_pref<Theme>('theme', 'system', oneOf('light', 'dark', 'system'))
-  const [density, set_density] = use_pref<Density>('density', 'normal', oneOf('compact', 'normal', 'comfortable'))
+  const [info, set_info] = useState<AppInfo | null>(null)
+  const [safety, set_safety] = useState<SafetyStatus | null>(null)
+  const [density, set_density] = use_pref<Density>('x-music.pref.density', 'normal', one_of('compact', 'normal', 'comfortable'))
+  const [right_tab, set_right_tab] = useState<'library' | 'context'>('library')
+  const [settings_section, set_settings_section] = useState<Section | null>(null)
   use_watch(library.data)
-  const [rightTab, setRightTab] = useState<'library' | 'context'>('library')
-  const [showSettings, setShowSettings] = useState(false)
-  const [settingsSection, setSettingsSection] = useState<Section>('library')
 
   useEffect(() => {
-    // Renderer failures are invisible from the terminal otherwise, which turns UI bugs into
-    // guesswork. Forwarding them to the main log is cheap and always on.
-    const onError = (e: ErrorEvent): void =>
-      log.error(e.message, { source: e.filename, line: e.lineno })
-    const onRejection = (e: PromiseRejectionEvent): void =>
-      log.error('unhandled rejection', { reason: String(e.reason) })
-    window.addEventListener('error', onError)
-    window.addEventListener('unhandledrejection', onRejection)
+    // Renderer failures are invisible from the terminal otherwise, so they go to the main log.
+    const on_error = (event: ErrorEvent): void => log.error(event.message, { source: event.filename, line: event.lineno })
+    const on_rejection = (event: PromiseRejectionEvent): void => log.error('unhandled rejection', { reason: String(event.reason) })
+    window.addEventListener('error', on_error)
+    window.addEventListener('unhandledrejection', on_rejection)
 
-    const stopPlayer = player.init()
+    const stop_player = player.init()
     void boot()
 
     return () => {
-      window.removeEventListener('error', onError)
-      window.removeEventListener('unhandledrejection', onRejection)
-      stopPlayer()
+      window.removeEventListener('error', on_error)
+      window.removeEventListener('unhandledrejection', on_rejection)
+      stop_player()
     }
   }, [])
 
   async function boot(): Promise<void> {
     configureLogging((await ipc('app:logConfig')).spec)
     log.debug('renderer booting')
-    setInfo(await ipc('app:info'))
-    setSafety(await ipc('app:safety'))
+    set_info(await ipc('app:info'))
+    set_safety(await ipc('app:safety'))
     await library.refresh()
 
     // Open settings on the Import tab when there is nothing to look at yet.
-    if ((library.stats?.tracks ?? 0) === 0) {
-      setSettingsSection('import')
-      setShowSettings(true)
-    }
+    if ((library.stats?.tracks ?? 0) === 0) set_settings_section('import')
   }
-
-  useEffect(() => {
-    const root = document.documentElement
-    if (theme === 'system') root.removeAttribute('data-theme')
-    else root.setAttribute('data-theme', theme)
-  }, [theme])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-density', density)
   }, [density])
 
-  const cycleTheme = (): void => {
-    set_theme(theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system')
-  }
+  use_shortcuts([
+    { keys: 'ctrl+space', run: () => void player.toggle() },
+    { keys: 'alt+arrowright', run: () => void player.next() },
+    { keys: 'alt+arrowleft', run: () => void player.previous() },
+    { keys: 'shift+arrowright', run: () => seek_by(SEEK_STEP_IN_MILLISECONDS) },
+    { keys: 'shift+arrowleft', run: () => seek_by(-SEEK_STEP_IN_MILLISECONDS) },
+    { keys: 'mod+f', run: focus_search },
+    { keys: '/', run: focus_search }
+  ])
 
-  const leftPane = (
-    <div className={s.vbleft}>
+  const tools = (
+    <>
+      <span className="topbar-spacer" />
+      {safety && (
+        <Badge tone={safety.pinned ? 'info' : safety.readOnly ? 'good' : 'warn'} title={safety.reason}>
+          {safety.readOnly ? 'Read-only' : 'Writes enabled'}
+        </Badge>
+      )}
+      <button onClick={() => set_settings_section('library')}>Settings</button>
+    </>
+  )
+
+  const player_column = (
+    <div className="player-column">
       <Split
-        id="vbleft"
-        dir="vertical"
+        storage_key="x-music.split.vbleft"
+        axis="vertical"
         specs={[{ min: 150, max: 320 }, { min: 120, grow: true }]}
         preferred={[196, undefined]}
-        panes={[<PlayerBlock />, <TabbedLists />]}
+        panes={[<PlayerBlock key="player" />, <TabbedLists key="lists" />]}
       />
     </div>
   )
 
-  const panesRow = (
+  const panes_row = (
     <Split
-      id="hpfp"
-      dir="horizontal"
+      storage_key="x-music.split.hpfp"
       specs={[{ min: 90 }, { min: 90 }, { min: 90, grow: true }]}
       panes={[
-        <FilterPane id="fp0" field="genre" />,
-        <FilterPane id="fp1" field="album_artist" />,
-        <FilterPane id="fp2" field="album" />
+        <FilterPane key="fp0" id="fp0" field="genre" />,
+        <FilterPane key="fp1" id="fp1" field="album_artist" />,
+        <FilterPane key="fp2" id="fp2" field="album" />
       ]}
     />
-  )
-
-  const rightPane = (
-    <div className={s.tbright}>
-      <div className={s.tabs}>
-        <button className={cx(s.tab, rightTab === 'library' && s.active)} onClick={() => setRightTab('library')}>
-          Library
-        </button>
-        <button className={cx(s.tab, rightTab === 'context' && s.active)} onClick={() => setRightTab('context')}>
-          Context
-        </button>
-      </div>
-
-      {rightTab === 'library' ? (
-        <Split
-          id="vpright"
-          dir="vertical"
-          specs={[{ min: 90, max: 480 }, { min: 160, grow: true }]}
-          preferred={[190, undefined]}
-          panes={[panesRow, <SongList />]}
-        />
-      ) : (
-        <div className={s.context}>
-          <p>Context panel — lyrics, artist info and related tracks land in a later milestone.</p>
-        </div>
-      )}
-    </div>
   )
 
   const stats = library.stats
 
   return (
-    <div className={s.vbmain}>
-      {showSettings && (
+    <Shell
+      brand="X-Music"
+      sidebar={player_column}
+      sidebar_width={{ default_width: 420, min: 280, max: 720, storage_key: 'x-music.sidebar-width' }}
+      theme={theme}
+      user=""
+      tools={tools}
+    >
+      <div className="library-view">
+        <Tabs
+          label="Views"
+          items={[{ id: 'library', label: 'Library' }, { id: 'context', label: 'Context' }]}
+          active={right_tab}
+          on_select={set_right_tab}
+        />
+
+        {right_tab === 'library' ? (
+          <Split
+            storage_key="x-music.split.vpright"
+            axis="vertical"
+            specs={[{ min: 90, max: 480 }, { min: 160, grow: true }]}
+            preferred={[190, undefined]}
+            panes={[panes_row, <SongList key="songs" />]}
+          />
+        ) : (
+          <div className="empty">
+            <p>Context panel — lyrics, artist info and related tracks land in a later milestone.</p>
+          </div>
+        )}
+
+        <footer className="statusbar">
+          {library.error ? (
+            <span className="tone-bad">{library.error}</span>
+          ) : stats && (
+            <>
+              <span>{plural(stats.tracks, 'track')}</span>
+              <span>{plural(stats.media, 'file')}</span>
+              <span>{plural(stats.albums, 'album')}</span>
+              {stats.missing > 0 && <span className="tone-warn">{stats.missing.toLocaleString()} missing</span>}
+              <span>{format_duration(stats.totalMs / 1000, { largest_unit: 'days' })}</span>
+            </>
+          )}
+          <span className="statusbar-spacer" />
+          {info && <span className="muted">Electron {info.electron} · Chromium {info.chrome}</span>}
+        </footer>
+      </div>
+
+      {settings_section !== null && (
         <SettingsPage
           info={info}
           safety={safety}
-          theme={theme}
           density={density}
-          initialSection={settingsSection}
-          onclose={() => setShowSettings(false)}
-          onTheme={set_theme}
+          initialSection={settings_section}
+          onclose={() => set_settings_section(null)}
           onDensity={set_density}
         />
       )}
-
-      <div className={s.hbmenu}>
-        <button className={s.menuItem}
-                onClick={() => { setSettingsSection('library'); setShowSettings(true) }}>Settings</button>
-        <span className={s.spacer}></span>
-
-        {safety && (
-          <span className={cx(s.safety, safety.pinned && s.pinned)} title={safety.reason}>
-            {safety.readOnly ? '🔒 Read-only' : '⚠ Writes enabled'}
-          </span>
-        )}
-
-        <button className={s.menuItem} onClick={cycleTheme} title={`Theme: ${theme}`}>
-          {theme === 'dark' ? '◐' : theme === 'light' ? '◑' : '◒'}
-        </button>
-      </div>
-
-      {/* Every boundary below is draggable; sizes persist per split id. */}
-      <Split
-        id="hpmain"
-        dir="horizontal"
-        specs={[{ min: 280, max: 720 }, { min: 420, grow: true }]}
-        preferred={[420, undefined]}
-        panes={[leftPane, rightPane]}
-      />
-
-      <footer className={s.status}>
-        {library.error ? (
-          <span className={s.err}>{library.error}</span>
-        ) : stats && (
-          <>
-            <span>{stats.tracks.toLocaleString()} tracks</span>
-            <span className={s.sep}>·</span>
-            <span>{stats.media.toLocaleString()} files</span>
-            <span className={s.sep}>·</span>
-            <span>{stats.albums.toLocaleString()} albums</span>
-            {stats.missing > 0 && (
-              <>
-                <span className={s.sep}>·</span>
-                <span className={s.warn}>{stats.missing.toLocaleString()} missing</span>
-              </>
-            )}
-            <span className={s.sep}>·</span>
-            <span>{duration(stats.totalMs)}</span>
-          </>
-        )}
-        <span className={s.spacer}></span>
-        {info && <span className={s.dim}>Electron {info.electron} · Chromium {info.chrome}</span>}
-      </footer>
-    </div>
+    </Shell>
   )
 }

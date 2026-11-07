@@ -4,12 +4,14 @@
 import { Fragment } from 'react'
 import { useEffect, useState } from 'react'
 import type { MergePreview, MergeResult, Resolution } from '@shared/ipc'
-import { isBoolean } from '@shared/prefs'
+import { Badge } from '@x-tech-laboratories/x-libs/web/react/badges'
+import { Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
+import { is_boolean } from '@x-tech-laboratories/x-libs/web/prefs'
 import { ipc } from '../lib/ipc'
 import { cx } from '../lib/cx'
-import { use_pref } from '../lib/prefs'
 import { library } from '../stores/library'
-import { Page } from '../lib/Page'
+import { PageView } from './PageView'
 import s from './MergeView.module.css'
 
 function show(v: unknown): string {
@@ -26,7 +28,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<MergeResult | null>(null)
   const [undoing, setUndoing] = useState(false)
-  const [onlyDifferences, setOnlyDifferences] = use_pref('merge.onlyDifferences', false, isBoolean)
+  const [onlyDifferences, setOnlyDifferences] = use_pref('x-music.pref.merge.onlyDifferences', false, is_boolean)
 
   useEffect(() => {
     void (async () => {
@@ -133,21 +135,21 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
 
   const actions = !result && preview && (
     <>
-      <label className={s.toggle}>
+      <label className="check">
         <input
           type="checkbox"
           checked={onlyDifferences}
           onChange={(e) => setOnlyDifferences(e.currentTarget.checked)}
         /> Only differences
       </label>
-      <button className={s.primary} onClick={apply} disabled={busy || survivor === null}>
+      <button className="accent solid" onClick={apply} disabled={busy || survivor === null}>
         {busy ? 'Merging…' : 'Merge'}
       </button>
     </>
   )
 
   return (
-    <Page
+    <PageView
       title={`Merge ${ids.length} tracks into one`}
       subtitle={conflictCount > 0
         ? `${conflictCount} field${conflictCount === 1 ? '' : 's'} disagree — pick which value to keep`
@@ -159,7 +161,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
 
       {result ? (
         <div className={s.done}>
-          <h2 className={s.h2}>Merged</h2>
+          <h3 className={s.h2}>Merged</h3>
           <p className={s.doneText}>
             One track now holds <strong>{result.mediaMoved + 1}</strong>
             {' '}{result.mediaMoved + 1 === 1 ? 'file' : 'files'}.
@@ -168,8 +170,8 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
             )}
           </p>
           <div className={s.rowActions}>
-            <button className={s.rowButton} onClick={undo} disabled={undoing}>{undoing ? 'Undoing…' : 'Undo this merge'}</button>
-            <button className={cx(s.rowButton, s.primary)} onClick={() => onclose?.(true)}>Done</button>
+            <button onClick={undo} disabled={undoing}>{undoing ? 'Undoing…' : 'Undo this merge'}</button>
+            <button className="accent solid" onClick={() => onclose?.(true)}>Done</button>
           </div>
         </div>
       ) : preview ? (
@@ -231,27 +233,27 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
           </div>
 
           <section>
-            <h2 className={s.h2}>Combined statistics</h2>
+            <h3 className={s.h2}>Combined statistics</h3>
             <p className={s.hint}>
               These are not a choice: plays and skips are summed, the highest rating wins, and play
               history is merged and deduplicated.
             </p>
-            <div className={s.statgrid}>
-              <div className={s.stat}><strong className={s.statValue}>{preview.statistics.playCount}</strong><span className={s.statLabel}>plays</span></div>
-              <div className={s.stat}><strong className={s.statValue}>{preview.statistics.skipCount}</strong><span className={s.statLabel}>skips</span></div>
-              <div className={s.stat}><strong className={s.statValue}>{preview.statistics.rating ?? '—'}</strong><span className={s.statLabel}>rating</span></div>
-            </div>
+            <Tiles>
+              <Tile label="plays" value={preview.statistics.playCount} value_first />
+              <Tile label="skips" value={preview.statistics.skipCount} value_first />
+              <Tile label="rating" value={preview.statistics.rating ?? '—'} value_first />
+            </Tiles>
           </section>
 
           <section className={s.files}>
-            <h2 className={s.h2}>Files the surviving track will hold</h2>
+            <h3 className={s.h2}>Files the surviving track will hold</h3>
             <ul className={s.fileList}>
               {preview.media.map((m) => (
                 <li key={m.id} className={s.file}>
                   <span className={s.codec}>{m.codec ?? '?'}</span>
                   <span className={s.uri} title={m.uri}>{m.uri}</span>
                   <span className={s.src}>Source {sourceIndex(m.from)}</span>
-                  {!m.present && <span className={s.missing}>missing</span>}
+                  {!m.present && <Badge tone="bad">missing</Badge>}
                 </li>
               ))}
             </ul>
@@ -260,6 +262,6 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
       ) : (
         <p className={s.note}>Loading…</p>
       )}
-    </Page>
+    </PageView>
   )
 }

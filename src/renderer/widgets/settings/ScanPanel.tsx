@@ -3,19 +3,22 @@ import { ipc } from '../../lib/ipc'
 import { cx } from '../../lib/cx'
 import type { FileOutcome, FileResult, Root, ScanProgress, ScanReport } from '@shared/ipc'
 import { library } from '../../stores/library'
-import { virtualWindow } from '@shared/view'
+import { Badge, type Tone } from '@x-tech-laboratories/x-libs/web/react/badges'
+import { virtual_window } from '@x-tech-laboratories/x-libs/web/virtual'
 import s from './ScanPanel.module.css'
 
 const ROW = 24
 
-const OUTCOMES: { id: FileOutcome; label: string }[] = [
-  { id: 'new', label: 'New' },
-  { id: 'matched', label: 'Matched' },
-  { id: 'moved', label: 'Moved' },
-  { id: 'unchanged', label: 'Unchanged' },
-  { id: 'missing', label: 'Missing' },
-  { id: 'error', label: 'Failed' }
+const OUTCOMES: { id: FileOutcome; label: string; tone: Tone }[] = [
+  { id: 'new', label: 'New', tone: 'good' },
+  { id: 'matched', label: 'Matched', tone: 'none' },
+  { id: 'moved', label: 'Moved', tone: 'info' },
+  { id: 'unchanged', label: 'Unchanged', tone: 'none' },
+  { id: 'missing', label: 'Missing', tone: 'warn' },
+  { id: 'error', label: 'Failed', tone: 'bad' }
 ]
+
+const tone_of = (outcome: FileOutcome): Tone => OUTCOMES.find((each) => each.id === outcome)?.tone ?? 'none'
 
 const short = (p: string | undefined): string =>
   p ? (p.length > 72 ? `…${p.slice(-71)}` : p) : ''
@@ -48,7 +51,7 @@ export function ScanPanel() {
     () => (filter === 'all' ? results : results.filter((r) => r.outcome === filter)),
     [results, filter]
   )
-  const win = virtualWindow(shown.length, ROW, scrollTop, viewport)
+  const win = virtual_window(shown.length, ROW, scrollTop, viewport)
   const slice = shown.slice(win.start, win.end)
 
   useEffect(() => {
@@ -139,7 +142,7 @@ export function ScanPanel() {
   return (
     <section className={s.scan}>
       <header className={s.header}>
-        <h2 className={s.heading}>Music folders</h2>
+        <h3 className={s.heading}>Music folders</h3>
         <p className={s.lead}>
           X-Music reads these folders to build the library. Files are only ever read, never modified.
         </p>
@@ -153,7 +156,7 @@ export function ScanPanel() {
               <span className={s.when}>
                 {r.lastScan ? `scanned ${new Date(r.lastScan).toLocaleString()}` : 'never scanned'}
               </span>
-              <button className={cx(s.button, s.remove)} onClick={() => remove(r.id)} disabled={scanning}>Remove</button>
+              <button className="danger" onClick={() => remove(r.id)} disabled={scanning}>Remove</button>
             </li>
           ))}
         </ul>
@@ -162,11 +165,11 @@ export function ScanPanel() {
       )}
 
       <div className={s.actions}>
-        <button className={s.button} onClick={add} disabled={scanning}>Add folder…</button>
-        <button className={cx(s.button, s.primary)} onClick={scan} disabled={scanning || roots.length === 0}>
+        <button onClick={add} disabled={scanning}>Add folder…</button>
+        <button className="accent solid" onClick={scan} disabled={scanning || roots.length === 0}>
           {scanning ? 'Scanning…' : 'Scan now'}
         </button>
-        {scanning && <button className={s.button} onClick={cancel}>Cancel</button>}
+        {scanning && <button onClick={cancel}>Cancel</button>}
       </div>
 
       {progress && (
@@ -185,12 +188,12 @@ export function ScanPanel() {
       {hasResults && (
         <div className={s.results}>
           <div className={s.filters}>
-            <button className={cx(s.button, filter === 'all' && s.sel)} onClick={() => setFilter('all')}>
+            <button aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
               All <span className={s.n}>{results.length.toLocaleString()}</span>
             </button>
             {OUTCOMES.map((o) =>
               tally[o.id] ? (
-                <button key={o.id} className={cx(s.button, s[o.id], filter === o.id && s.sel)}
+                <button key={o.id} aria-pressed={filter === o.id}
                         onClick={() => setFilter(o.id)}>
                   {o.label} <span className={s.n}>{tally[o.id]!.toLocaleString()}</span>
                 </button>
@@ -204,11 +207,11 @@ export function ScanPanel() {
           </div>
 
           <div className={s.body} ref={body} onScroll={onScroll}>
-            <div className={s.spacer} style={{ height: `${win.totalPx}px` }}>
-              <div className={s.rows} style={{ transform: `translateY(${win.offsetPx}px)` }}>
+            <div className={s.spacer} style={{ height: `${win.total_px}px` }}>
+              <div className={s.rows} style={{ transform: `translateY(${win.offset_px}px)` }}>
                 {slice.map((r, i) => (
                   <div key={win.start + i} className={s.row} style={{ height: `${ROW}px` }}>
-                    <span className={cx(s.badge, s[r.outcome])}>{r.outcome}</span>
+                    <Badge tone={tone_of(r.outcome)}>{r.outcome}</Badge>
                     <span className={s.file} title={r.path}>{short(r.path)}</span>
                     <span className={s.why}>{r.detail ?? ''}</span>
                   </div>

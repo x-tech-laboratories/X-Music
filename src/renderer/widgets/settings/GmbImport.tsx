@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { ipc } from '../../lib/ipc'
 import { cx } from '../../lib/cx'
 import type { GmbPreview, ImportReport } from '@shared/ipc'
@@ -77,7 +78,7 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
   return (
     <section className={s.import}>
       <header className={s.header}>
-        <h2 className={s.heading}>gmusicbrowser</h2>
+        <h3 className={s.heading}>gmusicbrowser</h3>
         <p className={s.lead}>
           Imports ratings, play counts, full play history, genres, groupings, labels and saved lists.
           Your music files are only ever read.
@@ -86,11 +87,11 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
 
       <div className={s.row}>
         <label className={s.label} htmlFor="gmbrc">Configuration file</label>
-        <input className={s.input} id="gmbrc" value={path} spellCheck={false}
+        <input id="gmbrc" value={path} spellCheck={false}
                onChange={(e) => setPath(e.currentTarget.value)}
                onBlur={(e) => void check(e.currentTarget.value)}
                onKeyDown={(e) => { if (e.key === 'Enter') void check(e.currentTarget.value) }} />
-        <button className={s.button} onClick={browse}>Browse…</button>
+        <button onClick={browse}>Browse…</button>
       </div>
 
       {preview && !preview.exists ? (
@@ -100,12 +101,12 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
         <p className={cx(s.note, s.err)}>Could not parse: {preview.error}</p>
       ) : preview && (
         <>
-          <div className={s.preview}>
-            <div><strong>{preview.songs.toLocaleString()}</strong><span>songs</span></div>
-            <div><strong>{preview.playHistoryEntries.toLocaleString()}</strong><span>play events</span></div>
-            <div><strong>{preview.savedLists}</strong><span>saved lists</span></div>
-            <div><strong>{preview.savedFilters}</strong><span>saved filters</span></div>
-          </div>
+          <Tiles>
+            <Tile label="songs" value={preview.songs.toLocaleString()} value_first />
+            <Tile label="play events" value={preview.playHistoryEntries.toLocaleString()} value_first />
+            <Tile label="saved lists" value={preview.savedLists} value_first />
+            <Tile label="saved filters" value={preview.savedFilters} value_first />
+          </Tiles>
           {preview.baseFolder && (
             <p className={s.note}>Music root: <code className={s.code}>{preview.baseFolder}</code>{preview.version && <> · gmbrc {preview.version}</>}</p>
           )}
@@ -115,24 +116,24 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
 
           <div className={s.opts}>
             <label className={s.label}>
-              <input className={s.check} type="checkbox" checked={statistics}
+              <input type="checkbox" checked={statistics}
                      onChange={(e) => setStatistics((e.currentTarget as HTMLInputElement).checked)} /> Ratings, play counts and history
             </label>
             <label className={s.label}>
-              <input className={s.check} type="checkbox" checked={labels}
+              <input type="checkbox" checked={labels}
                      onChange={(e) => setLabels((e.currentTarget as HTMLInputElement).checked)} /> Genres, groupings and labels
             </label>
             <label className={s.label}>
-              <input className={s.check} type="checkbox" checked={playlists}
+              <input type="checkbox" checked={playlists}
                      onChange={(e) => setPlaylists((e.currentTarget as HTMLInputElement).checked)} /> Saved lists as playlists
             </label>
           </div>
 
           <div className={s.actions}>
-            <button className={cx(s.button, s.primary)} disabled={busy || preview.songs === 0} onClick={run}>
+            <button className="accent solid" disabled={busy || preview.songs === 0} onClick={run}>
               {busy ? 'Importing…' : `Import ${preview.songs.toLocaleString()} songs`}
             </button>
-            <button className={s.button} disabled={busy} onClick={reset}>Clear library</button>
+            <button className="danger" disabled={busy} onClick={reset}>Clear library</button>
             <span className={s.readonly}>Reads only — your music files are never modified.</span>
           </div>
         </>
@@ -152,7 +153,7 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
             <p key={note} className={s.note}>{note}</p>
           ))}
 
-          <button className={cx(s.button, s.primary, s.big)} onClick={ondone}>Show my library →</button>
+          <button className="accent solid" onClick={ondone}>Show my library →</button>
         </div>
       )}
     </section>

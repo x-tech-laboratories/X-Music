@@ -1,14 +1,21 @@
-import { useState } from 'react'
-import { ipc } from '../../lib/ipc'
-import { cx } from '../../lib/cx'
-import { Page } from '../../lib/Page'
+// Settings as a full-window view: the library, its folders, imports, duplicates, appearance and versions.
+
+import { useEffect, useState } from 'react'
+import { confirm_dialog } from '@x-tech-laboratories/x-libs/web/react/dialog'
+import { Segmented } from '@x-tech-laboratories/x-libs/web/react/controls'
+import { Facts, SettingRow, SettingsGroup } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
+import { format_duration } from '@x-tech-laboratories/x-libs/durations'
+import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import type { Theme } from '@x-tech-laboratories/x-libs/web/theme'
 import type { AppInfo, SafetyStatus } from '@shared/ipc'
+import { ipc } from '../../lib/ipc'
+import { theme } from '../../lib/theme'
 import { library } from '../../stores/library'
-import { use_watch } from '../../lib/watch'
+import { PageView } from '../PageView'
 import { GmbImport } from './GmbImport'
 import { ScanPanel } from './ScanPanel'
 import { DuplicatesPanel } from './DuplicatesPanel'
-import s from './SettingsPage.module.css'
 
 const sections = [
   { id: 'library', label: 'Library' },
@@ -20,165 +27,121 @@ const sections = [
 ] as const
 
 export type Section = (typeof sections)[number]['id']
+export type Density = 'compact' | 'normal' | 'comfortable'
 
-const duration = (ms: number): string => {
-  const h = Math.floor(ms / 3_600_000)
-  const d = Math.floor(h / 24)
-  return d > 0 ? `${d}d ${h % 24}h` : `${h}h`
+// The theme as the Shell's button and this page share it.
+function use_theme(): Theme {
+  const [current, set_current] = useState(theme.get)
+  useEffect(() => theme.on_change(set_current), [])
+  return current
 }
 
 export function SettingsPage({
   info = null,
   safety = null,
-  theme = 'system',
   density = 'normal',
   initialSection = 'library',
   onclose,
-  onTheme,
   onDensity
 }: {
   info?: AppInfo | null
   safety?: SafetyStatus | null
-  theme?: 'light' | 'dark' | 'system'
-  density?: 'compact' | 'normal' | 'comfortable'
+  density?: Density
   initialSection?: Section
-  onclose?: () => void
-  onTheme?: (t: 'light' | 'dark' | 'system') => void
-  onDensity?: (d: 'compact' | 'normal' | 'comfortable') => void
+  onclose: () => void
+  onDensity?: (density: Density) => void
 }) {
   use_watch(library.data)
-  // The prop only chooses where to open; the nav owns the value from then on.
-  const [section, setSection] = useState<Section>(initialSection)
-  const [clearing, setClearing] = useState(false)
+  // The prop only chooses where to open; the tabs own the value from then on.
+  const [section, set_section] = useState<Section>(initialSection)
+  const current_theme = use_theme()
 
-  async function clearLibrary(): Promise<void> {
-    setClearing(true)
-    try {
-      await ipc('library:reset')
-      await library.refresh()
-    } finally {
-      setClearing(false)
-    }
+  function clear_library(): void {
+    confirm_dialog({
+      title: 'Clear the library database?',
+      message: 'Removes every track, playlist and statistic. Files are untouched.',
+      confirm_label: 'Clear library',
+      busy_label: 'Clearing…',
+      danger: true,
+      run: async () => {
+        await ipc('library:reset')
+        await library.refresh()
+      }
+    })
   }
-
-  const nav = sections.map((sec) => (
-    <button key={sec.id} className={cx(s.navButton, section === sec.id && s.active)}
-            onClick={() => setSection(sec.id)}>{sec.label}</button>
-  ))
 
   const stats = library.stats
 
+  let body
+  if (section === 'library') {
+    body = (
+      <SettingsGroup heading="Library">
+        <Facts layout="rows" rows={[
+          ['Database', stats ? <code className="path">{stats.path}</code> : null],
+          ['Contents', stats
+            ? [plural(stats.tracks, 'track'), plural(stats.media, 'file'), plural(stats.albums, 'album'),
+               format_duration(stats.totalMs / 1000, { largest_unit: 'days' }),
+               ...(stats.missing > 0 ? [`${stats.missing} missing`] : [])].join(' · ')
+            : null],
+          ['File safety', safety ? (
+            <>
+              <strong className={safety.readOnly ? 'tone-good' : undefined}>{safety.readOnly ? 'Read-only' : 'Writes enabled'}</strong>
+              <span className="setting-hint"> {safety.reason} </span>
+              <span className="setting-hint">
+                {safety.pinned
+                  ? <>Pinned by the environment. Unset <code>X_MUSIC_FORCE_READ_ONLY</code> to change it.</>
+                  : 'X-Music cannot write tags yet, so this is a guarantee rather than a preference.'}
+              </span>
+            </>
+          ) : null]
+        ]} />
+        <SettingRow label="Danger zone" hint="Removes every track, playlist and statistic. Files are untouched.">
+          <button className="danger" onClick={clear_library}>Clear library database</button>
+        </SettingRow>
+      </SettingsGroup>
+    )
+  } else if (section === 'folders') {
+    body = <ScanPanel />
+  } else if (section === 'import') {
+    body = <GmbImport ondone={onclose} />
+  } else if (section === 'duplicates') {
+    body = <DuplicatesPanel />
+  } else if (section === 'appearance') {
+    body = (
+      <SettingsGroup heading="Appearance" hint="Colours come from the Halon tokens; density sets the song list's row height.">
+        <SettingRow label="Theme">
+          <Segmented
+            label="Theme"
+            choices={[{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]}
+            value={current_theme}
+            on_change={(choice) => theme.set(choice)}
+          />
+        </SettingRow>
+        <SettingRow label="Density">
+          <Segmented
+            label="Density"
+            choices={[{ value: 'compact', label: 'Compact' }, { value: 'normal', label: 'Normal' }, { value: 'comfortable', label: 'Comfortable' }]}
+            value={density}
+            on_change={(choice) => onDensity?.(choice)}
+          />
+        </SettingRow>
+      </SettingsGroup>
+    )
+  } else {
+    body = (
+      <SettingsGroup heading="About">
+        <Facts layout="rows" rows={[
+          ['X-Music', info?.version ?? null],
+          ['Runtime', info ? `Electron ${info.electron} · Chromium ${info.chrome} · Node ${info.node} · ${info.platform}` : null],
+          ['Last query', library.lastSql ? <pre className="output">{library.lastSql}</pre> : null]
+        ]} />
+      </SettingsGroup>
+    )
+  }
+
   return (
-    <Page title="Settings" onclose={onclose} nav={nav}>
-      {section === 'library' ? (
-        <section className={s.section}>
-          <h2 className={s.heading}>Library</h2>
-
-          <div className={s.field}>
-            <span className={s.label}>Database</span>
-            <code className={s.code}>{stats?.path ?? '—'}</code>
-          </div>
-
-          <div className={s.field}>
-            <span className={s.label}>Contents</span>
-            <span>
-              {stats ? (
-                <>
-                  {stats.tracks.toLocaleString()} tracks ·{' '}
-                  {stats.media.toLocaleString()} files ·{' '}
-                  {stats.albums.toLocaleString()} albums ·{' '}
-                  {duration(stats.totalMs)}
-                  {stats.missing > 0 && <> · {stats.missing} missing</>}
-                </>
-              ) : '—'}
-            </span>
-          </div>
-
-          <div className={s.field}>
-            <span className={s.label}>File safety</span>
-            <span>
-              {safety ? (
-                <>
-                  <strong className={cx(safety.readOnly && s.ok)}>{safety.readOnly ? 'Read-only' : 'Writes enabled'}</strong>
-                  <span className={s.hint}>{safety.reason}</span>
-                  {safety.pinned ? (
-                    <span className={s.hint}>
-                      Pinned by the environment. Unset <code className={s.code}>X_MUSIC_FORCE_READ_ONLY</code> to change it.
-                    </span>
-                  ) : (
-                    <span className={s.hint}>
-                      X-Music cannot write tags yet, so this is a guarantee rather than a preference.
-                    </span>
-                  )}
-                </>
-              ) : '—'}
-            </span>
-          </div>
-
-          <div className={s.field}>
-            <span className={s.label}>Danger zone</span>
-            <span>
-              <button className={s.danger} disabled={clearing} onClick={clearLibrary}>
-                {clearing ? 'Clearing…' : 'Clear library database'}
-              </button>
-              <span className={s.hint}>Removes every track, playlist and statistic. Files are untouched.</span>
-            </span>
-          </div>
-        </section>
-      ) : section === 'folders' ? (
-        <ScanPanel />
-      ) : section === 'import' ? (
-        <GmbImport ondone={onclose} />
-      ) : section === 'duplicates' ? (
-        <DuplicatesPanel />
-      ) : section === 'appearance' ? (
-        <section className={s.section}>
-          <h2 className={s.heading}>Appearance</h2>
-
-          <div className={s.field}>
-            <span className={s.label}>Theme</span>
-            <div className={s.choices}>
-              {(['system', 'light', 'dark'] as const).map((t) => (
-                <button key={t} className={cx(s.choice, theme === t && s.sel)} onClick={() => onTheme?.(t)}>{t}</button>
-              ))}
-            </div>
-          </div>
-
-          <div className={s.field}>
-            <span className={s.label}>Density</span>
-            <div className={s.choices}>
-              {(['compact', 'normal', 'comfortable'] as const).map((d) => (
-                <button key={d} className={cx(s.choice, density === d && s.sel)} onClick={() => onDensity?.(d)}>{d}</button>
-              ))}
-            </div>
-          </div>
-
-          <p className={s.hint}>
-            Colours come from the Halon token set; density maps onto the row-height scale, so both
-            apply everywhere without a component knowing about them.
-          </p>
-        </section>
-      ) : (
-        <section className={s.section}>
-          <h2 className={s.heading}>About</h2>
-          <div className={s.field}>
-            <span className={s.label}>X-Music</span>
-            <span>{info?.version ?? '—'}</span>
-          </div>
-          <div className={s.field}>
-            <span className={s.label}>Runtime</span>
-            <span>
-              {info
-                ? `Electron ${info.electron} · Chromium ${info.chrome} · Node ${info.node} · ${info.platform}`
-                : '—'}
-            </span>
-          </div>
-          <div className={s.field}>
-            <span className={s.label}>Last query</span>
-            <code className={cx(s.code, s.sql)}>{library.lastSql || '—'}</code>
-          </div>
-        </section>
-      )}
-    </Page>
+    <PageView title="Settings" onclose={onclose} sections={[...sections]} section={section} onSection={set_section}>
+      {body}
+    </PageView>
   )
 }

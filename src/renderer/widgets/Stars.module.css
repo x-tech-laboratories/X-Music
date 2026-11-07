@@ -1,16 +1,17 @@
-.stars { display: flex; gap: 1px; }
+.stars { display: flex; gap: var(--border-width); }
 
-.star {
+.stars .star, .stars .star:hover:not(:disabled) {
+  height: auto;
   min-width: 12px;
   padding: 0;
-  font-size: var(--font-size-md);
+  font-size: var(--text-control);
   line-height: 1;
   color: var(--rating-off);
   background: none;
   border: 0;
-  cursor: pointer;
-  transition: color var(--transition-fast);
+  transition: color var(--duration-fast);
 }
 
-.star.on { color: var(--rating-on); }
+.stars .star.on { color: var(--rating-on); }
+
 .stars:hover .star.on { color: var(--rating-hover); }

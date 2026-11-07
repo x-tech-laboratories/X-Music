@@ -1,9 +1,9 @@
 // Playback view state. The decisions all live in the main process; this mirrors status and
 // interpolates the position between ticks so the seek bar moves smoothly without a 60 Hz IPC feed.
 
+import { create_watch } from '@x-tech-laboratories/x-libs/web/watch'
 import type { PlayerStatus, RepeatMode } from '@shared/ipc'
 import { ipc } from '../lib/ipc'
-import { create_watch } from '../lib/watch'
 
 class PlayerStore {
   // Bumped when the status changes.
