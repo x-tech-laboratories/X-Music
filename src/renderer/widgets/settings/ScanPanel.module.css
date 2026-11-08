@@ -1,11 +1,5 @@
 .scan { display: grid; gap: var(--space-5); max-width: 70ch; }
 
-.header { display: grid; gap: var(--space-2); }
-
-.heading { margin: 0; font-size: var(--text-h3); color: var(--text-heading); }
-
-.lead { margin: 0; font-size: var(--text-caption); color: var(--text-secondary); }
-
 .roots { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 
 .roots li {

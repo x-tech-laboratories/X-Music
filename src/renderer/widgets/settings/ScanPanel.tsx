@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
 import { ipc } from '../../lib/ipc'
 import { cx } from '../../lib/cx'
-import type { FileOutcome, FileResult, Root, ScanProgress, ScanReport } from '@shared/ipc'
+import type { FileOutcome, FileResult, ScanProgress, ScanReport } from '@shared/ipc'
 import { library } from '../../stores/library'
 import { Badge, type Tone } from '@x-tech-laboratories/x-libs/web/react/badges'
+import { PageHeading } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { virtual_window } from '@x-tech-laboratories/x-libs/web/virtual'
 import s from './ScanPanel.module.css'
 
@@ -26,7 +28,7 @@ const short = (p: string | undefined): string =>
 const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)}s`
 
 export function ScanPanel() {
-  const [roots, setRoots] = useState<Root[]>([])
+  const roots = use_resource(() => ipc('library:roots'), [])
   const [progress, setProgress] = useState<ScanProgress | null>(null)
   const [report, setReport] = useState<ScanReport | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +72,6 @@ export function ScanPanel() {
   }, [hasResults])
 
   useEffect(() => {
-    void load()
     const offProgress = window.xMusicEvents.on('scan:progress', (p) => setProgress(p))
     const offFiles = window.xMusicEvents.on('scan:files', (batch) => {
       setResults((prev) => [...prev, ...batch])
@@ -84,19 +85,11 @@ export function ScanPanel() {
     return () => { offProgress(); offFiles(); offDone() }
   }, [])
 
-  async function load(): Promise<void> {
-    try {
-      setRoots(await ipc('library:roots'))
-    } catch (err) {
-      setError((err as Error).message)
-    }
-  }
-
   async function add(): Promise<void> {
     try {
       setError(null)
       const added = await ipc('library:addRoot')
-      if (added) await load()
+      if (added) await roots.reload(true)
     } catch (err) {
       setError((err as Error).message)
     }
@@ -104,7 +97,7 @@ export function ScanPanel() {
 
   async function remove(id: number): Promise<void> {
     await ipc('library:removeRoot', id)
-    await load()
+    await roots.reload(true)
   }
 
   async function scan(): Promise<void> {
@@ -141,16 +134,14 @@ export function ScanPanel() {
 
   return (
     <section className={s.scan}>
-      <header className={s.header}>
-        <h3 className={s.heading}>Music folders</h3>
-        <p className={s.lead}>
-          X-Music reads these folders to build the library. Files are only ever read, never modified.
-        </p>
-      </header>
+      <PageHeading
+        title="Music folders"
+        subtitle="X-Music reads these folders to build the library. Files are only ever read, never modified."
+      />
 
-      {roots.length ? (
+      <Loaded resource={roots} lines={2}>{(list) => list.length ? (
         <ul className={s.roots}>
-          {roots.map((r) => (
+          {list.map((r) => (
             <li key={r.id}>
               <code className={s.code}>{r.path}</code>
               <span className={s.when}>
@@ -162,11 +153,11 @@ export function ScanPanel() {
         </ul>
       ) : (
         <p className={s.note}>No folders yet. Add one to scan, or import from gmusicbrowser instead.</p>
-      )}
+      )}</Loaded>
 
       <div className={s.actions}>
         <button onClick={add} disabled={scanning}>Add folder…</button>
-        <button className="accent solid" onClick={scan} disabled={scanning || roots.length === 0}>
+        <button className="accent solid" onClick={scan} disabled={scanning || (roots.data?.length ?? 0) === 0}>
           {scanning ? 'Scanning…' : 'Scan now'}
         </button>
         {scanning && <button onClick={cancel}>Cancel</button>}

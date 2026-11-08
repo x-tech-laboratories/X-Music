@@ -5,6 +5,7 @@ import type { DuplicateGroup, DuplicateReason, MergeResult } from '@shared/ipc'
 import { MergeView } from '../MergeView'
 import { library } from '../../stores/library'
 import { Badge, type Tone } from '@x-tech-laboratories/x-libs/web/react/badges'
+import { PageHeading } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
 import { is_number_in } from '@x-tech-laboratories/x-libs/web/prefs'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
@@ -107,12 +108,10 @@ export function DuplicatesPanel() {
   return (
     <>
       <section className={s.dupes}>
-        <header className={s.header}>
-          <h3 className={s.heading}>Find duplicates</h3>
-          <p className={s.lead}>
-            X-Music never merges automatically. This proposes groups with its reasoning; you decide.
-          </p>
-        </header>
+        <PageHeading
+          title="Find duplicates"
+          subtitle="X-Music never merges automatically. This proposes groups with its reasoning; you decide."
+        />
 
         <div className={s.opts}>
           {REASONS.map((r) => (

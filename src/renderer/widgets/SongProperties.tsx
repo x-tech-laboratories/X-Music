@@ -1,10 +1,9 @@
 // Everything X-Music knows about one track. This is the first place the entity model is visible:
 // a track is a piece of music, and the files are sources hanging off it (DESIGN-SPEC §6.5).
 
-import { Fragment } from 'react'
-import { useEffect, useState } from 'react'
-import type { TrackDetails } from '@shared/ipc'
+import { Fragment, useState } from 'react'
 import { Badge } from '@x-tech-laboratories/x-libs/web/react/badges'
+import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { bytes, stamp } from '@x-tech-laboratories/x-libs/web/format'
 import { ipc } from '../lib/ipc'
@@ -41,21 +40,13 @@ const hashExplanation = (algo: string | null): string => ({
 } as Record<string, string>)[algo ?? ''] ?? 'Not hashed yet; scan this folder to enable move detection.'
 
 export function SongProperties({ trackId, onclose }: { trackId: number; onclose: () => void }) {
-  const [details, setDetails] = useState<TrackDetails | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [section, setSection] = useState<Section>('overview')
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const found = await ipc('tracks:details', trackId)
-        setDetails(found)
-        if (!found) setError('This track no longer exists.')
-      } catch (err) {
-        setError((err as Error).message)
-      }
-    })()
-  }, [])
+  const resource = use_resource(async () => {
+    const found = await ipc('tracks:details', trackId)
+    if (!found) throw new Error('This track no longer exists.')
+    return found
+  }, [trackId])
+  const details = resource.data
 
   const totalPlays = details?.history.filter((h) => h.kind === 'play').length ?? 0
   const totalSkips = details?.history.filter((h) => h.kind === 'skip').length ?? 0
@@ -67,11 +58,9 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose:
     { id: 'history', label: 'History' }
   ]
 
-  let body
-  if (error) {
-    body = <p className="tone-bad">{error}</p>
-  } else if (!details) {
-    body = <p className={s.note}>Loading…</p>
+  let body = null
+  if (!details) {
+    body = null
   } else if (section === 'overview') {
     body = (
       <section className={s.section}>
@@ -285,7 +274,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose:
       section={section}
       onSection={setSection}
     >
-      {body}
+      <Loaded resource={resource} lines={6}>{() => body}</Loaded>
     </PageView>
   )
 }

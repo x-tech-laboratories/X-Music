@@ -34,8 +34,6 @@ class LibraryStore {
   private lastSqlValue = ''
   private errorValue: string | null = null
   private searchValue = ''
-  // Counts the times the search was cleared from outside the box, so the box can start empty again.
-  private searchResetsValue = 0
 
   private readonly stack = new FilterStack()
   private sort: SortKey[] = []
@@ -54,7 +52,6 @@ class LibraryStore {
   get error(): string | null { return this.errorValue }
   set error(v: string | null) { this.errorValue = v; this.data.bump() }
   get search(): string { return this.searchValue }
-  get searchResets(): number { return this.searchResetsValue }
   set search(v: string) { this.searchValue = v; this.data.bump() }
 
   // Changes whenever the result set does, so panes can re-read without deep watching.
@@ -115,7 +112,6 @@ class LibraryStore {
     this.paneValues.clear()
     this.paneAnchor.clear()
     this.search = ''
-    this.searchResetsValue += 1
     this.persist()
     await this.refresh()
   }
@@ -272,7 +268,6 @@ class LibraryStore {
     }
     if (id === 'search') {
       this.search = ''
-      this.searchResetsValue += 1
     }
     this.persist()
     await this.refresh()
