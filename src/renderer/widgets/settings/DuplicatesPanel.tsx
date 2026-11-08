@@ -122,9 +122,9 @@ export function DuplicatesPanel() {
               {r.id === 'fuzzy' && <Badge tone="warn">noisy</Badge>}
             </label>
           ))}
-          <label className={cx(s.label, s.tol)}>
+          <label className={s.label}>
             Length tolerance
-            <input type="number" min="0" max="60" value={tolerance}
+            <input type="number" className="input-xs" min="0" max="60" value={tolerance}
                    onChange={(e) => {
                      const v = (e.currentTarget as HTMLInputElement).value
                      if (v !== '') setTolerance(+v)

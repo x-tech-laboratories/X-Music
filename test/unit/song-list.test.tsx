@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { TrackRow } from '@shared/ipc'
 import { library } from '../../src/renderer/stores/library'
+import { player } from '../../src/renderer/stores/player'
 import { SongList } from '../../src/renderer/widgets/SongList'
 
 // ============================================================================
@@ -41,6 +42,7 @@ beforeEach(() => {
   Object.assign(window, { xMusic: bridge, xMusicEvents: { on: () => () => {} } })
   ;(library as unknown as { tracks: TrackRow[] }).tracks = tracks(3)
   library.clearSelection()
+  player.status = null
 })
 
 afterEach(cleanup)
@@ -84,6 +86,23 @@ describe('song list', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Title/ }))
 
     await vi.waitFor(() => expect(calls.get('library:query')).toHaveBeenCalledWith(expect.objectContaining({ sort: [{ field: 'title', dir: 'asc' }] })))
+  })
+
+  it('marks the playing track with Halon\'s now-playing row', () => {
+    player.status = { state: 'playing', track: { id: 20 }, positionMs: 0, durationMs: 61_000 } as unknown as typeof player.status
+    render(<SongList />)
+
+    expect(row('Track 2').classList.contains('now-playing')).toBe(true)
+    expect(row('Track 1').classList.contains('now-playing')).toBe(false)
+  })
+
+  it('lights the stars of a rating with Halon\'s rating classes', () => {
+    ;(library as unknown as { tracks: TrackRow[] }).tracks = [{ ...tracks(1)[0], rating: 60 }]
+    render(<SongList />)
+
+    const rating = screen.getByRole('slider', { name: 'Rating' })
+    expect(rating.classList.contains('rating')).toBe(true)
+    expect(rating.querySelectorAll('.star.on')).toHaveLength(3)
   })
 
   it('shows lengths as clock times', () => {

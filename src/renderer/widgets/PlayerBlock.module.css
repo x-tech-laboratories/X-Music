@@ -20,6 +20,6 @@
 
 .clock { font-variant-numeric: tabular-nums; font-size: var(--text-caption); color: var(--text-tertiary); }
 
-.range { width: 100%; accent-color: var(--media-progress); }
+.range { width: 100%; }
 
 .spacer { flex: 1; }

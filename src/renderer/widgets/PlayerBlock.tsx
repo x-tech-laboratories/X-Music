@@ -1,6 +1,6 @@
 // gmb's VBplayer: indicator row, transport, the three text lines, and the time bar.
 
-import type { ChangeEvent } from 'react'
+import type { ChangeEvent, CSSProperties } from 'react'
 import { Badge } from '@x-tech-laboratories/x-libs/web/react/badges'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
@@ -25,7 +25,7 @@ function TimeBar({ durationMs }: { durationMs: number | null }) {
   return (
     <div className={s.time}>
       <span className={s.clock}>{format_clock(player.positionMs)}</span>
-      <input className={s.range} type="range" min="0" max="1000" value={progress} disabled={!durationMs} aria-label="Seek" onChange={on_seek} />
+      <input className={cx(s.range, 'seek')} style={{ '--range-progress': `${progress / 10}%` } as CSSProperties} type="range" min="0" max="1000" value={progress} disabled={!durationMs} aria-label="Seek" onChange={on_seek} />
       <span className={s.clock}>{format_clock(durationMs)}</span>
     </div>
   )
