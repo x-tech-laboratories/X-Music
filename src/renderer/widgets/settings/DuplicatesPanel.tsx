@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ipc } from '../../lib/ipc'
-import { cx } from '../../lib/cx'
+import { cx } from '@x-tech-laboratories/x-libs/web/dom'
 import type { DuplicateGroup, DuplicateReason, MergeResult } from '@shared/ipc'
 import { MergeView } from '../MergeView'
 import { library } from '../../stores/library'
@@ -109,6 +109,7 @@ export function DuplicatesPanel() {
     <>
       <section className={s.dupes}>
         <PageHeading
+          level={2}
           title="Find duplicates"
           subtitle="X-Music never merges automatically. This proposes groups with its reasoning; you decide."
         />

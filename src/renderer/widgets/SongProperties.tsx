@@ -7,9 +7,10 @@ import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/stat
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { bytes, stamp } from '@x-tech-laboratories/x-libs/web/format'
 import { ipc } from '../lib/ipc'
-import { cx } from '../lib/cx'
-import { PageView } from './PageView'
-import { Stars } from './Stars'
+import { cx } from '@x-tech-laboratories/x-libs/web/dom'
+import { PageView } from '@x-tech-laboratories/x-libs/web/react/page_view'
+import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
+import { ratingToStars } from '@shared/fields'
 import { Cover } from './Cover'
 import s from './SongProperties.module.css'
 
@@ -41,11 +42,7 @@ const hashExplanation = (algo: string | null): string => ({
 
 export function SongProperties({ trackId, onclose }: { trackId: number; onclose: () => void }) {
   const [section, setSection] = useState<Section>('overview')
-  const resource = use_resource(async () => {
-    const found = await ipc('tracks:details', trackId)
-    if (!found) throw new Error('This track no longer exists.')
-    return found
-  }, [trackId])
+  const resource = use_resource(() => ipc('tracks:details', trackId), [trackId])
   const details = resource.data
 
   const totalPlays = details?.history.filter((h) => h.kind === 'play').length ?? 0
@@ -120,7 +117,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose:
         <p className={s.hint}>These belong to the track, not to any one file, so they survive a re-rip.</p>
         <dl className={s.dl}>
           <dt className={s.dt}>Rating</dt>
-          <dd className={s.dd}><Stars value={details.statistics.rating} /></dd>
+          <dd className={s.dd}><Rating value={ratingToStars(details.statistics.rating)} /></dd>
           <dt className={s.dt}>Plays</dt><dd className={s.dd}>{details.statistics.playCount}</dd>
           <dt className={s.dt}>Skips</dt><dd className={s.dd}>{details.statistics.skipCount}</dd>
           <dt className={s.dt}>First played</dt><dd className={s.dd}>{when(details.statistics.firstPlayed)}</dd>
@@ -172,7 +169,7 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose:
               {!m.present && <Badge tone="bad">missing</Badge>}
               <span className={s.codec}>{(m.codec ?? m.kind).toUpperCase()}</span>
               <span className={s.path} title={m.uri}>{m.uri}</span>
-              <button className={s.reveal} onClick={() => ipc('tracks:reveal', m.uri)} disabled={!m.present}>
+              <button onClick={() => ipc('tracks:reveal', m.uri)} disabled={!m.present}>
                 Show in folder
               </button>
             </header>
@@ -269,12 +266,12 @@ export function SongProperties({ trackId, onclose }: { trackId: number; onclose:
         ? `${details.media.length} source${details.media.length === 1 ? '' : 's'} · ` +
           `${details.statistics.playCount} play${details.statistics.playCount === 1 ? '' : 's'}`
         : undefined}
-      onclose={onclose}
+      on_close={onclose}
       sections={sections}
       section={section}
-      onSection={setSection}
+      on_section={setSection}
     >
-      <Loaded resource={resource} lines={6}>{() => body}</Loaded>
+      <Loaded resource={resource} lines={6} empty={<p className="muted">This track no longer exists.</p>}>{() => body}</Loaded>
     </PageView>
   )
 }

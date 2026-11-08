@@ -69,20 +69,7 @@
   font-size: var(--text-caption);
 }
 
-.source .header .reveal {
-  height: var(--row-height);
-  padding: 0 var(--space-4);
-  font-size: var(--text-caption);
-  color: var(--text-secondary);
-  background: transparent;
-  border: var(--border-width) solid var(--border-control);
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.source .header .reveal:disabled { opacity: 0.4; cursor: default; }
-
-.tech { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.tech { grid-template-columns: repeat(2, minmax(90px, auto) 1fr); }
 
 .tech .dt { grid-column: auto; }
 

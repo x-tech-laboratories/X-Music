@@ -28,24 +28,6 @@
 
 .smeta { font-weight: 400; color: var(--text-tertiary); }
 
-.pickSurvivor, .takeall, .union {
-  height: var(--row-height);
-  padding: 0 var(--space-2);
-  font: inherit;
-  font-size: var(--text-caption);
-  color: var(--text-secondary);
-  background: var(--surface-default);
-  border: var(--border-width) solid var(--border-control);
-  border-radius: var(--radius-small);
-  cursor: pointer;
-}
-
-.pickSurvivor.on { color: var(--text-on-fill); background: var(--accent); border-color: transparent; }
-
-.takeall { font-weight: 400; }
-
-.takeall:hover, .pickSurvivor:hover, .union:hover { border-color: var(--border-focus); }
-
 .label { color: var(--text-tertiary); background: var(--surface-secondary); }
 
 .label.conflict { color: var(--text-body); font-weight: 600; }
@@ -83,8 +65,6 @@
   border-right: 0;
   background: var(--surface-secondary);
 }
-
-.union.on { color: var(--text-on-fill); background: var(--accent); border-color: transparent; }
 
 .rval { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         color: var(--text-heading); }

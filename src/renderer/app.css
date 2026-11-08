@@ -3,8 +3,6 @@
 /* ── Player tokens (DESIGN-SPEC §5.4), derived from Halon's ─────────────────── */
 
 :root {
-  --media-progress: var(--accent);
-  --media-progress-track: var(--border-default);
   --row-hover: var(--surface-navigation-hover);
   --column-header: var(--surface-secondary);
   --column-separator: var(--border-default);
@@ -38,8 +36,5 @@ main {
 .song-list-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .song-list-body { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; overflow: hidden; }
 .song-list-body > .table-tools { justify-content: flex-end; }
-/* Stands in for Halon's .table-wrap.scroll until the X-Libs table takes a class for its wrapper. */
-.song-list-body > .table-wrap { min-height: 0; overflow: auto; }
-.song-list-body > .table-wrap thead th { position: sticky; top: 0; z-index: 1; }
 .song-list td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .song-list tbody tr { cursor: default; }

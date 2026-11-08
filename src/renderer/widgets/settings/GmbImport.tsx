@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
+import { PathInput } from '@x-tech-laboratories/x-libs/web/react/controls'
 import { PageHeading, Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { ipc } from '../../lib/ipc'
-import { cx } from '../../lib/cx'
+import { cx } from '@x-tech-laboratories/x-libs/web/dom'
 import type { ImportReport } from '@shared/ipc'
 import { library } from '../../stores/library'
 import s from './GmbImport.module.css'
@@ -36,17 +37,11 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
     if (at) setChecked(at)
   }
 
-  async function browse(): Promise<void> {
-    try {
-      const picked = await ipc('import:gmbBrowse')
-      if (picked) {
-        setPath(picked)
-        check(picked)
-      }
-    } catch (err) {
-      setError((err as Error).message)
-    }
-  }
+  // A typed path is checked once typing pauses, a picked one at once.
+  useEffect(() => {
+    const timer = setTimeout(() => check(path), 400)
+    return () => clearTimeout(timer)
+  }, [path])
 
   async function run(): Promise<void> {
     setBusy(true)
@@ -75,17 +70,14 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
   return (
     <section className={s.import}>
       <PageHeading
+        level={2}
         title="gmusicbrowser"
         subtitle="Imports ratings, play counts, full play history, genres, groupings, labels and saved lists. Your music files are only ever read."
       />
 
       <div className={s.row}>
-        <label className={s.label} htmlFor="gmbrc">Configuration file</label>
-        <input id="gmbrc" value={path} spellCheck={false}
-               onChange={(e) => setPath(e.currentTarget.value)}
-               onBlur={(e) => void check(e.currentTarget.value)}
-               onKeyDown={(e) => { if (e.key === 'Enter') void check(e.currentTarget.value) }} />
-        <button onClick={browse}>Browse…</button>
+        <span className={s.label}>Configuration file</span>
+        <PathInput label="Configuration file" value={path} on_change={setPath} pick={() => ipc('import:gmbBrowse')} />
       </div>
 
       <Loaded resource={preview} lines={2}>{(found) => !found.exists ? (

@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react'
+import { useEffect, useMemo, useState, type UIEvent } from 'react'
 import { ipc } from '../../lib/ipc'
-import { cx } from '../../lib/cx'
+import { cx } from '@x-tech-laboratories/x-libs/web/dom'
+import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import type { FileOutcome, FileResult, ScanProgress, ScanReport } from '@shared/ipc'
 import { library } from '../../stores/library'
 import { Badge, type Tone } from '@x-tech-laboratories/x-libs/web/react/badges'
+import { FollowToggle, use_follow_tail } from '@x-tech-laboratories/x-libs/web/react/following'
 import { PageHeading } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { ProgressBar } from '@x-tech-laboratories/x-libs/web/react/progress'
 import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { virtual_window } from '@x-tech-laboratories/x-libs/web/virtual'
 import s from './ScanPanel.module.css'
@@ -37,10 +40,11 @@ export function ScanPanel() {
   // Every file's outcome is kept; the table renders only the rows in view.
   const [results, setResults] = useState<FileResult[]>([])
   const [filter, setFilter] = useState<FileOutcome | 'all'>('all')
-  const [follow, setFollow] = useState(true)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewport, setViewport] = useState(320)
-  const body = useRef<HTMLDivElement>(null)
+  // Following the tail is only helpful while rows are still arriving.
+  const tail = use_follow_tail<HTMLDivElement>(results.length, scanning)
+  const body = tail.ref
   const hasResults = results.length > 0
 
   const tally = useMemo(() => {
@@ -55,12 +59,6 @@ export function ScanPanel() {
   )
   const win = virtual_window(shown.length, ROW, scrollTop, viewport)
   const slice = shown.slice(win.start, win.end)
-
-  useEffect(() => {
-    // Following the tail is only helpful while rows are still arriving.
-    const el = body.current
-    if (follow && scanning && el) el.scrollTop = el.scrollHeight
-  }, [results.length, follow, scanning])
 
   useEffect(() => {
     const el = body.current
@@ -91,7 +89,7 @@ export function ScanPanel() {
       const added = await ipc('library:addRoot')
       if (added) await roots.reload(true)
     } catch (err) {
-      setError((err as Error).message)
+      setError(describe_error(err))
     }
   }
 
@@ -105,12 +103,12 @@ export function ScanPanel() {
     setReport(null)
     setResults([])
     setFilter('all')
-    setFollow(true)
+    tail.set_following(true)
     setScanning(true)
     try {
       await ipc('library:scan')
     } catch (err) {
-      setError((err as Error).message)
+      setError(describe_error(err))
       setScanning(false)
       setProgress(null)
     }
@@ -120,21 +118,15 @@ export function ScanPanel() {
     await ipc('library:scanCancel')
   }
 
-  const pct =
-    progress && progress.found > 0
-      ? Math.round((progress.processed / progress.found) * 100)
-      : 0
-
   const onScroll = (e: UIEvent<HTMLDivElement>): void => {
-    const el = e.currentTarget
-    setScrollTop(el.scrollTop)
-    // Scrolling up by hand means the user wants to read, not chase the tail.
-    if (scanning && el.scrollTop + el.clientHeight < el.scrollHeight - 8) setFollow(false)
+    setScrollTop(e.currentTarget.scrollTop)
+    tail.on_scroll(e)
   }
 
   return (
     <section className={s.scan}>
       <PageHeading
+        level={2}
         title="Music folders"
         subtitle="X-Music reads these folders to build the library. Files are only ever read, never modified."
       />
@@ -164,16 +156,16 @@ export function ScanPanel() {
       </div>
 
       {progress && (
-        <div className={s.progress}>
-          <div className={s.bar}><div className={s.fill} style={{ width: `${pct}%` }}></div></div>
-          <div className={s.detail}>
-            {progress.phase === 'walking'
-              ? `Finding files… ${progress.found.toLocaleString()}`
-              : progress.phase === 'finishing'
-                ? 'Checking for files that disappeared…'
-                : `${progress.processed.toLocaleString()} / ${progress.found.toLocaleString()}`}
-          </div>
-        </div>
+        <ProgressBar
+          label="Scan progress"
+          value={progress.phase === 'reading' ? progress.processed : null}
+          max={progress.found}
+          detail={progress.phase === 'walking'
+            ? `Finding files… ${progress.found.toLocaleString()}`
+            : progress.phase === 'finishing'
+              ? 'Checking for files that disappeared…'
+              : `${progress.processed.toLocaleString()} / ${progress.found.toLocaleString()}`}
+        />
       )}
 
       {hasResults && (
@@ -191,10 +183,7 @@ export function ScanPanel() {
               ) : null
             )}
             <span className={s.grow}></span>
-            <label className={s.follow}>
-              <input type="checkbox" checked={follow} disabled={!scanning}
-                     onChange={(e) => setFollow((e.currentTarget as HTMLInputElement).checked)} /> Follow
-            </label>
+            <FollowToggle following={tail.following} on_change={tail.set_following} disabled={!scanning} />
           </div>
 
           <div className={s.body} ref={body} onScroll={onScroll}>
@@ -213,7 +202,7 @@ export function ScanPanel() {
         </div>
       )}
 
-      {error && <p className={cx(s.note, s.err)}>{error}</p>}
+      {error && <p className={cx(s.note, 'tone-bad')}>{error}</p>}
 
       {report && (
         <div className={s.report}>

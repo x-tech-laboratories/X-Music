@@ -29,7 +29,7 @@
           version = (builtins.fromJSON (builtins.readFile ./package.json)).version;
           src = self;
 
-          npmDepsHash = "sha256-9z2r6w1WZzp5lFS519SqX3QkGWVirDcMInONxxS5Y3s=";
+          npmDepsHash = "sha256-1yVvnqrfdMdkYpiHf9CE9Hanr4doWJnaSfAtG6EacT4=";
           inherit nodejs;
 
           nativeBuildInputs = with pkgs; [ makeWrapper copyDesktopItems autoPatchelfHook ];

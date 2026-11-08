@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import { ipc } from '../lib/ipc'
-import { cx } from '../lib/cx'
+import { cx } from '@x-tech-laboratories/x-libs/web/dom'
 import s from './Cover.module.css'
 
 export function Cover({
