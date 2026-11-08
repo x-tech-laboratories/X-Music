@@ -10,11 +10,11 @@ import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
 import { row_after_key } from '@x-tech-laboratories/x-libs/web/selection'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import type { TrackRow } from '@shared/ipc'
-import { field } from '@shared/fields'
+import { field, ratingToStars } from '@shared/fields'
 import { library } from '../stores/library'
 import { player } from '../stores/player'
 import { logger } from '../lib/log'
-import { Stars } from './Stars'
+import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { MergeView } from './MergeView'
 import { SongProperties } from './SongProperties'
 
@@ -40,7 +40,7 @@ const columns: TableColumn<TrackRow>[] = [
   column('album', 220, (track) => track.album ?? ''),
   column('year', 60, (track) => track.year ?? '', true),
   column('length', 70, (track) => format_clock(track.length_ms, ''), true),
-  column('rating', 96, (track) => <Stars value={track.rating} />),
+  column('rating', 96, (track) => <Rating value={ratingToStars(track.rating)} />),
   column('play_count', 60, (track) => track.play_count, true)
 ]
 
@@ -182,6 +182,7 @@ export function SongList() {
       <div className="song-list-body" ref={body}>
         <DataTable
           caption="Tracks"
+          wrap_class="scroll"
           columns={columns}
           rows={tracks}
           row_key={(track) => track.id}

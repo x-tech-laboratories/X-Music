@@ -12,7 +12,7 @@ import type { AppInfo, SafetyStatus } from '@shared/ipc'
 import { ipc } from '../../lib/ipc'
 import { theme } from '../../lib/theme'
 import { library } from '../../stores/library'
-import { PageView } from '../PageView'
+import { PageView } from '@x-tech-laboratories/x-libs/web/react/page_view'
 import { GmbImport } from './GmbImport'
 import { ScanPanel } from './ScanPanel'
 import { DuplicatesPanel } from './DuplicatesPanel'
@@ -140,7 +140,7 @@ export function SettingsPage({
   }
 
   return (
-    <PageView title="Settings" onclose={onclose} sections={[...sections]} section={section} onSection={set_section}>
+    <PageView title="Settings" on_close={onclose} sections={[...sections]} section={section} on_section={set_section}>
       {body}
     </PageView>
   )

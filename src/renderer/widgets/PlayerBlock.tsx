@@ -5,9 +5,10 @@ import { Badge } from '@x-tech-laboratories/x-libs/web/react/badges'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { player } from '../stores/player'
-import { cx } from '../lib/cx'
-import { Stars } from './Stars'
-import { VolumeButton } from './VolumeButton'
+import { cx } from '@x-tech-laboratories/x-libs/web/dom'
+import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
+import { VolumeButton } from '@x-tech-laboratories/x-libs/web/react/volume'
+import { ratingToStars } from '@shared/fields'
 import { Cover } from './Cover'
 import s from './PlayerBlock.module.css'
 
@@ -52,7 +53,7 @@ export function PlayerBlock() {
         </button>
         {queued > 0 && <Badge tone="info">{queued} queued</Badge>}
         <span className={s.spacer} />
-        <Stars value={track?.rating ?? null} />
+        <Rating value={ratingToStars(track?.rating ?? null)} />
       </div>
 
       <div className={s.main}>
@@ -65,7 +66,7 @@ export function PlayerBlock() {
             </button>
             <button className="icon" aria-label="Next" title="Next (Alt+→)" onClick={() => void player.next()}>⏭</button>
             <span className={s.spacer} />
-            <VolumeButton volume={status?.volume ?? 80} onchange={(volume) => void player.setVolume(volume)} />
+            <VolumeButton volume={status?.volume ?? 80} on_change={(volume) => void player.setVolume(volume)} />
           </div>
 
           <div className={cx(s.line, s.title)} title={track?.title ?? ''}>{track?.title ?? 'Nothing playing'}</div>

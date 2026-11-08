@@ -5,7 +5,7 @@ import { library } from '../stores/library'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
 import { use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
-import { cx } from '../lib/cx'
+import { cx } from '@x-tech-laboratories/x-libs/web/dom'
 import s from './FilterPane.module.css'
 
 // Every groupable field, per DESIGN-SPEC §3.2.1: no field is second class, so the list is

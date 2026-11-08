@@ -1,6 +1,6 @@
 {
   "name": "x-music",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A customizable music player with a real library engine",
   "license": "GPL-3.0-or-later",
   "type": "module",
@@ -24,8 +24,8 @@
     "lint": "oxlint"
   },
   "dependencies": {
-    "@x-tech-laboratories/halon": "^0.4.0",
-    "@x-tech-laboratories/x-libs": "^0.9.0",
+    "@x-tech-laboratories/halon": "^0.5.0",
+    "@x-tech-laboratories/x-libs": "^0.11.0",
     "better-sqlite3": "^13.0.3",
     "music-metadata": "^11.15.0",
     "react": "^19.3.1",

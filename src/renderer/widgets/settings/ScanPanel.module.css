@@ -19,23 +19,6 @@
 
 .actions { display: flex; gap: var(--space-4); }
 
-.progress { display: grid; gap: var(--space-2); }
-
-.bar {
-  height: 6px;
-  overflow: hidden;
-  background: var(--media-progress-track);
-  border-radius: 999px;
-}
-
-.fill {
-  height: 100%;
-  background: var(--media-progress);
-  transition: width var(--duration-slow);
-}
-
-.detail { display: flex; gap: var(--space-4); font-size: var(--text-caption); color: var(--text-tertiary); }
-
 .results {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -58,14 +41,6 @@
 .filters .n { font-variant-numeric: tabular-nums; opacity: 0.75; }
 
 .grow { flex: 1; }
-
-.follow {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  font-size: var(--text-caption);
-  color: var(--text-tertiary);
-}
 
 .body { height: 320px; overflow-y: auto; }
 
@@ -104,8 +79,6 @@
 .note { margin: 0; font-size: var(--text-caption); color: var(--text-tertiary); }
 
 .note.warn { color: var(--status-warning-text); }
-
-.note.err { color: var(--status-danger); }
 
 .report {
   display: grid;

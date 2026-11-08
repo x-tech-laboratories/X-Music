@@ -9,9 +9,9 @@ import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/stat
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
 import { is_boolean } from '@x-tech-laboratories/x-libs/web/prefs'
 import { ipc } from '../lib/ipc'
-import { cx } from '../lib/cx'
+import { cx } from '@x-tech-laboratories/x-libs/web/dom'
 import { library } from '../stores/library'
-import { PageView } from './PageView'
+import { PageView } from '@x-tech-laboratories/x-libs/web/react/page_view'
 import s from './MergeView.module.css'
 
 function show(v: unknown): string {
@@ -145,7 +145,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
       subtitle={conflictCount > 0
         ? `${conflictCount} field${conflictCount === 1 ? '' : 's'} disagree — pick which value to keep`
         : 'Every field agrees; merging keeps all files under one track'}
-      onclose={() => onclose?.(false)}
+      on_close={() => onclose?.(false)}
       actions={actions}
     >
       {error && <p className={cx(s.note, s.err)}>{error}</p>}
@@ -180,7 +180,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
             {preview.ids.map((id) => (
               <div key={id} className={cx(s.cell, s.head, s.source, survivor === id && s.survivor)}>
                 <div className={s.shead}>
-                  <button className={cx(s.pickSurvivor, survivor === id && s.on)} onClick={() => setSurvivor(id)}>
+                  <button className={cx(survivor === id && 'accent solid')} aria-pressed={survivor === id} onClick={() => setSurvivor(id)}>
                     {survivor === id ? '● Survivor' : '○ Make survivor'}
                   </button>
                   <span className={s.sname}>Source {sourceIndex(id)}</span>
@@ -188,7 +188,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
                 <div className={s.smeta}>
                   {mediaFor(id)} file{mediaFor(id) === 1 ? '' : 's'}
                 </div>
-                <button className={s.takeall} onClick={() => takeAll(id)}>Take all from this</button>
+                <button onClick={() => takeAll(id)}>Take all from this</button>
               </div>
             ))}
             <div className={cx(s.cell, s.head, s.result)}>Result</div>
@@ -213,7 +213,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
 
                 <div className={cx(s.cell, s.resultCell)}>
                   {f.conflict && f.multi && (
-                    <button className={cx(s.union, unionChosen(f.field) && s.on)} onClick={() => pickUnion(f.field)}>
+                    <button className={cx(unionChosen(f.field) && 'accent solid')} aria-pressed={unionChosen(f.field)} onClick={() => pickUnion(f.field)}>
                       Keep all
                     </button>
                   )}
