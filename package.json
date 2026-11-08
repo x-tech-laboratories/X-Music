@@ -24,8 +24,8 @@
     "lint": "oxlint"
   },
   "dependencies": {
-    "@x-tech-laboratories/halon": "^0.2.0",
-    "@x-tech-laboratories/x-libs": "^0.7.0",
+    "@x-tech-laboratories/halon": "^0.3.0",
+    "@x-tech-laboratories/x-libs": "^0.8.0",
     "better-sqlite3": "^13.0.3",
     "music-metadata": "^11.15.0",
     "react": "^19.3.1",

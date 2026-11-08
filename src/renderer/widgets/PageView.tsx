@@ -27,12 +27,12 @@ export function PageView<Section extends string>({
   return (
     <Dialog
       title={title}
+      subtitle={subtitle}
       on_close={onclose}
-      wide
+      full
       class_name="page-view"
-      buttons={<>{actions}<button onClick={onclose} title="Close (Esc)">Close</button></>}
+      actions={<>{actions}<button onClick={onclose} title="Close (Esc)">Close</button></>}
     >
-      {subtitle && <p className="muted">{subtitle}</p>}
       {sections && section !== undefined && (
         <Tabs label={`${title} sections`} items={sections} active={section} on_select={onSection} />
       )}

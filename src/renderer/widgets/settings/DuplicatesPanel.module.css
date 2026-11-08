@@ -10,8 +10,6 @@
 
 .label { display: flex; gap: var(--space-2); align-items: center; font-size: var(--text-caption); }
 
-.tol input { width: 56px; height: var(--row-height); }
-
 .actions { display: flex; gap: var(--space-4); align-items: center; }
 
 .groups { display: grid; gap: var(--space-4); }

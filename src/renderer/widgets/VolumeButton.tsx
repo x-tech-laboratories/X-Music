@@ -1,6 +1,6 @@
 // gmb's VolumeIcon: a button that reveals a slider in a popover; scrolling it adjusts the volume and a middle-click mutes.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Popover } from '@x-tech-laboratories/x-libs/web/react/menus'
 import s from './VolumeButton.module.css'
 
@@ -58,7 +58,7 @@ export function VolumeButton({ volume = 80, onchange }: { volume?: number; oncha
         <Popover anchor={trigger.current} label="Volume" on_close={() => { closed_at.current = Date.now(); set_open(false) }}>
           <div className={s.volume}>
             <button className="icon" onClick={toggle_mute} aria-label={volume === 0 ? 'Unmute' : 'Mute'}>{volume === 0 ? '🔇' : '🔊'}</button>
-            <input className={s.range} type="range" min="0" max="100" step={STEP} value={volume} aria-label="Volume" onChange={(event) => set(Number(event.currentTarget.value))} />
+            <input className="seek input-sm" style={{ '--range-progress': `${volume}%` } as CSSProperties} type="range" min="0" max="100" step={STEP} value={volume} aria-label="Volume" onChange={(event) => set(Number(event.currentTarget.value))} />
             <span className={s.percent}>{volume}%</span>
           </div>
         </Popover>

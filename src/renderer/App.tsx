@@ -131,6 +131,24 @@ export function App() {
 
   const stats = library.stats
 
+  const status_bar = (
+    <>
+      {library.error ? (
+        <span className="tone-bad">{library.error}</span>
+      ) : stats && (
+        <>
+          <span>{plural(stats.tracks, 'track')}</span>
+          <span>{plural(stats.media, 'file')}</span>
+          <span>{plural(stats.albums, 'album')}</span>
+          {stats.missing > 0 && <span className="tone-warn">{stats.missing.toLocaleString()} missing</span>}
+          <span>{format_duration(stats.totalMs / 1000, { largest_unit: 'days' })}</span>
+        </>
+      )}
+      <span className="statusbar-spacer" />
+      {info && <span className="muted">Electron {info.electron} · Chromium {info.chrome}</span>}
+    </>
+  )
+
   return (
     <Shell
       brand="X-Music"
@@ -139,6 +157,7 @@ export function App() {
       theme={theme}
       user=""
       tools={tools}
+      status_bar={status_bar}
     >
       <div className="library-view">
         <Tabs
@@ -162,21 +181,6 @@ export function App() {
           </div>
         )}
 
-        <footer className="statusbar">
-          {library.error ? (
-            <span className="tone-bad">{library.error}</span>
-          ) : stats && (
-            <>
-              <span>{plural(stats.tracks, 'track')}</span>
-              <span>{plural(stats.media, 'file')}</span>
-              <span>{plural(stats.albums, 'album')}</span>
-              {stats.missing > 0 && <span className="tone-warn">{stats.missing.toLocaleString()} missing</span>}
-              <span>{format_duration(stats.totalMs / 1000, { largest_unit: 'days' })}</span>
-            </>
-          )}
-          <span className="statusbar-spacer" />
-          {info && <span className="muted">Electron {info.electron} · Chromium {info.chrome}</span>}
-        </footer>
       </div>
 
       {settings_section !== null && (

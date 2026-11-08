@@ -199,7 +199,7 @@ export function SongList() {
           on_hidden_columns_change={set_hidden}
           active_row={tracks[Math.min(cursor, tracks.length - 1)]?.id}
           row_selected={(track) => library.isSelected(track.id)}
-          row_class={(track) => (track.id === current_id ? 'playing' : undefined)}
+          row_class={(track) => (track.id === current_id ? 'now-playing' : undefined)}
           on_row_click={(track, event) => { set_cursor(index_of(track)); select_row(index_of(track), event) }}
           on_row_double_click={(track) => play_from(index_of(track))}
           on_row_context_menu={open_menu}
