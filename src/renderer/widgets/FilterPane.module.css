@@ -40,7 +40,7 @@
 
 .row:hover:not(:disabled) { background: var(--row-hover); }
 
-.row.sel { background: color-mix(in srgb, var(--accent) 28%, transparent); color: var(--text-heading); }
+.row.sel { background: var(--row-selected); color: var(--text-heading); }
 
 .all { font-style: italic; color: var(--text-secondary); }
 

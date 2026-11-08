@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
 import type { GroupRow } from '@shared/ipc'
 import { fieldsWith } from '@shared/fields'
 import { sanitizePaneField } from '@shared/viewstate'
 import { library } from '../stores/library'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
+import { use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
 import { cx } from '../lib/cx'
 import s from './FilterPane.module.css'
@@ -19,15 +19,12 @@ export function FilterPane({ field = 'genre', id = 'pane' }: { field?: string; i
   const [remembered, remember] = use_pref<string>(`x-music.pref.pane.${id}.field`, field)
   const current = sanitizePaneField(remembered, field)
   use_watch(library.data)
-  const [rows, setRows] = useState<GroupRow[]>([])
+  // Every change to the library reloads the groups quietly, so the old rows stay until the new ones arrive.
+  const groups = use_resource(() => library.groupsFor(current), [current], { watch: library.data })
+  const rows = groups.data ?? []
 
   // Read the selection back from the filter stack so a chip removal updates the pane too.
   const selectedCount = library.selectionFor(current).length
-
-  const version = library.version
-  useEffect(() => {
-    void (async () => setRows(await library.groupsFor(current)))()
-  }, [current, version])
 
   async function pick(row: GroupRow, index: number, e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): Promise<void> {
     await library.setPaneFilter(current, row.label ?? null, {
@@ -78,7 +75,7 @@ export function FilterPane({ field = 'genre', id = 'pane' }: { field?: string; i
             <span className={s.n}>{total.toLocaleString()}</span>
           </button>
         </li>
-        {rows.length === 0 ? (
+        {groups.status === 'loaded' && rows.length === 0 ? (
           <li className={s.empty}>No values</li>
         ) : rows.map((g, i) => (
           <li key={g.gid}>

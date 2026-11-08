@@ -1,11 +1,11 @@
 // Sources side by side, one column each, one row per field — so a disagreement reads as a diff
 // rather than as a list of options. Resolution stays per field, following Thunderbird CardBook.
 
-import { Fragment } from 'react'
-import { useEffect, useState } from 'react'
-import type { MergePreview, MergeResult, Resolution } from '@shared/ipc'
+import { Fragment, useState } from 'react'
+import type { MergeResult, Resolution } from '@shared/ipc'
 import { Badge } from '@x-tech-laboratories/x-libs/web/react/badges'
 import { Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
 import { is_boolean } from '@x-tech-laboratories/x-libs/web/prefs'
 import { ipc } from '../lib/ipc'
@@ -21,26 +21,17 @@ function show(v: unknown): string {
 }
 
 export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: boolean) => void }) {
-  const [preview, setPreview] = useState<MergePreview | null>(null)
-  const [survivor, setSurvivor] = useState<number | null>(null)
+  const loaded = use_resource(() => ipc('tracks:mergePreview', ids), [])
+  const preview = loaded.data
+  // The source that survives, the preview's proposal until one is picked.
+  const [chosen_survivor, setSurvivor] = useState<number | null>(null)
+  const survivor = chosen_survivor ?? preview?.survivor ?? null
   const [choices, setChoices] = useState<Record<string, Resolution>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<MergeResult | null>(null)
   const [undoing, setUndoing] = useState(false)
   const [onlyDifferences, setOnlyDifferences] = use_pref('x-music.pref.merge.onlyDifferences', false, is_boolean)
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const p = await ipc('tracks:mergePreview', ids)
-        setPreview(p)
-        setSurvivor(p.survivor)
-      } catch (err) {
-        setError((err as Error).message)
-      }
-    })()
-  }, [])
 
   const sourceIndex = (id: number): number => (preview?.ids.indexOf(id) ?? -1) + 1
 
@@ -260,7 +251,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
           </section>
         </>
       ) : (
-        <p className={s.note}>Loading…</p>
+        <Loaded resource={loaded} lines={6}>{() => null}</Loaded>
       )}
     </PageView>
   )

@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { PageHeading, Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { ipc } from '../../lib/ipc'
 import { cx } from '../../lib/cx'
-import type { GmbPreview, ImportReport } from '@shared/ipc'
+import type { ImportReport } from '@shared/ipc'
 import { library } from '../../stores/library'
 import s from './GmbImport.module.css'
 
 export function GmbImport({ ondone }: { ondone?: () => void }) {
   const [path, setPath] = useState('')
-  const [preview, setPreview] = useState<GmbPreview | null>(null)
+  // The path last checked, which the preview is read for; the field itself may hold a newer, unchecked one.
+  const [checked, setChecked] = useState('')
+  const preview = use_resource(() => ipc('import:gmbPreview', checked), [checked], { enabled: checked !== '' })
   const [report, setReport] = useState<ImportReport | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -22,21 +25,15 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
       try {
         const initial = await ipc('import:gmbDefaultPath')
         setPath(initial)
-        await check(initial)
+        check(initial)
       } catch (err) {
         setError(`Could not reach the main process: ${(err as Error).message}`)
       }
     })()
   }, [])
 
-  async function check(at: string): Promise<void> {
-    if (!at) return
-    try {
-      setError(null)
-      setPreview(await ipc('import:gmbPreview', at))
-    } catch (err) {
-      setError((err as Error).message)
-    }
+  function check(at: string): void {
+    if (at) setChecked(at)
   }
 
   async function browse(): Promise<void> {
@@ -44,7 +41,7 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
       const picked = await ipc('import:gmbBrowse')
       if (picked) {
         setPath(picked)
-        await check(picked)
+        check(picked)
       }
     } catch (err) {
       setError((err as Error).message)
@@ -77,13 +74,10 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
 
   return (
     <section className={s.import}>
-      <header className={s.header}>
-        <h3 className={s.heading}>gmusicbrowser</h3>
-        <p className={s.lead}>
-          Imports ratings, play counts, full play history, genres, groupings, labels and saved lists.
-          Your music files are only ever read.
-        </p>
-      </header>
+      <PageHeading
+        title="gmusicbrowser"
+        subtitle="Imports ratings, play counts, full play history, genres, groupings, labels and saved lists. Your music files are only ever read."
+      />
 
       <div className={s.row}>
         <label className={s.label} htmlFor="gmbrc">Configuration file</label>
@@ -94,24 +88,24 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
         <button onClick={browse}>Browse…</button>
       </div>
 
-      {preview && !preview.exists ? (
+      <Loaded resource={preview} lines={2}>{(found) => !found.exists ? (
         <p className={cx(s.note, s.warn)}>No file at that path. gmusicbrowser keeps it at{' '}
           <code className={s.code}>~/.config/gmusicbrowser/gmbrc</code> by default.</p>
-      ) : preview?.error ? (
-        <p className={cx(s.note, s.err)}>Could not parse: {preview.error}</p>
-      ) : preview && (
+      ) : found.error ? (
+        <p className={cx(s.note, s.err)}>Could not parse: {found.error}</p>
+      ) : (
         <>
           <Tiles>
-            <Tile label="songs" value={preview.songs.toLocaleString()} value_first />
-            <Tile label="play events" value={preview.playHistoryEntries.toLocaleString()} value_first />
-            <Tile label="saved lists" value={preview.savedLists} value_first />
-            <Tile label="saved filters" value={preview.savedFilters} value_first />
+            <Tile label="songs" value={found.songs.toLocaleString()} value_first />
+            <Tile label="play events" value={found.playHistoryEntries.toLocaleString()} value_first />
+            <Tile label="saved lists" value={found.savedLists} value_first />
+            <Tile label="saved filters" value={found.savedFilters} value_first />
           </Tiles>
-          {preview.baseFolder && (
-            <p className={s.note}>Music root: <code className={s.code}>{preview.baseFolder}</code>{preview.version && <> · gmbrc {preview.version}</>}</p>
+          {found.baseFolder && (
+            <p className={s.note}>Music root: <code className={s.code}>{found.baseFolder}</code>{found.version && <> · gmbrc {found.version}</>}</p>
           )}
-          {preview.unmappedColumns.length > 0 && (
-            <p className={cx(s.note, s.warn)}>Unrecognised columns will be ignored: {preview.unmappedColumns.join(', ')}</p>
+          {found.unmappedColumns.length > 0 && (
+            <p className={cx(s.note, s.warn)}>Unrecognised columns will be ignored: {found.unmappedColumns.join(', ')}</p>
           )}
 
           <div className={s.opts}>
@@ -130,14 +124,14 @@ export function GmbImport({ ondone }: { ondone?: () => void }) {
           </div>
 
           <div className={s.actions}>
-            <button className="accent solid" disabled={busy || preview.songs === 0} onClick={run}>
-              {busy ? 'Importing…' : `Import ${preview.songs.toLocaleString()} songs`}
+            <button className="accent solid" disabled={busy || found.songs === 0} onClick={run}>
+              {busy ? 'Importing…' : `Import ${found.songs.toLocaleString()} songs`}
             </button>
             <button className="danger" disabled={busy} onClick={reset}>Clear library</button>
             <span className={s.readonly}>Reads only — your music files are never modified.</span>
           </div>
         </>
-      )}
+      )}</Loaded>
 
       {error && <p className={cx(s.note, s.err)}>{error}</p>}
 

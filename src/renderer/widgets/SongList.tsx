@@ -160,7 +160,7 @@ export function SongList() {
   return (
     <section className="song-list" aria-label="Song list">
       <div className="song-list-tools">
-        <SearchBox key={library.searchResets} label="Search the library" value={library.search} on_input={(text) => void library.setSearch(text)} />
+        <SearchBox label="Search the library" value={library.search} on_input={(text) => void library.setSearch(text)} />
         {chips.length > 0 && (
           <Chips>
             {chips.map((chip) => (

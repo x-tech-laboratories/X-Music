@@ -1,4 +1,4 @@
-// A full-window view over the library on the X-Libs dialog, so Escape and the Close button always lead back out.
+// A full-window view over the library on the X-Libs dialog, so Escape and the Close button always lead back out; the tabs stay put while the body scrolls.
 
 import type { ReactNode } from 'react'
 import { Dialog } from '@x-tech-laboratories/x-libs/web/react/dialog'
@@ -30,13 +30,12 @@ export function PageView<Section extends string>({
       subtitle={subtitle}
       on_close={onclose}
       full
-      class_name="page-view"
       actions={<>{actions}<button onClick={onclose} title="Close (Esc)">Close</button></>}
     >
       {sections && section !== undefined && (
         <Tabs label={`${title} sections`} items={sections} active={section} on_select={onSection} />
       )}
-      <div className="page-view-content">{children}</div>
+      {children}
     </Dialog>
   )
 }
