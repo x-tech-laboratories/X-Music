@@ -14,6 +14,7 @@ const isDev = !app.isPackaged
 function createWindow(): BrowserWindow {
   return create_window(BrowserWindow, {
     title: 'X-Music',
+    icon: join(__dirname, '../../resources/icon.png'),
     // electron-vite emits an ESM preload as .mjs; loading .js here silently yields no bridge.
     preload: join(__dirname, '../preload/index.mjs'),
     file: join(__dirname, '../renderer/index.html'),

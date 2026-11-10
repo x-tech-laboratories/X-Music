@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Two beamed notes cut out of the X-Tech hexagon, at the same margin as the X-Tech icon. -->
+  <title>X-Music</title>
+  <mask id="cut">
+    <rect width="64" height="64" fill="#fff"/>
+    <g fill="#000">
+      <ellipse cx="24" cy="42" rx="5.5" ry="4.2" transform="rotate(-20 24 42)"/>
+      <ellipse cx="41" cy="38" rx="5.5" ry="4.2" transform="rotate(-20 41 38)"/>
+      <rect x="27.3" y="20" width="3.2" height="22"/>
+      <rect x="44.3" y="16" width="3.2" height="22"/>
+      <path d="M27.3 18.5 47.5 14.5V20.5L27.3 24.5Z"/>
+    </g>
+  </mask>
+  <path fill="#0088ff" mask="url(#cut)" d="M63 32 47.5 58.847 16.5 58.847 1 32 16.5 5.153 47.5 5.153Z"/>
+</svg>
