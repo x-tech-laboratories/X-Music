@@ -52,7 +52,8 @@
             # Only the host platform's prebuild can be patched to find libstdc++.
             find node_modules/better-sqlite3/prebuilds -name "*.node" ! -name "linux-${pkgs.stdenv.hostPlatform.node.arch}.node" -delete
             mkdir -p $out/lib/x-music
-            cp -r out package.json node_modules $out/lib/x-music/
+            cp -r out resources package.json node_modules $out/lib/x-music/
+            install -Dm644 resources/icon.svg $out/share/icons/hicolor/scalable/apps/x-music.svg
             makeWrapper ${electron}/bin/electron $out/bin/x-music \
               --add-flags $out/lib/x-music \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.mpv ]} \
@@ -67,7 +68,7 @@
               desktopName = "X-Music";
               comment = "Music player";
               exec = "x-music %U";
-              icon = "audio-x-generic";
+              icon = "x-music";
               categories = [ "Audio" "AudioVideo" "Player" ];
             })
           ];
