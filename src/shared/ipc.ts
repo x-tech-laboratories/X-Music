@@ -1,6 +1,7 @@
 // The IPC contract. Both the main process and the renderer import this module, so the boundary is
 // type-checked end to end with no codegen step, and the X-Libs bridge builds both ends from it.
 
+import { backup_method_names, type BackupMethods } from '@x-tech-laboratories/x-libs/backup_protocol'
 import { define_bridge } from '@x-tech-laboratories/x-libs/electron/bridge'
 import { define_events } from '@x-tech-laboratories/x-libs/electron/events'
 import type { FilterNode, SortKey, Limit } from './filter'
@@ -363,3 +364,5 @@ export const CHANNELS: readonly Channel[] = [
 // The page reaches these as window.xMusic and window.xMusicEvents.
 export const x_music_bridge = define_bridge<XMusicApi>('xMusic', CHANNELS)
 export const x_music_events = define_events<XMusicEvents>('xMusicEvents')
+// The library database's backups, for Settings, as window.xMusicBackups.
+export const x_music_backups_bridge = define_bridge<BackupMethods>('xMusicBackups', backup_method_names)

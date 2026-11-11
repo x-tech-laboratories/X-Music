@@ -38,7 +38,8 @@ function emit<E extends EventName>(name: E, payload: XMusicEvents[E]): void {
   x_music_events.emit(BrowserWindow.getAllWindows(), name, payload)
 }
 
-export function registerIpc(db: DB): void {
+// Returns what stops the player, whose mpv is a process of its own that would otherwise outlive X-Music.
+export function registerIpc(db: DB): { stopPlayer: () => Promise<void> } {
   // A scan runs at most once at a time; the flag is what cancel flips.
   let scanning: { aborted: boolean } | null = null
 
@@ -279,4 +280,5 @@ export function registerIpc(db: DB): void {
   }
 
   x_music_bridge.handle(ipcMain, handlers)
+  return { stopPlayer: () => player.dispose() }
 }

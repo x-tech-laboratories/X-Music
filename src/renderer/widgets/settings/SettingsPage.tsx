@@ -1,6 +1,7 @@
-// Settings as a full-window view: the library, its folders, imports, duplicates, appearance and versions.
+// Settings as a full-window view: the library, its folders, imports, duplicates, backups, appearance and versions.
 
 import { useEffect, useState } from 'react'
+import { BackupSettings } from '@x-tech-laboratories/x-libs/web/react/backup_settings'
 import { confirm_dialog } from '@x-tech-laboratories/x-libs/web/react/dialog'
 import { Segmented } from '@x-tech-laboratories/x-libs/web/react/controls'
 import { Facts, SettingRow, SettingsGroup } from '@x-tech-laboratories/x-libs/web/react/layout'
@@ -22,6 +23,7 @@ const sections = [
   { id: 'folders', label: 'Folders' },
   { id: 'import', label: 'Import' },
   { id: 'duplicates', label: 'Duplicates' },
+  { id: 'backups', label: 'Backups' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'about', label: 'About' }
 ] as const
@@ -106,6 +108,12 @@ export function SettingsPage({
     body = <GmbImport ondone={onclose} />
   } else if (section === 'duplicates') {
     body = <DuplicatesPanel />
+  } else if (section === 'backups') {
+    body = (
+      <SettingsGroup heading="Backups" hint="Copies of the library database, kept beside it in backups. Restoring one restarts X-Music. Your music files are never backed up or touched.">
+        <BackupSettings device={window.xMusicBackups} data_name="tracks, playlists, ratings and play history" />
+      </SettingsGroup>
+    )
   } else if (section === 'appearance') {
     body = (
       <SettingsGroup heading="Appearance" hint="Colours come from the Halon tokens; density sets the song list's row height.">

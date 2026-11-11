@@ -1,8 +1,11 @@
-import { app, BrowserWindow, nativeTheme, protocol, screen, shell, net } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, protocol, screen, shell, net } from 'electron'
 import { pathToFileURL } from 'node:url'
 import { join } from 'node:path'
 import { create_window } from '@x-tech-laboratories/x-libs/electron/window'
+import { take_staged_restore } from '@x-tech-laboratories/x-libs/server/sqlite_backups'
 
+import { x_music_backups_bridge } from '@shared/ipc'
+import { libraryBackups } from './backups'
 import { openLibrary, libraryPath } from './db'
 import { registerIpc } from './ipc'
 import { assertWritable, initSafety, safetyStatus } from './safety'
@@ -65,11 +68,19 @@ app.whenReady().then(() => {
     return net.fetch(pathToFileURL(file).toString())
   })
 
+  // A backup restored in Settings waits beside the database until now, when nothing has it open.
+  if (take_staged_restore(libraryPath())) log.info('restored a backup', { path: libraryPath() })
   const db = openLibrary()
   const safety = safetyStatus()
   log.info(safety.reason)
   log.info('library opened', { path: libraryPath() })
-  registerIpc(db)
+  const { stopPlayer } = registerIpc(db)
+  // A restore staged in Settings is taken in by starting again, once its reply has gone back to the page.
+  const backups = libraryBackups(db, libraryPath(), () => setImmediate(() => {
+    app.relaunch()
+    app.quit()
+  }))
+  x_music_backups_bridge.handle(ipcMain, backups.methods)
 
   createWindow()
 
@@ -77,7 +88,18 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 
-  app.on('before-quit', () => db.close())
+  // Quitting waits for mpv to stop, or for two seconds if it does not answer, then quits for real.
+  let stopped = false
+  app.on('before-quit', (event) => {
+    if (stopped) return
+    event.preventDefault()
+    stopped = true
+    backups.stop()
+    void Promise.race([stopPlayer(), new Promise((resolve) => setTimeout(resolve, 2000))]).finally(() => {
+      db.close()
+      app.quit()
+    })
+  })
 })
 
 app.on('window-all-closed', () => {
