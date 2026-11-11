@@ -34,6 +34,7 @@ implemented yet. See the roadmap in DESIGN-SPEC §15.
 | Duplicate detection (hash, MBID, tags, fuzzy) | working |
 | Song properties (identity, sources, raw tags, history) | working |
 | Album art (embedded, folder image, cached) | working |
+| Daily backups of the library database, on X-Libs | working |
 | Picard hand-off for tagging | specified (DESIGN-SPEC §7.1.1) |
 
 ## The one idea worth knowing
@@ -116,6 +117,19 @@ overwrites X-Music's own ratings or play counts, recognises moved and renamed fi
 and flags files that have disappeared rather than deleting their tracks.
 
 Both are idempotent. Running either twice, or both in either order, will not duplicate anything.
+
+### Backups
+
+The library database, `library.db` in X-Music's profile folder (`~/.config/x-music` on Linux), is
+backed up once a day into `backups` beside it, keeping the last 14. Settings → Backups backs up by
+hand, changes that, and restores a backup: the current database is backed up first, and X-Music
+restarts to take the restored one in. Only the database is backed up; your music files are never
+copied or touched. A database moved elsewhere with `X_MUSIC_DB` is backed up beside it only while
+writes are enabled, since read-only mode keeps X-Music to its own folder.
+
+Playlists have no history of their own yet: X-Music does not edit them, they only arrive from a
+gmusicbrowser import, and a merge's changes to them come back with Undo this merge. They gain one when
+they become editable. X-Music has no server, so nothing syncs between devices.
 
 ## Testing
 
