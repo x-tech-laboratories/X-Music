@@ -101,7 +101,6 @@ export function App() {
           {safety.readOnly ? 'Read-only' : 'Writes enabled'}
         </Badge>
       )}
-      <button onClick={() => set_settings_section('library')}>Settings</button>
     </>
   )
 
@@ -156,6 +155,7 @@ export function App() {
       sidebar_width={{ default_width: 420, min: 280, max: 720, storage_key: 'x-music.sidebar-width' }}
       theme={theme}
       user=""
+      settings={{ href: '#settings', active: settings_section !== null, on_open: () => set_settings_section('library') }}
       tools={tools}
       status_bar={status_bar}
     >
