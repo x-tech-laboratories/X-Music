@@ -2,6 +2,8 @@
 
 [![AI readiness](https://img.shields.io/endpoint?url=https://x-tech-laboratories.github.io/badges/x-tech-laboratories/X-Music.json)](https://x-tech-laboratories.github.io/guidelines/readiness/)
 
+<a href="https://liberapay.com/BeatLink/donate"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a>
+
 A desktop music player with gmusicbrowser's data model and power, a web-technology UI that users can
 re-layout and re-skin, drawn with the shared X-Libs widgets and the Halon theme (`@x-tech-laboratories/halon`).
 
