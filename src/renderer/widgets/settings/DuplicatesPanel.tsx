@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { ipc } from '../../lib/ipc'
 import { cx } from '@x-tech-laboratories/x-libs/web/dom'
-import type { DuplicateGroup, DuplicateReason, MergeResult } from '@shared/ipc'
+import type { DuplicateGroup, DuplicateMember, DuplicateReason, MergeResult } from '@shared/ipc'
 import { MergeView } from '../MergeView'
 import { library } from '../../stores/library'
 import { Badge, type Tone } from '@x-tech-laboratories/x-libs/web/react/badges'
 import { PageHeading } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
 import { is_number_in } from '@x-tech-laboratories/x-libs/web/prefs'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
@@ -21,6 +22,18 @@ const REASONS: { id: DuplicateReason; label: string; hint: string }[] = [
 const MAX_SHOWN = 200
 
 const mmss = (milliseconds: number | null): string => format_clock(milliseconds, '—')
+
+// The tracks of one duplicate group, side by side so the richest copy stands out.
+const MEMBER_COLUMNS: TableColumn<DuplicateMember>[] = [
+  { label: 'Title', sort: (m) => m.title, cell: (m) => m.title ?? '—' },
+  { label: 'Artist', sort: (m) => m.artist, cell: (m) => m.artist ?? '—' },
+  { label: 'Album', sort: (m) => m.album, cell: (m) => m.album ?? '—' },
+  { label: 'Length', class: 'number', sort: (m) => m.lengthMs, cell: (m) => mmss(m.lengthMs) },
+  { label: 'Rating', class: 'number', sort: (m) => m.rating, cell: (m) => m.rating ?? '—' },
+  { label: 'Plays', class: 'number', sort: (m) => m.playCount, cell: (m) => m.playCount },
+  { label: 'Files', class: 'number', sort: (m) => m.mediaCount, cell: (m) => m.mediaCount },
+  { label: 'Formats', sort: (m) => m.codecs, cell: (m) => m.codecs ?? '—' }
+]
 
 const CONFIDENCE_TONES: Record<DuplicateGroup['confidence'], Tone> = { certain: 'good', likely: 'info', possible: 'warn' }
 
@@ -183,29 +196,7 @@ export function DuplicatesPanel() {
                   </div>
                 )}
               </div>
-              <div className="table-wrap"><table>
-                <thead>
-                  <tr>
-                    <th>Title</th><th>Artist</th><th>Album</th>
-                    <th className="number">Length</th><th className="number">Rating</th>
-                    <th className="number">Plays</th><th className="number">Files</th><th>Formats</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {g.members.map((m) => (
-                    <tr key={m.trackId}>
-                      <td>{m.title ?? '—'}</td>
-                      <td>{m.artist ?? '—'}</td>
-                      <td>{m.album ?? '—'}</td>
-                      <td className="number">{mmss(m.lengthMs)}</td>
-                      <td className="number">{m.rating ?? '—'}</td>
-                      <td className="number">{m.playCount}</td>
-                      <td className="number">{m.mediaCount}</td>
-                      <td>{m.codecs ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table></div>
+              <DataTable columns={MEMBER_COLUMNS} rows={g.members} row_key={(m) => m.trackId} caption="Tracks in this group" />
             </article>
           ))}
         </div>
