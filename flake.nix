@@ -29,7 +29,9 @@
           version = (builtins.fromJSON (builtins.readFile ./package.json)).version;
           src = self;
 
-          npmDepsHash = "sha256-cgpHinm49kZI7p14oKewWK6I8rpxUVE7lMpDtrbxsj0=";
+          # Read from package-lock.json, so there is no deps hash to keep in step with it.
+          npmDeps = pkgs.importNpmLock { npmRoot = ./.; };
+          npmConfigHook = pkgs.importNpmLock.npmConfigHook;
           inherit nodejs;
 
           nativeBuildInputs = with pkgs; [ makeWrapper copyDesktopItems autoPatchelfHook ];
