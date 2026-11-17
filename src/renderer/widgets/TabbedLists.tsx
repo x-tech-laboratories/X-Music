@@ -8,10 +8,8 @@ import { library } from '../stores/library'
 import s from './TabbedLists.module.css'
 
 const tabs = [
-  { id: 'playlist', label: 'Playlist' },
   { id: 'queue', label: 'Queue' },
-  { id: 'info', label: 'Song info' },
-  { id: 'pictures', label: 'Pictures' }
+  { id: 'info', label: 'Song info' }
 ] as const
 
 type Tab = (typeof tabs)[number]['id']
@@ -49,7 +47,7 @@ export function TabbedLists() {
         </ol>
       </>
     )
-  } else if (tab === 'info') {
+  } else {
     body = status?.track ? (
       <Facts layout="rows" rows={[
         ['Title', status.track.title],
@@ -60,8 +58,6 @@ export function TabbedLists() {
     ) : (
       <p className="muted small">Nothing playing.</p>
     )
-  } else {
-    body = <p className="muted small">{tabs.find((each) => each.id === tab)?.label} — a later milestone.</p>
   }
 
   return (

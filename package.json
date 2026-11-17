@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@x-tech-laboratories/halon": "^0.25.1",
-    "@x-tech-laboratories/x-libs": "^0.57.0",
+    "@x-tech-laboratories/x-libs": "^0.58.0",
     "music-metadata": "^11.15.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
