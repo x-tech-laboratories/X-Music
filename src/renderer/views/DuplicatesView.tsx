@@ -6,7 +6,7 @@ import { DuplicatesPanel } from '../widgets/DuplicatesPanel'
 export function DuplicatesView() {
   return (
     <div className="page">
-      <PageHeading class_name="inline" title="Duplicates" />
+      <PageHeading title="Duplicates" subtitle="Tracks that look like the same recording. Nothing is merged until you choose to, and every merge can be undone." />
       <DuplicatesPanel />
     </div>
   )

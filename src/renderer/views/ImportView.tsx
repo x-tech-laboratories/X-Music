@@ -1,14 +1,13 @@
-// Import: bringing a gmusicbrowser library in, then on to the library once it is done.
+// Import: bringing a gmusicbrowser library in.
 
 import { PageHeading } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { GmbImport } from '../widgets/GmbImport'
-import { view_href } from './Navigation'
 
 export function ImportView() {
   return (
     <div className="page">
-      <PageHeading class_name="inline" title="Import" />
-      <GmbImport ondone={() => (location.hash = view_href('library'))} />
+      <PageHeading title="Import" subtitle="Bring in a gmusicbrowser library: ratings, play counts and history, genres, groupings, labels and saved lists." />
+      <GmbImport />
     </div>
   )
 }
