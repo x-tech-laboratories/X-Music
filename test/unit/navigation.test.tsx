@@ -59,6 +59,7 @@ describe('navigation', () => {
     const rows = within(views_nav()).getAllByRole('link')
     expect(rows.map((row) => row.textContent)).toEqual(['Library', 'Folders', 'Import', 'Duplicates'])
     expect(rows.map((row) => row.getAttribute('href'))).toEqual(['#/library', '#/folders', '#/import', '#/duplicates'])
+    expect(rows.every((row) => row.querySelector('svg[aria-hidden="true"]') !== null)).toBe(true)
     expect(within(views_nav()).getByRole('link', { name: 'Library' }).getAttribute('aria-current')).toBe('page')
     expect(await screen.findByRole('heading', { level: 1, name: 'Library' })).toBeTruthy()
   })

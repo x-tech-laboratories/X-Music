@@ -1,147 +1,152 @@
+// Bringing in a gmusicbrowser library: its configuration file previewed, what to bring in, and what came in.
+
 import { useEffect, useState } from 'react'
-import { PathInput } from '@x-tech-laboratories/x-libs/web/react/controls'
-import { PageHeading, Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { PathInput, Switch } from '@x-tech-laboratories/x-libs/web/react/controls'
+import { Facts, FormRow, Section, SettingRow, Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
+import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
+import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import type { GmbPreview, ImportReport } from '@shared/ipc'
 import { ipc } from '../lib/ipc'
-import { cx } from '@x-tech-laboratories/x-libs/web/dom'
-import type { ImportReport } from '@shared/ipc'
 import { library } from '../stores/library'
-import s from './GmbImport.module.css'
+import { view_href } from '../views/Navigation'
 
-export function GmbImport({ ondone }: { ondone?: () => void }) {
-  const [path, setPath] = useState('')
-  // The path last checked, which the preview is read for; the field itself may hold a newer, unchecked one.
-  const [checked, setChecked] = useState('')
+// A typed path is read once typing pauses this long.
+const CHECK_DELAY_IN_MILLISECONDS = 400
+
+// ============================================================================
+// Options
+// ============================================================================
+
+interface Options {
+  statistics: boolean
+  labels: boolean
+  playlists: boolean
+}
+
+const OPTION_ROWS: { id: keyof Options; label: string; hint: string }[] = [
+  { id: 'statistics', label: 'Ratings, play counts and history', hint: 'Every play gmusicbrowser kept, with its date.' },
+  { id: 'labels', label: 'Genres, groupings and labels', hint: 'As gmusicbrowser has them, not as the files are tagged.' },
+  { id: 'playlists', label: 'Saved lists as playlists', hint: 'Each saved list becomes a playlist of the same name.' }
+]
+
+// ============================================================================
+// Preview
+// ============================================================================
+
+function Preview({ found }: { found: GmbPreview }) {
+  return (
+    <>
+      <Tiles>
+        <Tile label="Tracks" value={found.songs.toLocaleString()} value_first />
+        <Tile label="Play events" value={found.playHistoryEntries.toLocaleString()} value_first />
+        <Tile label="Saved lists" value={found.savedLists.toLocaleString()} value_first />
+        <Tile label="Saved filters" value={found.savedFilters.toLocaleString()} value_first />
+      </Tiles>
+      <Facts layout="rows" rows={[
+        found.baseFolder ? ['Music folder', <span className="path">{found.baseFolder}</span>] : null,
+        found.version ? ['gmusicbrowser version', found.version] : null
+      ]} />
+      {found.unmappedColumns.length > 0 && (
+        <p className="tone-warn">These columns are not known to X-Music and are left out: {found.unmappedColumns.join(', ')}.</p>
+      )}
+    </>
+  )
+}
+
+function Imported({ report }: { report: ImportReport }) {
+  return (
+    <Section title="Imported">
+      <p>
+        Brought in {plural(report.tracksCreated, 'track')} and {plural(report.mediaCreated, 'file')}, with{' '}
+        {plural(report.playHistoryRows, 'play event')} and {plural(report.playlistsCreated, 'playlist')}.
+      </p>
+      {report.notes.map((note) => <p key={note} className="muted">{note}</p>)}
+      <div>
+        <a className="button accent solid" href={view_href('library')}>Show the library</a>
+      </div>
+    </Section>
+  )
+}
+
+// ============================================================================
+// Import
+// ============================================================================
+
+export function GmbImport() {
+  const [path, set_path] = useState('')
+  // The path last read for the preview; the field may hold a newer one still being typed.
+  const [checked, set_checked] = useState('')
   const preview = use_resource(() => ipc('import:gmbPreview', checked), [checked], { enabled: checked !== '' })
-  const [report, setReport] = useState<ImportReport | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const [statistics, setStatistics] = useState(true)
-  const [labels, setLabels] = useState(true)
-  const [playlists, setPlaylists] = useState(true)
+  const [options, set_options] = useState<Options>({ statistics: true, labels: true, playlists: true })
+  const [report, set_report] = useState<ImportReport | null>(null)
+  const [busy, set_busy] = useState(false)
+  const [error, set_error] = useState<string | null>(null)
 
   useEffect(() => {
-    void (async () => {
-      try {
-        const initial = await ipc('import:gmbDefaultPath')
-        setPath(initial)
-        check(initial)
-      } catch (err) {
-        setError(`Could not reach the main process: ${(err as Error).message}`)
-      }
-    })()
+    ipc('import:gmbDefaultPath').then(set_path, (failure: unknown) => set_error(describe_error(failure)))
   }, [])
 
-  function check(at: string): void {
-    if (at) setChecked(at)
-  }
-
-  // A typed path is checked once typing pauses, a picked one at once.
   useEffect(() => {
-    const timer = setTimeout(() => check(path), 400)
+    const timer = setTimeout(() => set_checked(path.trim()), CHECK_DELAY_IN_MILLISECONDS)
     return () => clearTimeout(timer)
   }, [path])
 
   async function run(): Promise<void> {
-    setBusy(true)
-    setError(null)
+    set_busy(true)
+    set_error(null)
     try {
-      setReport(await ipc('import:gmbRun', { path, statistics, labels, playlists }))
+      const done = await ipc('import:gmbRun', { path: checked, ...options })
+      set_report(done)
+      toast(`Imported ${plural(done.tracksCreated, 'track')}`, { tone: 'good', link: { href: view_href('library'), text: 'Show the library' } })
       await library.refresh()
-    } catch (err) {
-      setError((err as Error).message)
+    } catch (failure) {
+      set_error(describe_error(failure))
     } finally {
-      setBusy(false)
-    }
-  }
-
-  async function reset(): Promise<void> {
-    setBusy(true)
-    try {
-      await ipc('library:reset')
-      setReport(null)
-      await library.refresh()
-    } finally {
-      setBusy(false)
+      set_busy(false)
     }
   }
 
   return (
-    <section className={s.import}>
-      <PageHeading
-        level={2}
-        title="gmusicbrowser"
-        subtitle="Imports ratings, play counts, full play history, genres, groupings, labels and saved lists. Your music files are only ever read."
-      />
-
-      <div className={s.row}>
-        <span className={s.label}>Configuration file</span>
-        <PathInput label="Configuration file" value={path} on_change={setPath} pick={() => ipc('import:gmbBrowse')} />
-      </div>
-
-      <Loaded resource={preview} lines={2}>{(found) => !found.exists ? (
-        <p className={cx(s.note, s.warn)}>No file at that path. gmusicbrowser keeps it at{' '}
-          <code className={s.code}>~/.config/gmusicbrowser/gmbrc</code> by default.</p>
-      ) : found.error ? (
-        <p className={cx(s.note, s.err)}>Could not parse: {found.error}</p>
-      ) : (
-        <>
-          <Tiles>
-            <Tile label="songs" value={found.songs.toLocaleString()} value_first />
-            <Tile label="play events" value={found.playHistoryEntries.toLocaleString()} value_first />
-            <Tile label="saved lists" value={found.savedLists} value_first />
-            <Tile label="saved filters" value={found.savedFilters} value_first />
-          </Tiles>
-          {found.baseFolder && (
-            <p className={s.note}>Music root: <code className={s.code}>{found.baseFolder}</code>{found.version && <> · gmbrc {found.version}</>}</p>
-          )}
-          {found.unmappedColumns.length > 0 && (
-            <p className={cx(s.note, s.warn)}>Unrecognised columns will be ignored: {found.unmappedColumns.join(', ')}</p>
-          )}
-
-          <div className={s.opts}>
-            <label className={s.label}>
-              <input type="checkbox" checked={statistics}
-                     onChange={(e) => setStatistics((e.currentTarget as HTMLInputElement).checked)} /> Ratings, play counts and history
-            </label>
-            <label className={s.label}>
-              <input type="checkbox" checked={labels}
-                     onChange={(e) => setLabels((e.currentTarget as HTMLInputElement).checked)} /> Genres, groupings and labels
-            </label>
-            <label className={s.label}>
-              <input type="checkbox" checked={playlists}
-                     onChange={(e) => setPlaylists((e.currentTarget as HTMLInputElement).checked)} /> Saved lists as playlists
-            </label>
-          </div>
-
-          <div className={s.actions}>
-            <button className="accent solid" disabled={busy || found.songs === 0} onClick={run}>
-              {busy ? 'Importing…' : `Import ${found.songs.toLocaleString()} songs`}
-            </button>
-            <button className="danger" disabled={busy} onClick={reset}>Clear library</button>
-            <span className={s.readonly}>Reads only — your music files are never modified.</span>
-          </div>
-        </>
-      )}</Loaded>
-
-      {error && <p className={cx(s.note, s.err)}>{error}</p>}
-
-      {report && (
-        <div className={s.report}>
-          <p>
-            Imported <strong>{report.tracksCreated.toLocaleString()}</strong> tracks and{' '}
-            <strong>{report.mediaCreated.toLocaleString()}</strong> files,
-            with <strong>{report.playHistoryRows.toLocaleString()}</strong> play events and{' '}
-            <strong>{report.playlistsCreated}</strong> playlists.
-          </p>
-          {report.notes.map((note) => (
-            <p key={note} className={s.note}>{note}</p>
-          ))}
-
-          <button className="accent solid" onClick={ondone}>Show my library →</button>
+    <>
+      <Section title="gmusicbrowser">
+        <div className="form-rows">
+          <FormRow label="Configuration file" id="gmb-path" hint="gmusicbrowser keeps it at ~/.config/gmusicbrowser/gmbrc unless told otherwise.">
+            <PathInput label="Configuration file" value={path} on_change={set_path} pick={() => ipc('import:gmbBrowse')} />
+          </FormRow>
         </div>
-      )}
-    </section>
+
+        <Loaded resource={preview} lines={3}>{(found) => !found.exists ? (
+          <p className="tone-warn">No gmusicbrowser configuration at this path.</p>
+        ) : found.error ? (
+          <p className="tone-bad" role="alert">This file could not be read: {found.error}</p>
+        ) : (
+          <>
+            <Preview found={found} />
+            <div>
+              {OPTION_ROWS.map((row) => (
+                <SettingRow key={row.id} label={row.label} hint={row.hint} as_label>
+                  <Switch label={row.label} checked={options[row.id]} disabled={busy} on_change={(on) => set_options((now) => ({ ...now, [row.id]: on }))} />
+                </SettingRow>
+              ))}
+            </div>
+            <div className="toolbar">
+              <button type="button" className="accent solid" disabled={busy || found.songs === 0} onClick={() => void run()}>
+                {busy ? 'Importing…' : `Import ${plural(found.songs, 'track')}`}
+              </button>
+            </div>
+            <p className="muted">
+              Your music files are only read. To start afresh rather than add to the library, clear it
+              under <a href={view_href('settings')}>Settings</a> first.
+            </p>
+          </>
+        )}</Loaded>
+
+        {error && <p className="tone-bad" role="alert">{error}</p>}
+      </Section>
+
+      {report && <Imported report={report} />}
+    </>
   )
 }

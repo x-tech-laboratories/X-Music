@@ -6,7 +6,7 @@ import { ScanPanel } from '../widgets/ScanPanel'
 export function FoldersView() {
   return (
     <div className="page">
-      <PageHeading class_name="inline" title="Folders" />
+      <PageHeading title="Folders" subtitle="The folders X-Music builds your library from. Your music files are only ever read, never changed." />
       <ScanPanel />
     </div>
   )
