@@ -1,242 +1,203 @@
-import { useEffect, useMemo, useState, type UIEvent } from 'react'
-import { ipc } from '../lib/ipc'
-import { cx } from '@x-tech-laboratories/x-libs/web/dom'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
-import type { FileOutcome, FileResult, ScanProgress, ScanReport } from '@shared/ipc'
-import { library } from '../stores/library'
-import { Badge, type Tone } from '@x-tech-laboratories/x-libs/web/react/badges'
-import { FollowToggle, use_follow_tail } from '@x-tech-laboratories/x-libs/web/react/following'
-import { PageHeading } from '@x-tech-laboratories/x-libs/web/react/layout'
+// The music folders the library is read from, a scan of them, and what the scan did to each file.
+
+import { useEffect, useState } from 'react'
+import type { Tone } from '@x-tech-laboratories/x-libs/web/react/badges'
+import { Section, Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { OutcomeLog } from '@x-tech-laboratories/x-libs/web/react/outcome_log'
 import { ProgressBar } from '@x-tech-laboratories/x-libs/web/react/progress'
-import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
-import { virtual_window } from '@x-tech-laboratories/x-libs/web/virtual'
-import s from './ScanPanel.module.css'
+import { Empty, Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
+import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
+import { Age } from '@x-tech-laboratories/x-libs/web/react/time'
+import { format_duration } from '@x-tech-laboratories/x-libs/durations'
+import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import type { FileOutcome, FileResult, Root, ScanProgress, ScanReport } from '@shared/ipc'
+import { ipc } from '../lib/ipc'
+import { library } from '../stores/library'
+import { view_href } from '../views/Navigation'
 
-const ROW = 24
+// ============================================================================
+// Outcomes
+// ============================================================================
 
-const OUTCOMES: { id: FileOutcome; label: string; tone: Tone }[] = [
-  { id: 'new', label: 'New', tone: 'good' },
-  { id: 'matched', label: 'Matched', tone: 'none' },
-  { id: 'moved', label: 'Moved', tone: 'info' },
-  { id: 'unchanged', label: 'Unchanged', tone: 'none' },
-  { id: 'missing', label: 'Missing', tone: 'warn' },
-  { id: 'error', label: 'Failed', tone: 'bad' }
-]
+const OUTCOMES: Record<FileOutcome, [text: string, tone: Tone]> = {
+  new: ['New', 'good'],
+  matched: ['Matched', 'none'],
+  moved: ['Moved', 'info'],
+  unchanged: ['Unchanged', 'none'],
+  missing: ['Missing', 'warn'],
+  error: ['Failed', 'bad']
+}
 
-const tone_of = (outcome: FileOutcome): Tone => OUTCOMES.find((each) => each.id === outcome)?.tone ?? 'none'
+function progress_detail(progress: ScanProgress): string {
+  if (progress.phase === 'walking') return `Finding files… ${plural(progress.found, 'file')} so far`
+  if (progress.phase === 'finishing') return 'Checking for files that disappeared…'
+  return `${progress.processed.toLocaleString()} of ${plural(progress.found, 'file')}`
+}
 
-const short = (p: string | undefined): string =>
-  p ? (p.length > 72 ? `…${p.slice(-71)}` : p) : ''
+// ============================================================================
+// Folders
+// ============================================================================
 
-const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)}s`
+function folder_columns(scanning: boolean, remove: (root: Root) => void): TableColumn<Root>[] {
+  return [
+    { label: 'Folder', cell: (root) => <span className="path">{root.path}</span> },
+    { label: 'Last scanned', cell: (root) => <Age epoch={root.lastScan === null ? null : root.lastScan / 1000} missing="Never" /> },
+    {
+      label: 'Actions',
+      id: 'actions',
+      header: <span className="visually-hidden">Actions</span>,
+      class: 'actions-cell',
+      cell: (root) => (
+        <div className="row-actions">
+          <button type="button" aria-label={`Remove ${root.path}`} disabled={scanning} onClick={() => remove(root)}>Remove</button>
+        </div>
+      )
+    }
+  ]
+}
+
+// ============================================================================
+// Summary
+// ============================================================================
+
+function took(duration_in_milliseconds: number): string {
+  return duration_in_milliseconds < 1000 ? 'Under a second' : format_duration(duration_in_milliseconds / 1000)
+}
+
+function ScanSummary({ report, on_show_failed }: { report: ScanReport; on_show_failed: () => void }) {
+  const failed = report.errors.length
+  const notes = [
+    report.movesDetected > 0 && `${plural(report.movesDetected, 'moved or renamed file')} recognised by the audio, keeping ratings and play history.`,
+    report.markedMissing > 0 && `${plural(report.markedMissing, 'file')} no longer on disk, marked missing; their tracks and statistics are kept.`,
+    failed > 0 && `${plural(failed, 'file')} could not be read.`
+  ].filter(Boolean)
+  return (
+    <>
+      <Tiles>
+        <Tile label="Files read" value={report.filesFound.toLocaleString()} value_first />
+        <Tile label="New tracks" value={report.tracksCreated.toLocaleString()} value_first />
+        <Tile label="Already known" value={report.tracksMatched.toLocaleString()} value_first />
+        <Tile label="Unchanged" value={report.filesSkipped.toLocaleString()} value_first />
+        <Tile label="Took" value={took(report.durationMs)} value_first />
+      </Tiles>
+      {notes.length > 0 && (
+        <p className={failed > 0 || report.markedMissing > 0 ? 'tone-warn' : 'muted'}>
+          {notes.join(' ')}
+          {failed > 0 && <> <button type="button" onClick={on_show_failed}>{failed === 1 ? 'Show the failed file' : 'Show the failed files'}</button></>}
+        </p>
+      )}
+    </>
+  )
+}
+
+// A file's path within the music folder it is in, which is shorter to read than the whole path.
+function within_folder(path: string, roots: Root[]): string {
+  const root = roots.find((each) => path.startsWith(`${each.path}/`))
+  return root ? path.slice(root.path.length + 1) : path
+}
+
+// ============================================================================
+// Panel
+// ============================================================================
 
 export function ScanPanel() {
   const roots = use_resource(() => ipc('library:roots'), [])
-  const [progress, setProgress] = useState<ScanProgress | null>(null)
-  const [report, setReport] = useState<ScanReport | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [scanning, setScanning] = useState(false)
-
-  // Every file's outcome is kept; the table renders only the rows in view.
-  const [results, setResults] = useState<FileResult[]>([])
-  const [filter, setFilter] = useState<FileOutcome | 'all'>('all')
-  const [scrollTop, setScrollTop] = useState(0)
-  const [viewport, setViewport] = useState(320)
-  // Following the tail is only helpful while rows are still arriving.
-  const tail = use_follow_tail<HTMLDivElement>(results.length, scanning)
-  const body = tail.ref
-  const hasResults = results.length > 0
-
-  const tally = useMemo(() => {
-    const t: Record<string, number> = {}
-    for (const r of results) t[r.outcome] = (t[r.outcome] ?? 0) + 1
-    return t
-  }, [results])
-
-  const shown = useMemo(
-    () => (filter === 'all' ? results : results.filter((r) => r.outcome === filter)),
-    [results, filter]
-  )
-  const win = virtual_window(shown.length, ROW, scrollTop, viewport)
-  const slice = shown.slice(win.start, win.end)
+  const [progress, set_progress] = useState<ScanProgress | null>(null)
+  const [report, set_report] = useState<ScanReport | null>(null)
+  const [error, set_error] = useState<string | null>(null)
+  const [scanning, set_scanning] = useState(false)
+  const [results, set_results] = useState<FileResult[]>([])
+  const [filter, set_filter] = useState<FileOutcome | null>(null)
 
   useEffect(() => {
-    const el = body.current
-    if (!el) return
-    const observer = new ResizeObserver(() => setViewport(el.clientHeight))
-    observer.observe(el)
-    setViewport(el.clientHeight)
-    return () => observer.disconnect()
-  }, [hasResults])
-
-  useEffect(() => {
-    const offProgress = window.xMusicEvents.on('scan:progress', (p) => setProgress(p))
-    const offFiles = window.xMusicEvents.on('scan:files', (batch) => {
-      setResults((prev) => [...prev, ...batch])
-    })
-    const offDone = window.xMusicEvents.on('scan:done', (r) => {
-      setReport(r)
-      setProgress(null)
-      setScanning(false)
+    const off_progress = window.xMusicEvents.on('scan:progress', set_progress)
+    const off_files = window.xMusicEvents.on('scan:files', (batch) => set_results((shown) => [...shown, ...batch]))
+    const off_done = window.xMusicEvents.on('scan:done', (done) => {
+      set_report(done)
+      set_progress(null)
+      set_scanning(false)
+      void roots.reload(true)
       void library.refresh()
     })
-    return () => { offProgress(); offFiles(); offDone() }
+    return () => { off_progress(); off_files(); off_done() }
   }, [])
 
   async function add(): Promise<void> {
     try {
-      setError(null)
-      const added = await ipc('library:addRoot')
-      if (added) await roots.reload(true)
-    } catch (err) {
-      setError(describe_error(err))
+      set_error(null)
+      if (await ipc('library:addRoot')) await roots.reload(true)
+    } catch (failure) {
+      set_error(describe_error(failure))
     }
   }
 
-  async function remove(id: number): Promise<void> {
-    await ipc('library:removeRoot', id)
-    await roots.reload(true)
+  async function remove(root: Root): Promise<void> {
+    try {
+      set_error(null)
+      await ipc('library:removeRoot', root.id)
+      await roots.reload(true)
+    } catch (failure) {
+      set_error(describe_error(failure))
+    }
   }
 
   async function scan(): Promise<void> {
-    setError(null)
-    setReport(null)
-    setResults([])
-    setFilter('all')
-    tail.set_following(true)
-    setScanning(true)
+    set_error(null)
+    set_report(null)
+    set_results([])
+    set_filter(null)
+    set_scanning(true)
     try {
       await ipc('library:scan')
-    } catch (err) {
-      setError(describe_error(err))
-      setScanning(false)
-      setProgress(null)
+    } catch (failure) {
+      set_error(describe_error(failure))
+      set_scanning(false)
+      set_progress(null)
     }
   }
 
-  async function cancel(): Promise<void> {
-    await ipc('library:scanCancel')
-  }
-
-  const onScroll = (e: UIEvent<HTMLDivElement>): void => {
-    setScrollTop(e.currentTarget.scrollTop)
-    tail.on_scroll(e)
-  }
+  const has_folders = (roots.data?.length ?? 0) > 0
+  const tools = (
+    <>
+      <button type="button" onClick={() => void add()} disabled={scanning}>Add folder…</button>
+      {scanning
+        ? <button type="button" onClick={() => void ipc('library:scanCancel')}>Cancel</button>
+        : <button type="button" className="accent solid" onClick={() => void scan()} disabled={!has_folders}>Scan now</button>}
+    </>
+  )
 
   return (
-    <section className={s.scan}>
-      <PageHeading
-        level={2}
-        title="Music folders"
-        subtitle="X-Music reads these folders to build the library. Files are only ever read, never modified."
-      />
+    <>
+      <Section title="Music folders" tools={tools}>
+        <Loaded resource={roots} lines={2}>{(list) => list.length > 0 ? (
+          <DataTable caption="Music folders" columns={folder_columns(scanning, (root) => void remove(root))} rows={list} row_key={(root) => String(root.id)} column_hiding={false} />
+        ) : (
+          <Empty title="No music folders yet." hint={<>Add a folder to read its music, or bring in a gmusicbrowser library under <a href={view_href('import')}>Import</a>.</>} />
+        )}</Loaded>
+        {error && <p className="tone-bad" role="alert">{error}</p>}
+        {progress && (
+          <ProgressBar label="Scan progress" value={progress.phase === 'reading' ? progress.processed : null} max={progress.found} detail={progress_detail(progress)} />
+        )}
+      </Section>
 
-      <Loaded resource={roots} lines={2}>{(list) => list.length ? (
-        <ul className={s.roots}>
-          {list.map((r) => (
-            <li key={r.id}>
-              <code className={s.code}>{r.path}</code>
-              <span className={s.when}>
-                {r.lastScan ? `scanned ${new Date(r.lastScan).toLocaleString()}` : 'never scanned'}
-              </span>
-              <button className="danger" onClick={() => remove(r.id)} disabled={scanning}>Remove</button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className={s.note}>No folders yet. Add one to scan, or import from gmusicbrowser instead.</p>
-      )}</Loaded>
-
-      <div className={s.actions}>
-        <button onClick={add} disabled={scanning}>Add folder…</button>
-        <button className="accent solid" onClick={scan} disabled={scanning || (roots.data?.length ?? 0) === 0}>
-          {scanning ? 'Scanning…' : 'Scan now'}
-        </button>
-        {scanning && <button onClick={cancel}>Cancel</button>}
-      </div>
-
-      {progress && (
-        <ProgressBar
-          label="Scan progress"
-          value={progress.phase === 'reading' ? progress.processed : null}
-          max={progress.found}
-          detail={progress.phase === 'walking'
-            ? `Finding files… ${progress.found.toLocaleString()}`
-            : progress.phase === 'finishing'
-              ? 'Checking for files that disappeared…'
-              : `${progress.processed.toLocaleString()} / ${progress.found.toLocaleString()}`}
-        />
+      {(scanning || report || results.length > 0) && (
+        <Section title={scanning ? 'Scanning' : 'Last scan'}>
+          {report && <ScanSummary report={report} on_show_failed={() => set_filter('error')} />}
+          <OutcomeLog
+            label="Scanned files"
+            entries={results}
+            outcome_of={(result) => result.outcome}
+            outcomes={OUTCOMES}
+            item_of={(result) => within_folder(result.path, roots.data ?? [])}
+            detail_of={(result) => result.detail}
+            active={scanning}
+            filter={filter}
+            on_filter_change={set_filter}
+            labels={{ item: 'File', empty: scanning ? 'Looking for music files…' : 'No files were read.' }}
+          />
+        </Section>
       )}
-
-      {hasResults && (
-        <div className={s.results}>
-          <div className={s.filters}>
-            <button aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
-              All <span className={s.n}>{results.length.toLocaleString()}</span>
-            </button>
-            {OUTCOMES.map((o) =>
-              tally[o.id] ? (
-                <button key={o.id} aria-pressed={filter === o.id}
-                        onClick={() => setFilter(o.id)}>
-                  {o.label} <span className={s.n}>{tally[o.id]!.toLocaleString()}</span>
-                </button>
-              ) : null
-            )}
-            <span className={s.grow}></span>
-            <FollowToggle following={tail.following} on_change={tail.set_following} disabled={!scanning} />
-          </div>
-
-          <div className={s.body} ref={body} onScroll={onScroll}>
-            <div className={s.spacer} style={{ height: `${win.total_px}px` }}>
-              <div className={s.rows} style={{ transform: `translateY(${win.offset_px}px)` }}>
-                {slice.map((r, i) => (
-                  <div key={win.start + i} className={s.row} style={{ height: `${ROW}px` }}>
-                    <Badge tone={tone_of(r.outcome)}>{r.outcome}</Badge>
-                    <span className={s.file} title={r.path}>{short(r.path)}</span>
-                    <span className={s.why}>{r.detail ?? ''}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {error && <p className={cx(s.note, 'tone-bad')}>{error}</p>}
-
-      {report && (
-        <div className={s.report}>
-          <p>
-            Scanned <strong>{report.filesFound.toLocaleString()}</strong> files in{' '}
-            {seconds(report.durationMs)} —{' '}
-            <strong>{report.tracksCreated.toLocaleString()}</strong> new,{' '}
-            <strong>{report.tracksMatched.toLocaleString()}</strong> already known,{' '}
-            <strong>{report.filesSkipped.toLocaleString()}</strong> unchanged.
-          </p>
-          {report.movesDetected > 0 && (
-            <p className={s.note}>
-              {report.movesDetected} moved or renamed file{report.movesDetected === 1 ? '' : 's'}{' '}
-              recognised by audio content, keeping ratings and play history.
-            </p>
-          )}
-          {report.markedMissing > 0 && (
-            <p className={cx(s.note, s.warn)}>
-              {report.markedMissing} file{report.markedMissing === 1 ? '' : 's'} no longer on disk.
-              Flagged as missing; their tracks and statistics are kept.
-            </p>
-          )}
-          {report.errors.length > 0 && (
-            <>
-              <p className={cx(s.note, s.warn)}>{report.errors.length} file(s) could not be read:</p>
-              <ul className={s.errors}>
-                {report.errors.slice(0, 5).map((e) => (
-                  <li key={e.path}><code className={s.code}>{short(e.path)}</code> — {e.message}</li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      )}
-    </section>
+    </>
   )
 }
