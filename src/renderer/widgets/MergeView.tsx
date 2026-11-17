@@ -64,7 +64,7 @@ const failure = (error: unknown): string => clean_error_message(describe_error(e
 // Undo
 // ============================================================================
 
-async function undo_merge(batch_id: string, on_undone?: () => void): Promise<void> {
+export async function undo_merge(batch_id: string, on_undone?: () => void): Promise<void> {
   try {
     await ipc('undo_merge', batch_id)
     await library.refresh()

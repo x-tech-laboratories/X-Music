@@ -12,10 +12,11 @@ import { PageView } from '@x-tech-laboratories/x-libs/web/react/page_view'
 import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { ratingToStars } from '@shared/fields'
 import { ipc, page_ipc } from '../lib/ipc'
+import { open_track_history } from '../views/HistoryView'
 import { TrackCover } from './Cover'
 import s from './SongProperties.module.css'
 
-type SectionId = 'overview' | 'sources' | 'tags' | 'history'
+type SectionId = 'overview' | 'sources' | 'tags' | 'plays'
 
 // ============================================================================
 // Words
@@ -202,7 +203,7 @@ function RawTags({ details }: { details: TrackDetails }) {
   )
 }
 
-function History({ details }: { details: TrackDetails }) {
+function Plays({ details }: { details: TrackDetails }) {
   const plays = details.history.filter((entry) => entry.kind === 'play').length
   const skips = details.history.length - plays
   const shown_part = details.historyTotal > details.history.length ? `, showing the most recent ${details.history.length}` : ''
@@ -243,7 +244,7 @@ export function SongProperties({ trackId, onclose }: { trackId: string; onclose:
     { id: 'overview', label: 'Overview' },
     { id: 'sources', label: `Sources (${details?.media.length ?? 0})` },
     { id: 'tags', label: 'Raw tags' },
-    { id: 'history', label: 'History' }
+    { id: 'plays', label: 'Plays and skips' }
   ]
 
   return (
@@ -251,6 +252,7 @@ export function SongProperties({ trackId, onclose }: { trackId: string; onclose:
       title={details?.title ?? 'Track'}
       subtitle={details ? `${plural(details.media.length, 'source')} · ${plural(details.statistics.playCount, 'play')}` : undefined}
       on_close={onclose}
+      actions={details && <button onClick={() => open_track_history(details.id, details.title ?? 'Untitled track', () => void resource.reload(true))}>History</button>}
       sections={sections}
       section={section}
       on_section={set_section}
@@ -261,7 +263,7 @@ export function SongProperties({ trackId, onclose }: { trackId: string; onclose:
             {section === 'overview' && <Overview details={loaded} />}
             {section === 'sources' && <Sources details={loaded} />}
             {section === 'tags' && <RawTags details={loaded} />}
-            {section === 'history' && <History details={loaded} />}
+            {section === 'plays' && <Plays details={loaded} />}
           </div>
         )}
       </Loaded>

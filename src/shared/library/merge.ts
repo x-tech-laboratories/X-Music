@@ -517,3 +517,35 @@ export function unmerge(database: SqlDatabase, batchId: string): UnmergeResult {
     return { batchId, restored, survivor }
   })
 }
+
+// ── Listing ──────────────────────────────────────────────────────────────────
+
+export interface MergeEntry {
+  batch_id: string
+  at: number
+  survivor_id: string
+  // The survivor's title now, or as it was before the merge once it is gone.
+  survivor_title: string | null
+  // The tracks the merge took into the survivor, as they were before it.
+  absorbed: { id: string; title: string | null }[]
+  undone: boolean
+}
+
+// The latest merges, newest first, undone ones included, for the History page.
+export function list_recent_merges(database: SqlDatabase, limit: number): MergeEntry[] {
+  const rows = all_rows<{ batch_id: string; at: number; survivor_id: string; snapshot: string; undone: number; current_title: string | null }>(database, `
+    SELECT batch_id, at, survivor_id, snapshot, undone, (SELECT title FROM tracks WHERE tracks.id = survivor_id) AS current_title
+    FROM merge_journal ORDER BY at DESC, id DESC LIMIT ?`, limit)
+  return rows.map((row) => {
+    const tracks = (JSON.parse(row.snapshot) as Snapshot).tracks
+    const survivor = tracks.find((track) => track.id === row.survivor_id)
+    return {
+      batch_id: row.batch_id,
+      at: row.at,
+      survivor_id: row.survivor_id,
+      survivor_title: row.current_title ?? survivor?.title ?? null,
+      absorbed: tracks.filter((track) => track.id !== row.survivor_id).map((track) => ({ id: track.id, title: track.title })),
+      undone: row.undone === 1
+    }
+  })
+}

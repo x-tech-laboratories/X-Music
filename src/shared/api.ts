@@ -200,6 +200,10 @@ export const x_music_api: ApiSpec<XMusicApi & XMusicHistoryApi> = {
     description: 'Puts a track back as it was in one of its versions, bringing it back if it was deleted. The restore is itself a version, so it can be undone the same way.',
     params: [{ name: 'version_id', schema: id_of('version') }]
   },
+  list_recent_merges: {
+    description: 'Lists the latest merges, newest first, undone ones included: each with its batch id, when in Unix milliseconds, the surviving track and the tracks it took in. undo_merge with a batch id puts that merge back.',
+    params: [{ name: 'limit', schema: { type: 'integer', minimum: 1, description: 'At most this many.' } }]
+  },
   get_history_keep_days: { description: 'Gives how many days versions are kept; each track keeps its newest whatever its age.', params: [] },
   set_history_keep_days: { description: 'Sets how many days versions are kept.', params: [{ name: 'days', schema: { type: 'integer', minimum: 1 } }] }
 }

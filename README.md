@@ -15,9 +15,6 @@ run what exists.
 Early. The library core, query engine, playback and testing harness are real; tag writing is not
 implemented yet. See the roadmap in DESIGN-SPEC §15.
 
-Still to come, to meet the [Application Standard](https://x-tech-laboratories.github.io/standards/application/):
-the History page over the track history.
-
 | Area | State |
 |---|---|
 | Library store on X-Libs' `sql` and Drizzle, with ids any device can make | working |
@@ -37,7 +34,7 @@ the History page over the track history.
 | Tag writing | not started |
 | Filesystem watching | not started |
 | Merge tracks, with per-field resolution and undo | working |
-| Track history (every change a version, any version restorable, on X-Libs) | working; no History page yet |
+| Track history (every change a version, any version restorable, on X-Libs) | working, on the History page |
 | Duplicate detection (hash, MBID, tags, fuzzy) | working |
 | Song properties (identity, sources, raw tags, history) | working |
 | Album art (embedded, folder image, cached) | working |
@@ -163,8 +160,14 @@ Every change to a track is kept as a version, through X-Libs' history: a scan th
 import, a merge (the survivor edited, the others deleted) and an undo. Any version can be restored,
 and a track a merge took away can be brought back with its files. Plays are counted, not edited, so
 they make no version and a restore leaves the counts as they are. Versions are kept for a year by
-default (`history.keep_days`), each track keeping its newest. The page reaches them through
-`window.xMusicHistory`; the History page that shows them is still to come.
+default, each track keeping its newest; how long is set under Settings, Data, History. The page reaches
+them through `window.xMusicHistory`.
+
+The History page, a row of the sidebar at `#/history`, lists the latest track changes and merges
+together, newest first, each version saying field by field what it changed. History on a row, or the
+History button of a track's properties, opens that track's versions, and any earlier one can be
+restored; a track a merge took out can be brought back. A merge not yet undone has Undo merge, which
+puts every track back exactly, plays and playlist places included, from the merge's own record.
 
 Playlists have no history of their own yet: X-Music does not edit them, they only arrive from a
 gmusicbrowser import, and a merge's changes to them come back with Undo this merge. They gain one when
@@ -185,7 +188,7 @@ Every call the window makes on the library and the player is a tool, described o
 `src/shared/api.ts`. The calls that only read are marked read-only, so a client may run them without asking:
 `get_app_info`, `get_library_stats`, `list_tracks`, `list_track_groups`, `get_track`, `list_duplicates`,
 `get_merge_preview`, `list_folders`, `get_default_gmbrc_path`, `get_gmbrc_preview`, `get_player_status`,
-`list_versions`, `list_recent_versions` and `get_history_keep_days`. Every other tool changes something and
+`list_versions`, `list_recent_versions`, `list_recent_merges` and `get_history_keep_days`. Every other tool changes something and
 is marked so, and a client asks before running it: `add_folder`, `remove_folder`, `scan_folders`,
 `cancel_scan`, `import_gmbrc`, `merge_tracks`, `undo_merge`, `restore_version`, `set_history_keep_days`,
 `clear_library` and the player's `play_track`, `toggle_playback`, `play_next`, `play_previous`,

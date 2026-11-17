@@ -59,7 +59,7 @@ describe('IPC bridge', () => {
 
     x_music_history_bridge.handle(ipc_main, {} as never)
 
-    expect([...history_channels]).toEqual(['list_versions', 'list_recent_versions', 'restore_version', 'get_history_keep_days', 'set_history_keep_days'])
+    expect([...history_channels]).toEqual(['list_versions', 'list_recent_versions', 'restore_version', 'get_history_keep_days', 'set_history_keep_days', 'list_recent_merges'])
     expect(handled).toEqual(history_channels.map((channel) => `xMusicHistory:${channel}`))
   })
 

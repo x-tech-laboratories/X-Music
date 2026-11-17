@@ -16,7 +16,7 @@ import { findDuplicates } from '@shared/library/duplicates'
 import {
   get_history_keep_days, record_history, set_history_keep_days, track_history_methods
 } from '@shared/library/history'
-import { mergePreview, mergeTracks, unmerge } from '@shared/library/merge'
+import { list_recent_merges, mergePreview, mergeTracks, unmerge } from '@shared/library/merge'
 import {
   add_root, enabled_root_paths, group_tracks, library_stats, list_roots, mark_roots_scanned,
   query_tracks, remove_root
@@ -220,7 +220,8 @@ export async function registerIpc(db: SqlDatabase, options: IpcOptions): Promise
   const history: Implementation<XMusicHistoryApi> = {
     ...track_history_methods(() => db),
     get_history_keep_days: () => get_history_keep_days(db),
-    set_history_keep_days: (days) => set_history_keep_days(db, days)
+    set_history_keep_days: (days) => set_history_keep_days(db, days),
+    list_recent_merges: (limit) => list_recent_merges(db, limit)
   }
 
   const page: Implementation<XMusicPageApi> = {

@@ -20,6 +20,10 @@ const defaults: Record<string, unknown> = {
   list_folders: [],
   get_default_gmbrc_path: '',
   get_player_status: idle_status,
+  list_versions: [],
+  list_recent_versions: [],
+  list_recent_merges: [],
+  get_history_keep_days: 365,
   get_local_mcp_settings: { enabled: false, port: 3919 },
   get_local_mcp_status: { state: 'off', url: '', error: '' }
 }
