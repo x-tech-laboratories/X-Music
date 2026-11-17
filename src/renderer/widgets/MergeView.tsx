@@ -66,7 +66,7 @@ const failure = (error: unknown): string => clean_error_message(describe_error(e
 
 export async function undo_merge(batch_id: string, on_undone?: () => void): Promise<void> {
   try {
-    await ipc('tracks:unmerge', batch_id)
+    await ipc('undo_merge', batch_id)
     await library.refresh()
     on_undone?.()
     toast('Merge undone', { tone: 'good' })
@@ -152,7 +152,7 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
 }
 
 export function MergeView({ ids, onclose, on_undone }: MergeViewProps) {
-  const loaded = use_resource(() => ipc('tracks:mergePreview', ids), [])
+  const loaded = use_resource(() => ipc('get_merge_preview', ids), [])
   const preview = loaded.data
   // The source that survives, the preview's proposal until one is picked.
   const [chosen_survivor, set_survivor] = useState<string | null>(null)
@@ -169,7 +169,7 @@ export function MergeView({ ids, onclose, on_undone }: MergeViewProps) {
     if (survivor_id === undefined) return
     set_busy(true)
     try {
-      const result = await ipc('tracks:merge', { ids: preview.ids, survivor: survivor_id, resolutions: resolutions_for(preview, survivor, choices) })
+      const result = await ipc('merge_tracks', preview.ids, survivor_id, resolutions_for(preview, survivor, choices))
       await library.refresh()
       toast(`Merged ${plural(preview.ids.length, 'track')} into one holding ${plural(result.mediaMoved + 1, 'file')}`, {
         tone: 'good',

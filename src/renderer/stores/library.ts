@@ -115,8 +115,8 @@ async function refresh(): Promise<void> {
   try {
     const state = browse.get()
     const [stats, tracks] = await Promise.all([
-      ipc('library:stats'),
-      ipc('library:query', { filter: filter_of(state), sort: [...state.sort] })
+      ipc('get_library_stats'),
+      ipc('list_tracks', filter_of(state), [...state.sort])
     ])
     if (request !== latest_request) return
     const order = tracks.map((track) => track.id)
@@ -138,7 +138,7 @@ function change_browse(make: (state: Browse) => Browse): Promise<void> {
 
 // The values of a field under every filter but its own pane's, which throws so the pane can show why.
 function groups_for(field_id: string): Promise<GroupRow[]> {
-  return ipc('library:groupBy', { filter: filter_of(browse.get(), field_id), field: field_id })
+  return ipc('list_track_groups', filter_of(browse.get(), field_id), field_id)
 }
 
 // ============================================================================
@@ -157,7 +157,7 @@ async function names_of(ids: readonly TrackId[]): Promise<Map<TrackId, TrackName
     const track = loaded.get(id)
     if (track) return void names.set(id, { title: track.title ?? '', artist: track.artist ?? '' })
     if (!names_fetched.has(id)) {
-      const details = await ipc('tracks:details', id)
+      const details = await ipc('get_track', id)
       const artist = details?.fields.find((each) => each.field === 'artist')?.value ?? ''
       names_fetched.set(id, { title: details?.title ?? '', artist })
     }

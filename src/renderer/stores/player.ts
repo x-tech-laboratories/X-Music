@@ -40,12 +40,12 @@ async function act(work: () => Promise<PlayerStatus>): Promise<void> {
 function init(): () => void {
   void refresh()
 
-  const stop_status = window.xMusicEvents.on('player:status', (status) => {
+  const stop_status = window.xMusicEvents.on('player_status', (status) => {
     apply(status)
     last_tick_at = performance.now()
   })
 
-  const stop_position = window.xMusicEvents.on('player:position', (tick) => {
+  const stop_position = window.xMusicEvents.on('player_position', (tick) => {
     player_position.set(tick.positionMs)
     last_tick_at = performance.now()
     // Replacing status redraws everything that reads it, so only do it when the duration moved.
@@ -71,7 +71,7 @@ function init(): () => void {
 }
 
 function refresh(): Promise<void> {
-  return act(() => ipc('player:status'))
+  return act(() => ipc('get_player_status'))
 }
 
 // ============================================================================
@@ -81,21 +81,21 @@ function refresh(): Promise<void> {
 export const player = {
   init,
   refresh,
-  playTrack: (trackId: string, context?: string[], index?: number) => act(() => ipc('player:playTrack', { trackId, context, index })),
-  toggle: () => act(() => ipc('player:toggle')),
-  next: () => act(() => ipc('player:next')),
-  previous: () => act(() => ipc('player:previous')),
-  stop: () => act(() => ipc('player:stop')),
+  playTrack: (trackId: string, context?: string[], index?: number) => act(() => ipc('play_track', trackId, context, index)),
+  toggle: () => act(() => ipc('toggle_playback')),
+  next: () => act(() => ipc('play_next')),
+  previous: () => act(() => ipc('play_previous')),
+  stop: () => act(() => ipc('stop_playback')),
   seek: (milliseconds: number) => {
     player_position.set(milliseconds)
-    return act(() => ipc('player:seek', milliseconds))
+    return act(() => ipc('seek', milliseconds))
   },
-  setVolume: (volume: number) => act(() => ipc('player:volume', volume)),
-  enqueue: (trackIds: string[], position: 'end' | 'next' = 'end') => act(() => ipc('player:enqueue', { trackIds, position })),
-  dequeue: (index: number) => act(() => ipc('player:dequeue', index)),
-  clearQueue: () => act(() => ipc('player:clearQueue')),
-  setRepeat: (mode: RepeatMode) => act(() => ipc('player:repeat', mode)),
-  setShuffle: (on: boolean) => act(() => ipc('player:shuffle', on)),
+  setVolume: (volume: number) => act(() => ipc('set_volume', volume)),
+  enqueue: (trackIds: string[], position: 'end' | 'next' = 'end') => act(() => ipc('queue_tracks', trackIds, position)),
+  dequeue: (index: number) => act(() => ipc('remove_from_queue', index)),
+  clearQueue: () => act(() => ipc('clear_queue')),
+  setRepeat: (mode: RepeatMode) => act(() => ipc('set_repeat', mode)),
+  setShuffle: (on: boolean) => act(() => ipc('set_shuffle', on)),
 
   // Read-only views of the stores, for the widgets that read them in place.
   status_changes: player_status.watch,

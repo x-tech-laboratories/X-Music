@@ -78,7 +78,7 @@ const rows = async (): Promise<HTMLElement[]> => {
 }
 
 beforeEach(() => {
-  calls = record_calls({ 'tracks:unmerge': { batchId: 'merge-a', restored: ['track-4'], survivor: 'track-3' } })
+  calls = record_calls({ undo_merge: { batchId: 'merge-a', restored: ['track-4'], survivor: 'track-3' } })
   install_history()
 })
 
@@ -169,7 +169,7 @@ describe('restoring', () => {
 
     await waitFor(() => expect(history.restore_version).toHaveBeenCalledWith('version-1'))
     expect(await screen.findByText('So What is back as it was')).toBeTruthy()
-    expect(calls.some((call) => call.channel === 'library:stats')).toBe(true)
+    expect(calls.some((call) => call.channel === 'get_library_stats')).toBe(true)
   })
 
   it('brings back a removed track from the page', async () => {
@@ -206,7 +206,7 @@ describe('merges', () => {
     fireEvent.click(within(listed[1]!).getByRole('button', { name: 'Undo merge' }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Undo the merge into Freddie Freeloader?' })).getByRole('button', { name: 'Undo merge' }))
 
-    await waitFor(() => expect(calls.some((call) => call.channel === 'tracks:unmerge' && call.args[0] === 'merge-a')).toBe(true))
+    await waitFor(() => expect(calls.some((call) => call.channel === 'undo_merge' && call.args[0] === 'merge-a')).toBe(true))
     await waitFor(() => expect(screen.getAllByText('Merge undone').some((text) => !text.classList.contains('badge'))).toBe(true))
     await waitFor(() => expect(history.list_recent_merges).toHaveBeenCalledTimes(2))
   })

@@ -1433,9 +1433,10 @@ duplicate finder later only has to produce candidate id sets.
 - Tray icon with a configurable menu and scroll-to-change-volume.
 - Desktop notifications on track change, with album art.
 - **Last.fm / ListenBrainz** scrobbling with an offline queue that survives restarts.
-- A local HTTP control API (opt-in, loopback-only by default, token-authenticated) — this is what a
-  future phone remote and CLI both talk to.
-- An `x-music-ctl` CLI over the same API: `x-music-ctl play`, `x-music-ctl query 'rating:>=4 genre:jazz'`.
+- Every call described once in an X-Libs `api_spec` (`src/shared/api.ts`) and offered as tools by a local MCP
+  server through X-Libs `electron/mcp`: off until turned on in Settings, on 127.0.0.1 only.
+- An `x-music-ctl` CLI on the X-Libs `agent` modules over the same calls: `x-music-ctl play`,
+  `x-music-ctl query 'rating:>=4 genre:jazz'`.
 
 ---
 

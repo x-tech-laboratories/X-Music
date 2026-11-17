@@ -1,7 +1,7 @@
 // The performance budget from DESIGN-SPEC §12, expressed as runnable benchmarks. These exist so a
 // regression shows up as a number rather than as a vague feeling that the app got slower.
 
-import { bench, describe } from 'vitest'
+import { test } from 'vitest'
 
 import { compileFilter, compileGroupBy } from '@shared/query/compile'
 import { selectIds } from '@shared/query/evaluate'
@@ -29,38 +29,45 @@ const run = (node: Parameters<typeof compileFilter>[0]): void => {
   db.prepare(sql).all(...params)
 }
 
-describe(`SQL filter over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, () => {
-  bench('simple scalar predicate', () => run(SIMPLE))
-  bench('compound predicate with sets, dates and negation', () => run(COMPOUND))
-  bench('full-library scan', () => run(and()))
+// Each test times its benchmarks side by side through vitest's bench fixture.
+test(`SQL filter over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, async ({ bench }) => {
+  await bench.compare(
+    bench('simple scalar predicate', () => run(SIMPLE)),
+    bench('compound predicate with sets, dates and negation', () => run(COMPOUND)),
+    bench('full-library scan', () => run(and()))
+  )
 })
 
-describe(`native predicate over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, () => {
-  bench('simple scalar predicate', () => {
-    selectIds(SIMPLE, corpus.tracks, { now: FIXED_NOW })
-  })
-  bench('compound predicate with sets, dates and negation', () => {
-    selectIds(COMPOUND, corpus.tracks, { now: FIXED_NOW })
-  })
+test(`native predicate over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, async ({ bench }) => {
+  await bench.compare(
+    bench('simple scalar predicate', () => {
+      selectIds(SIMPLE, corpus.tracks, { now: FIXED_NOW })
+    }),
+    bench('compound predicate with sets, dates and negation', () => {
+      selectIds(COMPOUND, corpus.tracks, { now: FIXED_NOW })
+    })
+  )
 })
 
-describe(`group-by over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, () => {
-  bench('group by genre (multi-value)', () => {
-    const { sql, params } = compileGroupBy(and(), 'genre', FIXED_NOW)
-    db.prepare(sql).all(...params)
-  })
-  bench('group by year (scalar)', () => {
-    const { sql, params } = compileGroupBy(and(), 'year', FIXED_NOW)
-    db.prepare(sql).all(...params)
-  })
+test(`group-by over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, async ({ bench }) => {
+  await bench.compare(
+    bench('group by genre (multi-value)', () => {
+      const { sql, params } = compileGroupBy(and(), 'genre', FIXED_NOW)
+      db.prepare(sql).all(...params)
+    }),
+    bench('group by year (scalar)', () => {
+      const { sql, params } = compileGroupBy(and(), 'year', FIXED_NOW)
+      db.prepare(sql).all(...params)
+    })
+  )
 })
 
-describe(`sort over ${SIZE.toLocaleString()} tracks (budget: 150ms)`, () => {
-  bench('sort by album then track number', () => {
+test(`sort over ${SIZE.toLocaleString()} tracks (budget: 150ms)`, async ({ bench }) => {
+  await bench('sort by album then track number', () => {
     const { sql, params } = compileFilter(and(), {
       now: FIXED_NOW,
       sort: [{ field: 'album' }, { field: 'track_number' }]
     })
     db.prepare(sql).all(...params)
-  })
+  }).run()
 })

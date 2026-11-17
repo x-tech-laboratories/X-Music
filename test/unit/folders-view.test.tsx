@@ -44,7 +44,7 @@ function fake_events(): (event: string, payload: unknown) => void {
 
 beforeEach(() => {
   vi.useFakeTimers({ now, toFake: ['Date'] })
-  install_bridge({ 'library:roots': roots, 'library:scan': () => new Promise(() => undefined) })
+  install_bridge({ 'list_folders': roots, 'scan_folders': () => new Promise(() => undefined) })
 })
 
 afterEach(() => {
@@ -69,7 +69,7 @@ describe('folders view', () => {
   })
 
   it('points at Import when there are no folders', async () => {
-    install_bridge({ 'library:roots': [] })
+    install_bridge({ 'list_folders': [] })
     render(<FoldersView />)
 
     expect(await screen.findByText('No music folders yet.')).toBeTruthy()
@@ -94,8 +94,8 @@ describe('folders view', () => {
       { path: '/tmp/x-music-fixture/music/b.flac', outcome: 'unchanged' },
       { path: '/tmp/x-music-fixture/music/broken.flac', outcome: 'error', detail: 'not an audio file' }
     ]
-    emit('scan:files', files)
-    emit('scan:done', report)
+    emit('scan_files', files)
+    emit('scan_done', report)
 
     const log = screen.getByRole('table', { name: 'Scanned files' })
     expect(within(log).getByText('a.flac')).toBeTruthy()
@@ -111,7 +111,7 @@ describe('folders view', () => {
   })
 
   it('says why a scan could not start', async () => {
-    install_bridge({ 'library:roots': roots, 'library:scan': () => { throw new Error('a scan is already running') } })
+    install_bridge({ 'list_folders': roots, 'scan_folders': () => { throw new Error('a scan is already running') } })
     render(<FoldersView />)
 
     await screen.findByRole('table', { name: 'Music folders' })

@@ -38,7 +38,7 @@ afterEach(cleanup)
 
 describe('song properties', () => {
   it('lays the overview out as facts under section headings', async () => {
-    record_calls({ 'tracks:details': details, 'art:forTrack': { url: null, source: 'none' } })
+    record_calls({ 'get_track': details, 'get_cover_url': { url: null, source: 'none' } })
 
     render(<SongProperties trackId="track-7" onclose={() => undefined} />)
 
@@ -51,7 +51,7 @@ describe('song properties', () => {
   })
 
   it('shows each source with its facts and reveals it in its folder', async () => {
-    const calls = record_calls({ 'tracks:details': details })
+    const calls = record_calls({ 'get_track': details })
 
     render(<SongProperties trackId="track-7" onclose={() => undefined} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Sources (1)' }))
@@ -59,11 +59,11 @@ describe('song properties', () => {
     expect(screen.getByText('44100 Hz')).toBeTruthy()
     expect(screen.getByText('Plays')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Show in folder' }))
-    expect(calls.some((call) => call.channel === 'tracks:reveal' && call.args[0] === media.uri)).toBe(true)
+    expect(calls.some((call) => call.channel === 'show_in_folder' && call.args[0] === media.uri)).toBe(true)
   })
 
   it('joins repeated raw tags and says when a track was never played', async () => {
-    record_calls({ 'tracks:details': details })
+    record_calls({ 'get_track': details })
 
     render(<SongProperties trackId="track-7" onclose={() => undefined} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Raw tags' }))
@@ -74,7 +74,7 @@ describe('song properties', () => {
   })
 
   it('opens the track\'s history from its History button', async () => {
-    record_calls({ 'tracks:details': details })
+    record_calls({ 'get_track': details })
     const list_versions = vi.fn(async () => [])
     Object.assign(window, { xMusicHistory: { list_versions } })
 
@@ -88,7 +88,7 @@ describe('song properties', () => {
   })
 
   it('says when the track no longer exists, and closes', async () => {
-    record_calls({ 'tracks:details': null })
+    record_calls({ 'get_track': null })
     const onclose = vi.fn()
 
     render(<SongProperties trackId="track-7" onclose={onclose} />)

@@ -8,7 +8,7 @@ import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { GmbPreview, ImportReport } from '@shared/ipc'
-import { ipc } from '../lib/ipc'
+import { ipc, page_ipc } from '../lib/ipc'
 import { library } from '../stores/library'
 import { view_href } from '../views/Navigation'
 
@@ -78,14 +78,14 @@ export function GmbImport() {
   const [path, set_path] = useState('')
   // The path last read for the preview; the field may hold a newer one still being typed.
   const [checked, set_checked] = useState('')
-  const preview = use_resource(() => ipc('import:gmbPreview', checked), [checked], { enabled: checked !== '' })
+  const preview = use_resource(() => ipc('get_gmbrc_preview', checked), [checked], { enabled: checked !== '' })
   const [options, set_options] = useState<Options>({ statistics: true, labels: true, playlists: true })
   const [report, set_report] = useState<ImportReport | null>(null)
   const [busy, set_busy] = useState(false)
   const [error, set_error] = useState<string | null>(null)
 
   useEffect(() => {
-    ipc('import:gmbDefaultPath').then(set_path, (failure: unknown) => set_error(describe_error(failure)))
+    ipc('get_default_gmbrc_path').then(set_path, (failure: unknown) => set_error(describe_error(failure)))
   }, [])
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export function GmbImport() {
     set_busy(true)
     set_error(null)
     try {
-      const done = await ipc('import:gmbRun', { path: checked, ...options })
+      const done = await ipc('import_gmbrc', checked, options.statistics, options.labels, options.playlists)
       set_report(done)
       toast(`Imported ${plural(done.tracksCreated, 'track')}`, { tone: 'good', link: { href: view_href('library'), text: 'Show the library' } })
       await library.refresh()
@@ -113,7 +113,7 @@ export function GmbImport() {
       <Section title="gmusicbrowser">
         <div className="form-rows">
           <FormRow label="Configuration file" id="gmb-path" hint="gmusicbrowser keeps it at ~/.config/gmusicbrowser/gmbrc unless told otherwise.">
-            <PathInput label="Configuration file" value={path} on_change={set_path} pick={() => ipc('import:gmbBrowse')} />
+            <PathInput label="Configuration file" value={path} on_change={set_path} pick={() => page_ipc('pick_gmbrc_file')} />
           </FormRow>
         </div>
 

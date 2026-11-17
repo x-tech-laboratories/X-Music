@@ -12,7 +12,7 @@ import { format_duration } from '@x-tech-laboratories/x-libs/durations'
 import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { FileOutcome, FileResult, Root, ScanProgress, ScanReport } from '@shared/ipc'
-import { ipc } from '../lib/ipc'
+import { ipc, page_ipc } from '../lib/ipc'
 import { library } from '../stores/library'
 import { view_href } from '../views/Navigation'
 
@@ -102,7 +102,7 @@ function within_folder(path: string, roots: Root[]): string {
 // ============================================================================
 
 export function ScanPanel() {
-  const roots = use_resource(() => ipc('library:roots'), [])
+  const roots = use_resource(() => ipc('list_folders'), [])
   const [progress, set_progress] = useState<ScanProgress | null>(null)
   const [report, set_report] = useState<ScanReport | null>(null)
   const [error, set_error] = useState<string | null>(null)
@@ -111,9 +111,9 @@ export function ScanPanel() {
   const [filter, set_filter] = useState<FileOutcome | null>(null)
 
   useEffect(() => {
-    const off_progress = window.xMusicEvents.on('scan:progress', set_progress)
-    const off_files = window.xMusicEvents.on('scan:files', (batch) => set_results((shown) => [...shown, ...batch]))
-    const off_done = window.xMusicEvents.on('scan:done', (done) => {
+    const off_progress = window.xMusicEvents.on('scan_progress', set_progress)
+    const off_files = window.xMusicEvents.on('scan_files', (batch) => set_results((shown) => [...shown, ...batch]))
+    const off_done = window.xMusicEvents.on('scan_done', (done) => {
       set_report(done)
       set_progress(null)
       set_scanning(false)
@@ -126,7 +126,10 @@ export function ScanPanel() {
   async function add(): Promise<void> {
     try {
       set_error(null)
-      if (await ipc('library:addRoot')) await roots.reload(true)
+      const path = await page_ipc('pick_folder')
+      if (path === null) return
+      await ipc('add_folder', path)
+      await roots.reload(true)
     } catch (failure) {
       set_error(describe_error(failure))
     }
@@ -135,7 +138,7 @@ export function ScanPanel() {
   async function remove(root: Root): Promise<void> {
     try {
       set_error(null)
-      await ipc('library:removeRoot', root.id)
+      await ipc('remove_folder', root.id)
       await roots.reload(true)
     } catch (failure) {
       set_error(describe_error(failure))
@@ -149,7 +152,7 @@ export function ScanPanel() {
     set_filter(null)
     set_scanning(true)
     try {
-      await ipc('library:scan')
+      await ipc('scan_folders')
     } catch (failure) {
       set_error(describe_error(failure))
       set_scanning(false)
@@ -162,7 +165,7 @@ export function ScanPanel() {
     <>
       <button type="button" onClick={() => void add()} disabled={scanning}>Add folder…</button>
       {scanning
-        ? <button type="button" onClick={() => void ipc('library:scanCancel')}>Cancel</button>
+        ? <button type="button" onClick={() => void ipc('cancel_scan')}>Cancel</button>
         : <button type="button" className="accent solid" onClick={() => void scan()} disabled={!has_folders}>Scan now</button>}
     </>
   )

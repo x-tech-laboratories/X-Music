@@ -11,7 +11,7 @@ import { plural, size, stamp } from '@x-tech-laboratories/x-libs/web/format'
 import { PageView } from '@x-tech-laboratories/x-libs/web/react/page_view'
 import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { ratingToStars } from '@shared/fields'
-import { ipc } from '../lib/ipc'
+import { ipc, page_ipc } from '../lib/ipc'
 import { open_track_history } from '../views/HistoryView'
 import { TrackCover } from './Cover'
 import s from './SongProperties.module.css'
@@ -141,7 +141,7 @@ function Source({ media }: { media: DetailMedia }) {
           <span className={s.path} title={media.uri}>{media.uri}</span>
         </span>
       }
-      tools={<button onClick={() => void ipc('tracks:reveal', media.uri)} disabled={!media.present}>Show in folder</button>}
+      tools={<button onClick={() => void page_ipc('show_in_folder', media.uri)} disabled={!media.present}>Show in folder</button>}
     >
       <Facts rows={[
         ['Format', (media.codec ?? media.kind).toUpperCase()],
@@ -237,7 +237,7 @@ function Plays({ details }: { details: TrackDetails }) {
 
 export function SongProperties({ trackId, onclose }: { trackId: string; onclose: () => void }) {
   const [section, set_section] = useState<SectionId>('overview')
-  const resource = use_resource(() => ipc('tracks:details', trackId), [trackId])
+  const resource = use_resource(() => ipc('get_track', trackId), [trackId])
   const details = resource.data
 
   const sections: { id: SectionId; label: string }[] = [

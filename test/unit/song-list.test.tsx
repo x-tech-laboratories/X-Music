@@ -4,7 +4,7 @@
 import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { CHANNELS, type TrackRow } from '@shared/ipc'
+import { api_method_names, type TrackRow } from '@shared/ipc'
 import { browse, library, results } from '../../src/renderer/stores/library'
 import { player, player_status } from '../../src/renderer/stores/player'
 import { SongList } from '../../src/renderer/widgets/SongList'
@@ -30,13 +30,13 @@ const calls = new Map<string, ReturnType<typeof vi.fn>>()
 function bridge(listed: TrackRow[]): void {
   calls.clear()
   const answers: Record<string, unknown> = {
-    'library:query': listed,
-    'library:stats': stats(listed.length),
-    'library:groupBy': [],
-    'player:status': { state: 'idle', track: null, media: null, positionMs: 0, durationMs: null, volume: 80, repeat: 'off', shuffle: false, queue: [], contextLength: 0, contextIndex: -1 }
+    'list_tracks': listed,
+    'get_library_stats': stats(listed.length),
+    'list_track_groups': [],
+    'get_player_status': { state: 'idle', track: null, media: null, positionMs: 0, durationMs: null, volume: 80, repeat: 'off', shuffle: false, queue: [], contextLength: 0, contextIndex: -1 }
   }
   // A plain object of every channel, as the preload exposes it.
-  for (const channel of CHANNELS) calls.set(channel, vi.fn(async () => answers[channel] ?? answers['player:status']))
+  for (const channel of api_method_names) calls.set(channel, vi.fn(async () => answers[channel] ?? answers.get_player_status))
   Object.assign(window, { xMusic: Object.fromEntries(calls), xMusicEvents: { on: () => () => {} } })
 }
 
@@ -67,8 +67,8 @@ describe('the whole library', () => {
 
     await library.refresh()
 
-    expect(calls.get('library:query')).toHaveBeenCalledTimes(1)
-    expect(calls.get('library:query')!.mock.calls[0]![0]).not.toHaveProperty('limit')
+    expect(calls.get('list_tracks')).toHaveBeenCalledTimes(1)
+    expect(calls.get('list_tracks')!.mock.calls[0]![2]).toBeUndefined()
   })
 
   it('draws only the rows in view of a long list and reaches the last one by keyboard', () => {
@@ -112,7 +112,7 @@ describe('song list', () => {
 
     fireEvent.doubleClick(row('Track 2'))
 
-    expect(calls.get('player:playTrack')).toHaveBeenCalledWith({ trackId: 'track-20', context: ['track-10', 'track-20', 'track-30'], index: 1 })
+    expect(calls.get('play_track')).toHaveBeenCalledWith('track-20', ['track-10', 'track-20', 'track-30'], 1)
   })
 
   it('plays the row under the keyboard cursor on Enter', () => {
@@ -120,7 +120,7 @@ describe('song list', () => {
 
     fireEvent.keyDown(row('Track 3'), { key: 'Enter' })
 
-    expect(calls.get('player:playTrack')).toHaveBeenCalledWith({ trackId: 'track-30', context: ['track-10', 'track-20', 'track-30'], index: 2 })
+    expect(calls.get('play_track')).toHaveBeenCalledWith('track-30', ['track-10', 'track-20', 'track-30'], 2)
   })
 
   it('extends the selection with Shift and an arrow key', () => {
@@ -142,7 +142,7 @@ describe('song list', () => {
     expect(within(bar).getByText('2 selected')).toBeTruthy()
 
     fireEvent.click(within(bar).getByRole('button', { name: 'Add to queue' }))
-    expect(calls.get('player:enqueue')).toHaveBeenCalledWith({ trackIds: ['track-10', 'track-30'], position: 'end' })
+    expect(calls.get('queue_tracks')).toHaveBeenCalledWith(['track-10', 'track-30'], 'end')
 
     fireEvent.click(within(bar).getByRole('button', { name: 'Clear selection' }))
     expect(screen.queryByRole('toolbar', { name: 'Selected rows' })).toBeNull()
@@ -153,7 +153,7 @@ describe('song list', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Title/ }))
 
-    await vi.waitFor(() => expect(calls.get('library:query')).toHaveBeenCalledWith(expect.objectContaining({ sort: [{ field: 'title', dir: 'asc' }] })))
+    await vi.waitFor(() => expect(calls.get('list_tracks')).toHaveBeenCalledWith(expect.anything(), [{ field: 'title', dir: 'asc' }]))
   })
 
   it('marks the playing track with Halon\'s now-playing row', () => {
@@ -197,7 +197,7 @@ describe('filter chips', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove the filter Genre: Jazz' }))
 
     await vi.waitFor(() => expect(browse.get().panes).toEqual({}))
-    expect(calls.get('library:query')).toHaveBeenCalledWith(expect.objectContaining({ filter: expect.anything() }))
+    expect(calls.get('list_tracks')).toHaveBeenCalledWith(expect.anything(), expect.anything())
   })
 
   it('says how many of the library\'s tracks the filters let through', () => {
