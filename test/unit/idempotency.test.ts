@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseGmbrc } from '@shared/import/gmbrc'
 import { importGmbrc } from '@shared/import/gmb-import'
+import { createUpserter } from '@shared/library/identity'
 import { freshDb } from '../helpers/sqlite'
 
 const HEADER = [
@@ -79,3 +80,37 @@ describe('importing the same gmbrc twice', () => {
     db.close()
   })
 })
+
+describe('importing over a scanned library', () => {
+  const albums = (db: ReturnType<typeof freshDb>) =>
+    db.prepare('SELECT a.name, a.match_key, a.mb_release_id FROM tracks t JOIN albums a ON a.id = t.album_id').all()
+
+  it('adds nothing when the gmbrc names the files the scan found', () => {
+    const db = freshDb()
+    const scan = createUpserter(db)
+    for (const id of [1, 2]) {
+      scan({ title: `Track ${id}`, album: 'Kind of Blue', artist: 'Miles Davis', year: 1959, trackNumber: id,
+             sets: { artist: ['Miles Davis'] } }, { uri: `/music/miles/track${id}.flac` }, { metadata: true })
+    }
+    const before = { ...counts(db), albums: (db.prepare('SELECT COUNT(*) AS n FROM albums').get() as { n: number }).n }
+
+    importGmbrc(db, parseGmbrc(gmbrc([row(1), row(2)])))
+
+    expect({ ...counts(db), albums: (db.prepare('SELECT COUNT(*) AS n FROM albums').get() as { n: number }).n })
+      .toEqual({ ...before, history: 4, values: before.values + 4 })
+    db.close()
+  })
+
+  it('keeps a scanned track on its MusicBrainz album, which the gmbrc cannot name', () => {
+    const db = freshDb()
+    createUpserter(db)({ title: 'Track 1', album: 'Kind of Blue', artist: 'Miles Davis', year: 1959, mbReleaseId: 'release-1' },
+                       { uri: '/music/miles/track1.flac' }, { metadata: true })
+
+    importGmbrc(db, parseGmbrc(gmbrc([row(1)])))
+
+    expect(albums(db)).toEqual([{ name: 'Kind of Blue', match_key: 'mb\x1frelease-1', mb_release_id: 'release-1' }])
+    expect((db.prepare('SELECT COUNT(*) AS n FROM albums').get() as { n: number }).n).toBe(1)
+    db.close()
+  })
+})
+

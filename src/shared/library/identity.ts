@@ -6,11 +6,11 @@
 // file (same path, or same audio content). Guessing that two *different* files are the same
 // recording is a separate, reviewable operation — see DESIGN-SPEC §9.2.
 
-import { and, eq } from '@x-tech-laboratories/x-libs/drizzle'
+import { and, eq, isNotNull } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { field } from '../fields.ts'
-import { albumMatchKey, compilationKey } from './albums.ts'
+import { albumKeyName, albumMatchKey, compilationKey } from './albums.ts'
 import { drizzle_of, new_id } from './database.ts'
 import { albums, media, tracks } from './schema.ts'
 import { intern_value, set_extra, write_set } from './values.ts'
@@ -140,6 +140,17 @@ class Upserter {
         .where(and(eq(tracks.id, trackId), eq(albums.pinned, 1)))
         .get()
       if (current) return current.id
+
+      // A source without MusicBrainz ids, such as a gmbrc, keeps a track on the MusicBrainz album of the same name.
+      if (!t.mbReleaseId && t.album) {
+        const released = db
+          .select({ id: albums.id, name: albums.name })
+          .from(tracks)
+          .innerJoin(albums, eq(albums.id, tracks.album_id))
+          .where(and(eq(tracks.id, trackId), isNotNull(albums.mb_release_id)))
+          .get()
+        if (released && albumKeyName(released.name ?? '') === albumKeyName(t.album)) return released.id
+      }
     }
 
     const key = albumMatchKey(t, uri)
