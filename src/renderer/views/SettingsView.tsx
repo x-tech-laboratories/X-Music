@@ -3,9 +3,12 @@
 import { useEffect, useState } from 'react'
 import { BackupSettings } from '@x-tech-laboratories/x-libs/web/react/backup_settings'
 import { confirm_dialog } from '@x-tech-laboratories/x-libs/web/react/dialog'
-import { Segmented } from '@x-tech-laboratories/x-libs/web/react/controls'
+import { NumberField, Segmented } from '@x-tech-laboratories/x-libs/web/react/controls'
 import { Facts, PageHeading, SettingRow, SettingsPage, type SettingsCategory } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
+import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
+import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge'
 import { format_duration } from '@x-tech-laboratories/x-libs/durations'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { Theme } from '@x-tech-laboratories/x-libs/web/theme'
@@ -72,6 +75,34 @@ function LibraryDatabase() {
 }
 
 // ============================================================================
+// History
+// ============================================================================
+
+// How long track versions are kept, read once and saved on each change.
+function HistoryKeeping() {
+  const [days, set_days] = useState<number | null>(null)
+  useEffect(() => void window.xMusicHistory.get_history_keep_days().then(set_days, () => undefined), [])
+
+  async function change(next: number | null): Promise<void> {
+    if (next === null || next < 1) return
+    const before = days
+    set_days(next)
+    try {
+      await window.xMusicHistory.set_history_keep_days(next)
+    } catch (error) {
+      set_days(before)
+      toast(`Could not change how long changes are kept: ${clean_error_message(describe_error(error))}`, { tone: 'bad' })
+    }
+  }
+
+  return (
+    <SettingRow label="Keep changes for" hint="Older changes are pruned; each track always keeps its latest.">
+      <NumberField label="Keep changes for" bare unit="days" min={1} value={days} on_change={(next) => void change(next)} />
+    </SettingRow>
+  )
+}
+
+// ============================================================================
 // Page
 // ============================================================================
 
@@ -118,6 +149,12 @@ export function SettingsView({ info, density, on_density }: SettingsViewProps) {
       heading: 'Data',
       sections: [
         { id: 'library', heading: 'Library database', content: <LibraryDatabase /> },
+        {
+          id: 'history',
+          heading: 'History',
+          hint: 'Every change to a track is kept, to look back on or restore under History. Plays and skips are counted, not kept as changes.',
+          content: <HistoryKeeping />
+        },
         {
           id: 'backups',
           heading: 'Backups',
