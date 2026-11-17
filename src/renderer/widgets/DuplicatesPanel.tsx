@@ -102,7 +102,7 @@ export function DuplicatesPanel() {
   })
   const [search, set_search] = useState<Search | null>(null)
   const groups = use_resource(
-    () => ipc('tracks:duplicates', { reasons: search!.reasons, lengthToleranceMs: search!.tolerance_in_seconds * 1000, limit: MAX_SHOWN }),
+    () => ipc('list_duplicates', search!.reasons, search!.tolerance_in_seconds * 1000, MAX_SHOWN),
     [search],
     { enabled: search !== null }
   )
@@ -121,8 +121,8 @@ export function DuplicatesPanel() {
     set_working((now) => ({ ...now, [group.key]: true }))
     try {
       const ids = group.members.map((member) => member.trackId)
-      const preview = await ipc('tracks:mergePreview', ids)
-      const result = await ipc('tracks:merge', { ids, survivor: preview.survivor })
+      const preview = await ipc('get_merge_preview', ids)
+      const result = await ipc('merge_tracks', ids, preview.survivor)
       set_merges((now) => ({ ...now, [group.key]: result }))
       toast(`Merged ${plural(ids.length, 'track')} into one`, { tone: 'good', duration_in_milliseconds: UNDO_TOAST_IN_MILLISECONDS, action: { text: 'Undo', run: () => void undo(group.key, result) } })
       await library.refresh()
@@ -136,7 +136,7 @@ export function DuplicatesPanel() {
   async function undo(key: string, result: MergeResult): Promise<void> {
     set_working((now) => ({ ...now, [key]: true }))
     try {
-      await ipc('tracks:unmerge', result.batchId)
+      await ipc('undo_merge', result.batchId)
       set_merges(({ [key]: _undone, ...rest }) => rest)
       await library.refresh()
     } catch (failure) {
@@ -200,6 +200,7 @@ export function DuplicatesPanel() {
               void groups.reload()
             }
           }}
+          on_undone={() => void groups.reload()}
         />
       )}
     </>

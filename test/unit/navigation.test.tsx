@@ -3,11 +3,11 @@
 
 import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App } from '../../src/renderer/App'
 import { view_of } from '../../src/renderer/views/Navigation'
 import { library } from '../../src/renderer/stores/library'
-import { install_bridge } from '../helpers/bridge'
+import { emit_event, install_bridge } from '../helpers/bridge'
 
 // ============================================================================
 // Setup
@@ -94,9 +94,32 @@ describe('navigation', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Library' })).toBeTruthy()
   })
 
+  it('loads the library again when the MCP server changed it', async () => {
+    const calls = install_bridge()
+    render(<App />)
+    await screen.findByText('Your library is empty.')
+    const loads = () => calls.filter((call) => call.channel === 'get_library_stats').length
+    const before = loads()
+
+    act(() => emit_event('changed', null))
+
+    await waitFor(() => expect(loads()).toBe(before + 1))
+  })
+
+  it('puts the cursor in the library\'s search on /', async () => {
+    library.stats = { tracks: 1, media: 1, albums: 1, missing: 0, totalMs: 1000, schemaVersion: 1, path: '/tmp/x.db' }
+    install_bridge({ get_library_stats: library.stats })
+    render(<App />)
+    const search = await screen.findByRole('searchbox', { name: 'Search the library' })
+
+    fireEvent.keyDown(document.body, { key: '/' })
+
+    expect(document.activeElement).toBe(search)
+  })
+
   it('shows no placeholder tabs for features still to come', async () => {
     library.stats = { tracks: 1, media: 1, albums: 1, missing: 0, totalMs: 1000, schemaVersion: 1, path: '/tmp/x.db' }
-    install_bridge({ 'library:stats': library.stats })
+    install_bridge({ 'get_library_stats': library.stats })
     render(<App />)
 
     await screen.findByRole('heading', { level: 1, name: 'Library' })
@@ -122,7 +145,7 @@ describe('library view', () => {
   it('says why the library could not load and loads it again on Retry', async () => {
     let fails = true
     install_bridge({
-      'library:stats': () => {
+      'get_library_stats': () => {
         if (fails) throw new Error('database is locked')
         return { tracks: 0, media: 0, albums: 0, missing: 0, totalMs: 0, schemaVersion: 1, path: '/tmp/x.db' }
       }

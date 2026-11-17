@@ -6,8 +6,8 @@ import { backup_method_names, type BackupMethods } from '@x-tech-laboratories/x-
 import { define_bridge } from '@x-tech-laboratories/x-libs/electron/bridge'
 import { define_events } from '@x-tech-laboratories/x-libs/electron/events'
 import { history_method_names, type HistoryMethods } from '@x-tech-laboratories/x-libs/history'
+import { local_mcp_method_names, type LocalMcpMethods } from '@x-tech-laboratories/x-libs/local_mcp_protocol'
 import type { FilterNode, SortKey, Limit } from './filter'
-import type { FieldDescriptor } from './fields'
 import type { TrackDetails } from './library/details'
 import type { DuplicateGroup, DuplicateReason } from './library/duplicates'
 import type { TrackSnapshot } from './library/history'
@@ -163,100 +163,98 @@ export interface AppInfo {
   platform: string
 }
 
-/** Every channel the renderer may invoke, with its argument and result types. */
+// Every call X-Music offers: the page makes them, and other programs reach them through the local MCP server.
 export interface XMusicApi {
-  'app:info': () => AppInfo
-  'library:stats': () => LibraryStats
-  'library:query': (req: QueryRequest) => TrackRow[]
-  'library:groupBy': (req: { filter: FilterNode; field: string }) => GroupRow[]
-  'library:explain': (req: QueryRequest) => { sql: string; params: unknown[] }
-  'fields:list': () => FieldDescriptor[]
-  'theme:list': () => string[]
-  'import:gmbDefaultPath': () => string
-  'import:gmbBrowse': () => string | null
-  'import:gmbPreview': (path: string) => GmbPreview
-  'import:gmbRun': (req: { path: string; statistics?: boolean; labels?: boolean; playlists?: boolean }) => ImportReport
-  'library:reset': () => { cleared: boolean }
-  'library:roots': () => Root[]
-  'library:addRoot': () => Root | null
-  'library:removeRoot': (id: string) => { removed: boolean }
-  'library:scan': () => ScanReport
-  'library:scanCancel': () => { cancelled: boolean }
-  'tracks:mergePreview': (ids: string[]) => MergePreview
-  'tracks:merge': (req: {
-    ids: string[]
-    survivor: string
-    resolutions?: Record<string, Resolution>
-  }) => MergeResult
-  'tracks:unmerge': (batchId: string) => { batchId: string; restored: string[]; survivor: string }
-  'app:log': (record: {
-    level: 'critical' | 'error' | 'warn' | 'info' | 'debug'
-    scope: string
-    message: string
-    data?: unknown
-  }) => { logged: boolean }
-  'app:logConfig': () => { spec: string | undefined }
-  'tracks:details': (trackId: string) => TrackDetails | null
-  /** Resolves cover art lazily; returns an x-music-art:// url, or null when there is none. */
-  'art:forTrack': (req: { trackId: string; size?: number }) =>
-    { url: string | null; source: string }
-  'art:rescan': () => { forgotten: number }
-  'tracks:reveal': (uri: string) => { revealed: boolean }
-  'player:status': () => PlayerStatus
-  'player:playTrack': (req: { trackId: string; context?: string[]; index?: number }) => PlayerStatus
-  'player:toggle': () => PlayerStatus
-  'player:next': () => PlayerStatus
-  'player:previous': () => PlayerStatus
-  'player:stop': () => PlayerStatus
-  'player:seek': (positionMs: number) => PlayerStatus
-  'player:volume': (volume: number) => PlayerStatus
-  'player:enqueue': (req: { trackIds: string[]; position?: 'end' | 'next' }) => PlayerStatus
-  'player:dequeue': (index: number) => PlayerStatus
-  'player:clearQueue': () => PlayerStatus
-  'player:repeat': (mode: RepeatMode) => PlayerStatus
-  'player:shuffle': (on: boolean) => PlayerStatus
-  'tracks:duplicates': (opts?: {
-    reasons?: DuplicateReason[]
-    lengthToleranceMs?: number
-    limit?: number
-  }) => DuplicateGroup[]
+  get_app_info: () => AppInfo
+  get_library_stats: () => LibraryStats
+  list_tracks: (filter: FilterNode, sort?: readonly SortKey[], limit?: Limit, offset?: number) => TrackRow[]
+  list_track_groups: (filter: FilterNode, field: string) => GroupRow[]
+  get_track: (track_id: string) => TrackDetails | null
+  list_duplicates: (reasons?: DuplicateReason[], length_tolerance_ms?: number, limit?: number) => DuplicateGroup[]
+  get_merge_preview: (track_ids: string[]) => MergePreview
+  merge_tracks: (track_ids: string[], survivor_id: string, resolutions?: Record<string, Resolution>) => MergeResult
+  undo_merge: (batch_id: string) => { batchId: string; restored: string[]; survivor: string }
+  list_folders: () => Root[]
+  add_folder: (path: string) => Root
+  remove_folder: (folder_id: string) => { removed: boolean }
+  scan_folders: () => ScanReport
+  cancel_scan: () => { cancelled: boolean }
+  get_default_gmbrc_path: () => string
+  get_gmbrc_preview: (path: string) => GmbPreview
+  import_gmbrc: (path: string, statistics?: boolean, labels?: boolean, playlists?: boolean) => ImportReport
+  clear_library: () => { cleared: boolean }
+  get_player_status: () => PlayerStatus
+  play_track: (track_id: string, context?: string[], index?: number) => PlayerStatus
+  toggle_playback: () => PlayerStatus
+  play_next: () => PlayerStatus
+  play_previous: () => PlayerStatus
+  stop_playback: () => PlayerStatus
+  seek: (position_ms: number) => PlayerStatus
+  set_volume: (volume: number) => PlayerStatus
+  queue_tracks: (track_ids: string[], position?: 'end' | 'next') => PlayerStatus
+  remove_from_queue: (index: number) => PlayerStatus
+  clear_queue: () => PlayerStatus
+  set_repeat: (mode: RepeatMode) => PlayerStatus
+  set_shuffle: (on: boolean) => PlayerStatus
 }
+
+export const api_method_names = [
+  'get_app_info', 'get_library_stats', 'list_tracks', 'list_track_groups', 'get_track',
+  'list_duplicates', 'get_merge_preview', 'merge_tracks', 'undo_merge',
+  'list_folders', 'add_folder', 'remove_folder', 'scan_folders', 'cancel_scan',
+  'get_default_gmbrc_path', 'get_gmbrc_preview', 'import_gmbrc', 'clear_library',
+  'get_player_status', 'play_track', 'toggle_playback', 'play_next', 'play_previous', 'stop_playback',
+  'seek', 'set_volume', 'queue_tracks', 'remove_from_queue', 'clear_queue', 'set_repeat', 'set_shuffle'
+] as const satisfies readonly (keyof XMusicApi)[]
+
+export interface LogRecord {
+  level: 'critical' | 'error' | 'warn' | 'info' | 'debug'
+  scope: string
+  message: string
+  data?: unknown
+}
+
+// Calls only X-Music's own window makes: dialogs, the file manager, cover images and its log, none of them for other programs.
+export interface XMusicPageApi {
+  pick_folder: () => string | null
+  pick_gmbrc_file: () => string | null
+  show_in_folder: (uri: string) => { revealed: boolean }
+  // An x-music-art:// url, or null when the track has no cover.
+  get_cover_url: (track_id: string, size?: number) => { url: string | null; source: string }
+  write_log: (record: LogRecord) => { logged: boolean }
+  get_log_config: () => { spec: string | undefined }
+}
+
+export const page_method_names = [
+  'pick_folder', 'pick_gmbrc_file', 'show_in_folder', 'get_cover_url', 'write_log', 'get_log_config'
+] as const satisfies readonly (keyof XMusicPageApi)[]
 
 /** Pushed from the main process; the renderer subscribes rather than polling. */
 export type XMusicEvents = {
-  'scan:progress': ScanProgress
+  scan_progress: ScanProgress
   /** Batched, because one message per file would flood the bridge on a large library. */
-  'scan:files': FileResult[]
-  'scan:done': ScanReport
-  'player:status': PlayerStatus
+  scan_files: FileResult[]
+  scan_done: ScanReport
+  player_status: PlayerStatus
   /** Throttled; the UI interpolates between ticks rather than being fed every frame. */
-  'player:position': { positionMs: number; durationMs: number | null }
+  player_position: { positionMs: number; durationMs: number | null }
+  // The library changed outside the window, through the MCP server.
+  changed: null
 }
 
 export type EventName = keyof XMusicEvents
 
-export type Channel = keyof XMusicApi
-export type ApiArgs<C extends Channel> = Parameters<XMusicApi[C]>
-export type ApiResult<C extends Channel> = ReturnType<XMusicApi[C]>
+export type ApiName = keyof XMusicApi
+export type PageName = keyof XMusicPageApi
 
-export const CHANNELS: readonly Channel[] = [
-  'app:info', 'library:stats', 'library:query', 'library:groupBy',
-  'library:explain', 'library:reset', 'fields:list', 'theme:list',
-  'import:gmbDefaultPath', 'import:gmbBrowse', 'import:gmbPreview', 'import:gmbRun',
-  'library:roots', 'library:addRoot', 'library:removeRoot', 'library:scan', 'library:scanCancel',
-  'tracks:mergePreview', 'tracks:merge', 'tracks:unmerge', 'tracks:duplicates',
-  'app:log', 'app:logConfig', 'tracks:details', 'tracks:reveal',
-  'art:forTrack', 'art:rescan',
-  'player:status', 'player:playTrack', 'player:toggle', 'player:next', 'player:previous',
-  'player:stop', 'player:seek', 'player:volume', 'player:enqueue', 'player:dequeue',
-  'player:clearQueue', 'player:repeat', 'player:shuffle'
-]
-
-// The page reaches these as window.xMusic and window.xMusicEvents.
-export const x_music_bridge = define_bridge<XMusicApi>('xMusic', CHANNELS)
+// The page reaches these as window.xMusic, window.xMusicPage and window.xMusicEvents.
+export const x_music_bridge = define_bridge<XMusicApi>('xMusic', api_method_names)
+export const x_music_page_bridge = define_bridge<XMusicPageApi>('xMusicPage', page_method_names)
 export const x_music_events = define_events<XMusicEvents>('xMusicEvents')
 // The library database's backups, for Settings, as window.xMusicBackups.
 export const x_music_backups_bridge = define_bridge<BackupMethods>('xMusicBackups', backup_method_names)
+// The local MCP server's settings, for Settings, as window.xMusicMcp.
+export const x_music_mcp_bridge = define_bridge<LocalMcpMethods>('xMusicMcp', local_mcp_method_names)
 
 // The track history: a track's versions, the latest changes to every track, restoring a version, and how long versions are kept.
 export type XMusicHistoryApi = HistoryMethods<TrackSnapshot> & {

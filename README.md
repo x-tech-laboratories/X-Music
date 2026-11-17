@@ -16,8 +16,7 @@ Early. The library core, query engine, playback and testing harness are real; ta
 implemented yet. See the roadmap in DESIGN-SPEC §15.
 
 Still to come, to meet the [Application Standard](https://x-tech-laboratories.github.io/standards/application/):
-the History page over the track history, and a description of the API offered to other programs through
-a local MCP server.
+the History page over the track history.
 
 | Area | State |
 |---|---|
@@ -44,6 +43,7 @@ a local MCP server.
 | Album art (embedded, folder image, cached) | working |
 | Daily backups of the library database, on X-Libs | working |
 | Picard hand-off for tagging | specified (DESIGN-SPEC §7.1.1) |
+| Local MCP server for AI clients, every call described in an `api_spec` | working |
 
 ## Deviations
 
@@ -169,6 +169,35 @@ default (`history.keep_days`), each track keeping its newest. The page reaches t
 Playlists have no history of their own yet: X-Music does not edit them, they only arrive from a
 gmusicbrowser import, and a merge's changes to them come back with Undo this merge. They gain one when
 they become editable. X-Music has no server, so nothing syncs between devices.
+
+## MCP server
+
+X-Music has no server, so other programs reach it through its own MCP server on this computer. It is off
+until **Settings → MCP server** turns it on; it then listens on `http://127.0.0.1:3919/mcp` (the port is set
+there too), refuses any request whose Host or Origin is not this computer, and shows the command that adds it
+to Claude Code:
+
+```sh
+claude mcp add --transport http x-music http://127.0.0.1:3919/mcp
+```
+
+Every call the window makes on the library and the player is a tool, described once in
+`src/shared/api.ts`. The calls that only read are marked read-only, so a client may run them without asking:
+`get_app_info`, `get_library_stats`, `list_tracks`, `list_track_groups`, `get_track`, `list_duplicates`,
+`get_merge_preview`, `list_folders`, `get_default_gmbrc_path`, `get_gmbrc_preview`, `get_player_status`,
+`list_versions`, `list_recent_versions` and `get_history_keep_days`. Every other tool changes something and
+is marked so, and a client asks before running it: `add_folder`, `remove_folder`, `scan_folders`,
+`cancel_scan`, `import_gmbrc`, `merge_tracks`, `undo_merge`, `restore_version`, `set_history_keep_days`,
+`clear_library` and the player's `play_track`, `toggle_playback`, `play_next`, `play_previous`,
+`stop_playback`, `seek`, `set_volume`, `queue_tracks`, `remove_from_queue`, `clear_queue`, `set_repeat` and
+`set_shuffle`.
+
+The tools that remove or replace data can be undone as they are in the window: `clear_library` backs the
+library up first and is refused if that fails, `undo_merge` puts a merge back, and every change to a track,
+`restore_version` included, is a version in the history. A change made through MCP shows in the open window
+at once. Lengths are in milliseconds, ratings and the volume 0 to 100, dates Unix seconds, and ids are opaque
+strings from the `list_` and `get_` tools. The dialogs, the file manager and the window's log are not
+offered.
 
 ## Testing
 

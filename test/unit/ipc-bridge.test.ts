@@ -5,19 +5,29 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { trustedSender } from '@main/sender'
-import { CHANNELS, history_channels, x_music_bridge, x_music_events, x_music_history_bridge, type PlayerStatus } from '@shared/ipc'
+import { api_method_names, history_channels, page_method_names, x_music_bridge, x_music_events, x_music_history_bridge, x_music_page_bridge, type PlayerStatus } from '@shared/ipc'
 
 type Answer = (event: unknown, ...args: unknown[]) => Promise<unknown>
 
 describe('IPC bridge', () => {
-  it('answers every channel in the contract once, each on its own IPC channel', () => {
+  it('answers every call in the contract once, each on its own IPC channel', () => {
     const handled: string[] = []
     const ipc_main = { handle: (channel: string) => void handled.push(channel), removeHandler: vi.fn() }
 
     x_music_bridge.handle(ipc_main, {} as never)
+    x_music_page_bridge.handle(ipc_main, {} as never)
 
-    expect(new Set(CHANNELS).size).toBe(CHANNELS.length)
-    expect(handled).toEqual(CHANNELS.map((channel) => `xMusic:${channel}`))
+    const names = [...api_method_names, ...page_method_names]
+    expect(new Set(names).size).toBe(names.length)
+    expect(handled).toEqual([...api_method_names.map((name) => `xMusic:${name}`), ...page_method_names.map((name) => `xMusicPage:${name}`)])
+  })
+
+  it('names every call in snake case, a read with list_ or get_', () => {
+    for (const name of [...api_method_names, ...page_method_names]) expect(name).toMatch(/^[a-z]+(_[a-z]+)*$/)
+    expect(api_method_names.filter((name) => /^(list|get)_/.test(name))).toEqual([
+      'get_app_info', 'get_library_stats', 'list_tracks', 'list_track_groups', 'get_track', 'list_duplicates', 'get_merge_preview',
+      'list_folders', 'get_default_gmbrc_path', 'get_gmbrc_preview', 'get_player_status'
+    ])
   })
 
   it('exposes the client and the events where the page reads them', () => {
@@ -26,9 +36,11 @@ describe('IPC bridge', () => {
     const ipc_renderer = { invoke: vi.fn(async () => null), on: vi.fn(), removeListener: vi.fn() }
 
     x_music_bridge.expose(context_bridge, ipc_renderer)
+    x_music_page_bridge.expose(context_bridge, ipc_renderer)
     x_music_events.expose(context_bridge, ipc_renderer)
 
-    expect(Object.keys(exposed.xMusic as object).sort()).toEqual([...CHANNELS].sort())
+    expect(Object.keys(exposed.xMusic as object).sort()).toEqual([...api_method_names].sort())
+    expect(Object.keys(exposed.xMusicPage as object).sort()).toEqual([...page_method_names].sort())
     expect(typeof (exposed.xMusicEvents as { on: unknown }).on).toBe('function')
   })
 
@@ -36,9 +48,9 @@ describe('IPC bridge', () => {
     const send = vi.fn()
     const status = { state: 'idle' } as PlayerStatus
 
-    x_music_events.emit([{ webContents: { send } }], 'player:status', status)
+    x_music_events.emit([{ webContents: { send } }], 'player_status', status)
 
-    expect(send).toHaveBeenCalledWith('xMusicEvents:event', { name: 'player:status', payload: status })
+    expect(send).toHaveBeenCalledWith('xMusicEvents:event', { name: 'player_status', payload: status })
   })
 
   it('names the history calls as the standard does, each on its own channel', () => {
@@ -58,10 +70,10 @@ describe('IPC bridge', () => {
     const own = { senderFrame: { url: pathToFileURL(page.file).href } }
     const stranger = { senderFrame: { url: 'https://example.com/' } }
 
-    x_music_bridge.handle(ipc_main, { 'theme:list': () => ['halon-light'] } as never, { trusted: trustedSender(page), envelopes: true })
-    const answer = answers.get('xMusic:theme:list')!
+    x_music_bridge.handle(ipc_main, { get_default_gmbrc_path: () => '/home/user/.config/gmusicbrowser/gmbrc' } as never, { trusted: trustedSender(page), envelopes: true })
+    const answer = answers.get('xMusic:get_default_gmbrc_path')!
 
-    expect(await answer(own)).toEqual({ ok: true, result: ['halon-light'] })
+    expect(await answer(own)).toEqual({ ok: true, result: '/home/user/.config/gmusicbrowser/gmbrc' })
     expect(await answer(stranger)).toEqual({ ok: false, error: 'Untrusted sender.' })
     expect(await answer({ senderFrame: { url: pathToFileURL(join('/opt', 'elsewhere', 'index.html')).href } })).toMatchObject({ ok: false })
   })

@@ -39,17 +39,17 @@ node .claude/skills/run-x-music/driver.mjs menu 0     # context menu on the firs
 ```
 
 `eval` runs in the renderer and prints the JSON result, awaiting promises. The IPC surface is on
-`window.xMusic` keyed by channel name, so the app can be driven below the UI:
+`window.xMusic` keyed by call name (the same calls the MCP server offers), so the app can be driven below the UI:
 
 ```sh
-node .../driver.mjs eval "(async()=>JSON.stringify(await window.xMusic['library:roots']()))()"
-node .../driver.mjs eval "(async()=>JSON.stringify(await window.xMusic['library:stats']()))()"
+node .../driver.mjs eval "(async()=>JSON.stringify(await window.xMusic.list_folders()))()"
+node .../driver.mjs eval "(async()=>JSON.stringify(await window.xMusic.get_library_stats()))()"
 ```
 
 Long jobs are best started detached and polled, because a scan takes over a minute:
 
 ```sh
-node .../driver.mjs eval "window.__scan=window.xMusic['library:scan']().then(r=>window.__done=r); 'started'"
+node .../driver.mjs eval "window.__scan=window.xMusic.scan_folders().then(r=>window.__done=r); 'started'"
 node .../driver.mjs eval "JSON.stringify(window.__done??null)"
 ```
 
@@ -63,10 +63,9 @@ node .../driver.mjs eval "JSON.stringify(window.__done??null)"
 - **The context menu needs two separate calls.** Dispatching `contextmenu` and reading
   `[role=menuitem]` in the same `eval` finds nothing; the menu is gone by the time a third call runs.
   Open it in one call, click the item in the next.
-- **`library:addRoot` ignores arguments and opens a native folder picker**, which blocks the main
-  process forever with no way to dismiss it from CDP. Do not call it. Insert the row with sqlite
-  while the app is closed instead, with an id of its own since rows have no numbered ids:
-  `sqlite3 "$X_MUSIC_DB" "INSERT OR IGNORE INTO roots (id, path, enabled) VALUES (lower(hex(randomblob(16))), '<dir>', 1);"`
+- **`window.xMusicPage.pick_folder` opens a native folder picker**, which blocks the main process
+  forever with no way to dismiss it from CDP. Do not call it; add a folder by path with
+  `window.xMusic.add_folder('<dir>')` instead.
 - **mpv inherits the DevTools listening socket.** Killing X-Music leaves an orphaned `mpv --idle`
   holding port 9222, and the next launch logs "Cannot start http server for devtools" and exposes no
   page target. Check with `ss -ltnp | grep 9222` and kill that mpv by pid — never `pkill -x mpv`,

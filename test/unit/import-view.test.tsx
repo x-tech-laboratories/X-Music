@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { GmbPreview, ImportReport } from '@shared/ipc'
 import { ImportView } from '../../src/renderer/views/ImportView'
-import { install_bridge } from '../helpers/bridge'
+import { install_bridge, type Call } from '../helpers/bridge'
 
 // ============================================================================
 // Setup
@@ -24,23 +24,10 @@ const report: ImportReport = {
   playlistsCreated: 3, savedFiltersFound: 2, unmappedColumns: [], notes: ['34 songs were already in the library.']
 }
 
-interface Call { channel: string; args: unknown[] }
-
-// Keeps every call the page makes, on top of the bridge's answers.
-function recorded_calls(): Call[] {
-  const calls: Call[] = []
-  const inner = window.xMusic as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
-  Object.assign(window, {
-    xMusic: Object.fromEntries(Object.keys(inner).map((channel) => [channel, (...args: unknown[]) => {
-      calls.push({ channel, args })
-      return inner[channel]!(...args)
-    }]))
-  })
-  return calls
-}
+let calls: Call[] = []
 
 beforeEach(() => {
-  install_bridge({ 'import:gmbDefaultPath': fixture_path, 'import:gmbPreview': preview, 'import:gmbRun': report })
+  calls = install_bridge({ 'get_default_gmbrc_path': fixture_path, 'get_gmbrc_preview': preview, 'import_gmbrc': report })
 })
 
 afterEach(cleanup)
@@ -61,7 +48,7 @@ describe('import view', () => {
   })
 
   it('says where gmusicbrowser keeps the file when there is none at the path', async () => {
-    install_bridge({ 'import:gmbDefaultPath': fixture_path, 'import:gmbPreview': { ...preview, exists: false, songs: 0 } })
+    install_bridge({ 'get_default_gmbrc_path': fixture_path, 'get_gmbrc_preview': { ...preview, exists: false, songs: 0 } })
     render(<ImportView />)
 
     expect(await screen.findByText(/No gmusicbrowser configuration at this path/)).toBeTruthy()
@@ -81,7 +68,6 @@ describe('import view', () => {
   // ==========================================================================
 
   it('imports with the options switched on and reports what came in', async () => {
-    const calls = recorded_calls()
     render(<ImportView />)
 
     fireEvent.click(await screen.findByRole('switch', { name: 'Saved lists as playlists' }))
@@ -91,15 +77,15 @@ describe('import view', () => {
     expect(within(imported).getByText(/1,200 tracks/)).toBeTruthy()
     expect(within(imported).getByText('34 songs were already in the library.')).toBeTruthy()
     expect(within(imported).getByRole('link', { name: 'Show the library' }).getAttribute('href')).toBe('#/library')
-    const run = calls.find((call) => call.channel === 'import:gmbRun')
-    expect(run?.args[0]).toEqual({ path: fixture_path, statistics: true, labels: true, playlists: false })
+    const run = calls.find((call) => call.channel === 'import_gmbrc')
+    expect(run?.args).toEqual([fixture_path, true, true, false])
   })
 
   it('says why an import failed', async () => {
     install_bridge({
-      'import:gmbDefaultPath': fixture_path,
-      'import:gmbPreview': preview,
-      'import:gmbRun': () => { throw new Error('the file is not a gmbrc') }
+      'get_default_gmbrc_path': fixture_path,
+      'get_gmbrc_preview': preview,
+      'import_gmbrc': () => { throw new Error('the file is not a gmbrc') }
     })
     render(<ImportView />)
 

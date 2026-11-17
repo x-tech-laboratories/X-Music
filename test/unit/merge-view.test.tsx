@@ -37,7 +37,7 @@ function cell_button(field: string, text: string): HTMLElement {
 
 describe('merge view', () => {
   it('lays the sources side by side with what disagrees as buttons', async () => {
-    record_calls({ 'tracks:mergePreview': preview })
+    record_calls({ 'get_merge_preview': preview })
 
     render(<MergeView ids={['track-11', 'track-12']} />)
 
@@ -51,7 +51,7 @@ describe('merge view', () => {
   })
 
   it('sends the winners the grid shows, then offers Undo in a toast', async () => {
-    const calls = record_calls({ 'tracks:mergePreview': preview, 'tracks:merge': result, 'tracks:unmerge': { restored: 1 } })
+    const calls = record_calls({ 'get_merge_preview': preview, 'merge_tracks': result, 'undo_merge': { restored: 1 } })
     const onclose = vi.fn()
     const on_undone = vi.fn()
 
@@ -60,33 +60,33 @@ describe('merge view', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Merge' }))
 
     await waitFor(() => expect(onclose).toHaveBeenCalledWith(true))
-    expect(calls.find((call) => call.channel === 'tracks:merge')?.args).toEqual([{
-      ids: ['track-11', 'track-12'], survivor: 'track-11',
-      resolutions: { length: { kind: 'value', from: 'track-11' }, album: { kind: 'value', from: 'track-12' }, genre: { kind: 'union' } }
-    }])
+    expect(calls.find((call) => call.channel === 'merge_tracks')?.args).toEqual([
+      ['track-11', 'track-12'], 'track-11',
+      { length: { kind: 'value', from: 'track-11' }, album: { kind: 'value', from: 'track-12' }, genre: { kind: 'union' } }
+    ])
     expect(screen.getByText('Merged 2 tracks into one holding 2 files')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
     await waitFor(() => expect(on_undone).toHaveBeenCalled())
-    expect(calls.find((call) => call.channel === 'tracks:unmerge')?.args).toEqual(['batch-1'])
+    expect(calls.find((call) => call.channel === 'undo_merge')?.args).toEqual(['batch-1'])
   })
 
   it('takes every field and the survivor from one source', async () => {
-    const calls = record_calls({ 'tracks:mergePreview': preview, 'tracks:merge': result })
+    const calls = record_calls({ 'get_merge_preview': preview, 'merge_tracks': result })
 
     render(<MergeView ids={['track-11', 'track-12']} onclose={() => undefined} />)
     const second = await screen.findByRole('columnheader', { name: /Source 2/ })
     fireEvent.click(within(second).getByRole('button', { name: 'Take all from this' }))
     fireEvent.click(screen.getByRole('button', { name: 'Merge' }))
 
-    await waitFor(() => expect(calls.some((call) => call.channel === 'tracks:merge')).toBe(true))
-    expect(calls.find((call) => call.channel === 'tracks:merge')?.args[0]).toMatchObject({
-      survivor: 'track-12', resolutions: { album: { kind: 'value', from: 'track-12' }, genre: { kind: 'value', from: 'track-12' } }
-    })
+    await waitFor(() => expect(calls.some((call) => call.channel === 'merge_tracks')).toBe(true))
+    expect(calls.find((call) => call.channel === 'merge_tracks')?.args.slice(1)).toMatchObject([
+      'track-12', { album: { kind: 'value', from: 'track-12' }, genre: { kind: 'value', from: 'track-12' } }
+    ])
   })
 
   it('keeps the view open and says why when the merge fails', async () => {
-    record_calls({ 'tracks:mergePreview': preview, 'tracks:merge': () => { throw new Error("Error invoking remote method 'tracks:merge': Error: the library is locked") } })
+    record_calls({ 'get_merge_preview': preview, 'merge_tracks': () => { throw new Error("Error invoking remote method 'merge_tracks': Error: the library is locked") } })
     const onclose = vi.fn()
 
     render(<><MergeView ids={['track-11', 'track-12']} onclose={onclose} /><Toasts /></>)

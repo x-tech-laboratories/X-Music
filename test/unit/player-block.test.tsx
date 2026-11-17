@@ -51,7 +51,7 @@ describe('player block', () => {
   })
 
   it('shows shuffle and repeat as pressed toggles and cycles repeat', async () => {
-    const calls = record_calls({ 'player:repeat': (mode: unknown) => ({ ...idle, repeat: mode }) })
+    const calls = record_calls({ 'set_repeat': (mode: unknown) => ({ ...idle, repeat: mode }) })
     player_status.set({ ...idle, shuffle: true, repeat: 'all' })
 
     render(<PlayerBlock />)
@@ -59,11 +59,11 @@ describe('player block', () => {
     expect(screen.getByRole('button', { name: 'Shuffle' }).getAttribute('aria-pressed')).toBe('true')
     fireEvent.click(screen.getByRole('button', { name: 'Repeat all' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Repeat this track' }).getAttribute('aria-pressed')).toBe('true'))
-    expect(calls.find((call) => call.channel === 'player:repeat')?.args).toEqual(['one'])
+    expect(calls.find((call) => call.channel === 'set_repeat')?.args).toEqual(['one'])
   })
 
   it('shows a failed start as an alert with Try again, which plays again', async () => {
-    const calls = record_calls({ 'player:toggle': { ...idle, state: 'playing', track } })
+    const calls = record_calls({ 'toggle_playback': { ...idle, state: 'playing', track } })
     player_status.set({ ...idle, state: 'error', track, error: 'mpv did not answer within 10 seconds' })
 
     render(<PlayerBlock />)
@@ -71,11 +71,11 @@ describe('player block', () => {
     expect(screen.getByRole('alert').textContent).toContain('mpv did not answer within 10 seconds')
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
-    expect(calls.some((call) => call.channel === 'player:toggle')).toBe(true)
+    expect(calls.some((call) => call.channel === 'toggle_playback')).toBe(true)
   })
 
   it('says so in a toast when a call fails, with no unhandled rejection', async () => {
-    record_calls({ 'player:next': () => { throw new Error("Error invoking remote method 'player:next': Error: the player is gone") } })
+    record_calls({ 'play_next': () => { throw new Error("Error invoking remote method 'play_next': Error: the player is gone") } })
     player_status.set(idle)
 
     render(<><PlayerBlock /><Toasts /></>)

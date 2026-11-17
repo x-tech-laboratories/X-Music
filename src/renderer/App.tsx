@@ -11,12 +11,13 @@ import { format_duration } from '@x-tech-laboratories/x-libs/durations'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { AppInfo } from '@shared/ipc'
 import app_icon from '../../resources/icon.svg'
-import { ipc } from './lib/ipc'
+import { ipc, page_ipc } from './lib/ipc'
 import { configureLogging, log } from './lib/log'
 import { theme } from './lib/theme'
 import { library } from './stores/library'
 import { player } from './stores/player'
 import { PlayerBlock } from './widgets/PlayerBlock'
+import { focus_search } from './widgets/SongList'
 import { TabbedLists } from './widgets/TabbedLists'
 import { DuplicatesView } from './views/DuplicatesView'
 import { FoldersView } from './views/FoldersView'
@@ -35,10 +36,6 @@ const seek_by = (step: number): void => {
   const duration = player.status?.durationMs ?? null
   if (duration === null) return
   void player.seek(Math.min(duration, Math.max(0, player.positionMs + step)))
-}
-
-const focus_search = (): void => {
-  document.querySelector<HTMLInputElement>('input[type="search"][aria-label="Search the library"]')?.focus()
 }
 
 // ============================================================================
@@ -79,19 +76,22 @@ export function App() {
     window.addEventListener('unhandledrejection', on_rejection)
 
     const stop_player = player.init()
+    // A change an AI client made through the MCP server shows as if made here.
+    const stop_changes = window.xMusicEvents.on('changed', () => void library.refresh())
     void boot()
 
     return () => {
       window.removeEventListener('error', on_error)
       window.removeEventListener('unhandledrejection', on_rejection)
       stop_player()
+      stop_changes()
     }
   }, [])
 
   async function boot(): Promise<void> {
-    configureLogging((await ipc('app:logConfig')).spec)
+    configureLogging((await page_ipc('get_log_config')).spec)
     log.debug('renderer booting')
-    set_info(await ipc('app:info'))
+    set_info(await ipc('get_app_info'))
     await library.refresh()
   }
 

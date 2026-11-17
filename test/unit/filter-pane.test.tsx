@@ -15,7 +15,7 @@ import { install_bridge } from '../helpers/bridge'
 
 const group = (label: string | null, n: number): GroupRow => ({ gid: label, label, n, total_ms: 0 })
 
-const group_by = vi.fn(async (request: { field: string }): Promise<GroupRow[]> => request.field === 'rating'
+const group_by = vi.fn(async (_filter: unknown, field: string): Promise<GroupRow[]> => field === 'rating'
   ? [group('80', 2), group('20', 1)]
   : [group('Blues', 3), group('Jazz', 5), group('Rock', 2), group(null, 4)])
 const query = vi.fn(async () => [])
@@ -24,9 +24,7 @@ beforeEach(() => {
   localStorage.clear()
   group_by.mockClear()
   query.mockClear()
-  install_bridge({ 'library:groupBy': group_by, 'library:query': query })
-  const bridge = window.xMusic as unknown as Record<string, unknown>
-  Object.assign(window, { xMusic: new Proxy(bridge, { get: (target, channel: string) => channel === 'library:groupBy' ? group_by : channel === 'library:query' ? query : target[channel] }) })
+  install_bridge({ list_track_groups: group_by, list_tracks: query })
   browse.set({ sort: [], panes: {}, search: '' })
 })
 
@@ -64,7 +62,7 @@ describe('filter pane', () => {
     fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Enter' })
 
     expect(browse.get().panes).toEqual({ genre: ['Jazz'] })
-    await vi.waitFor(() => expect(query).toHaveBeenCalledWith(expect.objectContaining({ filter: expect.objectContaining({ field: 'genre', op: 'any', value: ['Jazz'] }) })))
+    await vi.waitFor(() => expect(query).toHaveBeenCalledWith(expect.objectContaining({ field: 'genre', op: 'any', value: ['Jazz'] }), expect.anything()))
   })
 
   it('stretches the picks with Shift and goes back to All on Escape', async () => {
@@ -84,7 +82,7 @@ describe('filter pane', () => {
     render(<><FilterPane id="first" field="genre" /><FilterPane id="second" field="album_artist" /></>)
     await screen.findByRole('listbox', { name: 'Album artist' })
 
-    const asked = Object.fromEntries(group_by.mock.calls.map(([request]) => [request.field, (request as unknown as { filter: unknown }).filter]))
+    const asked = Object.fromEntries(group_by.mock.calls.map(([filter, field]) => [field, filter]))
     expect(asked.genre).toEqual({ op: 'and', children: [] })
     expect(asked.album_artist).toEqual(expect.objectContaining({ field: 'genre', value: ['Jazz'] }))
   })

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { PlayerStatus, TrackDetails } from '@shared/ipc'
 import { results } from '../../src/renderer/stores/library'
-import { player, player_status } from '../../src/renderer/stores/player'
+import { player_status } from '../../src/renderer/stores/player'
 import { TabbedLists } from '../../src/renderer/widgets/TabbedLists'
 import { install_bridge } from '../helpers/bridge'
 
@@ -24,9 +24,7 @@ const dequeue = vi.fn(async () => status([]))
 
 beforeEach(() => {
   dequeue.mockClear()
-  install_bridge({ 'tracks:details': details, 'player:dequeue': dequeue })
-  const bridge = window.xMusic as unknown as Record<string, unknown>
-  Object.assign(window, { xMusic: new Proxy(bridge, { get: (target, channel: string) => channel === 'player:dequeue' ? dequeue : target[channel] }) })
+  install_bridge({ 'get_track': details, 'remove_from_queue': dequeue })
   results.set({ stats: null, tracks: [], order: [], error: null })
 })
 

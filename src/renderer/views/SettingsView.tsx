@@ -1,9 +1,10 @@
-// Settings: how the app looks, the library database and its backups, and the version.
+// Settings: how the app looks, the library database, its backups and the MCP server, and the version.
 
 import { useEffect, useState } from 'react'
 import { BackupSettings } from '@x-tech-laboratories/x-libs/web/react/backup_settings'
 import { confirm_dialog } from '@x-tech-laboratories/x-libs/web/react/dialog'
 import { Segmented } from '@x-tech-laboratories/x-libs/web/react/controls'
+import { LocalMcpSettings } from '@x-tech-laboratories/x-libs/web/react/local_mcp_settings'
 import { Facts, PageHeading, SettingRow, SettingsPage, type SettingsCategory } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
 import { format_duration } from '@x-tech-laboratories/x-libs/durations'
@@ -41,7 +42,7 @@ function clear_library(): void {
     busy_label: 'Clearing…',
     danger: true,
     run: async () => {
-      await ipc('library:reset')
+      await ipc('clear_library')
       await library.refresh()
     }
   })
@@ -123,6 +124,12 @@ export function SettingsView({ info, density, on_density }: SettingsViewProps) {
           heading: 'Backups',
           hint: 'Copies of the library database, kept beside it. Restoring one restarts X-Music. Your music files are never backed up or touched.',
           content: <BackupSettings device={window.xMusicBackups} data_name="tracks, playlists, ratings and play history" />
+        },
+        {
+          id: 'mcp',
+          heading: 'MCP server',
+          hint: 'Let AI assistants such as Claude Code reach the library and the player.',
+          content: <LocalMcpSettings device={window.xMusicMcp} name="x-music" data_name="read and change your music library and control the player" />
         }
       ]
     },

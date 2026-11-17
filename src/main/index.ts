@@ -2,14 +2,16 @@ import { app, BrowserWindow, ipcMain, nativeTheme, protocol, screen, shell, net 
 import { pathToFileURL } from 'node:url'
 import { join } from 'node:path'
 import { bring_to_front, hold_single_instance } from '@x-tech-laboratories/x-libs/electron/app'
+import { create_local_mcp } from '@x-tech-laboratories/x-libs/electron/mcp'
 import { create_window } from '@x-tech-laboratories/x-libs/electron/window'
 import { take_staged_restore } from '@x-tech-laboratories/x-libs/server/sqlite_backups'
 
-import { x_music_backups_bridge } from '@shared/ipc'
+import { is_read_only, mcp_instructions, x_music_api } from '@shared/api'
+import { history_channels, x_music_backups_bridge, x_music_bridge, x_music_events, x_music_history_bridge, x_music_mcp_bridge } from '@shared/ipc'
 import { describe_upgrade } from '@shared/library/legacy'
 import { libraryBackups, openLibraryBackedUp } from './backups'
 import { openDatabase, libraryPath } from './db'
-import { registerIpc } from './ipc'
+import { registerIpc, type ApiImplementation } from './ipc'
 import { trustedSender } from './sender'
 import { describeLogging, log } from './log'
 import { artCacheDir } from './artcache'
@@ -60,6 +62,26 @@ app.commandLine.appendSwitch('disable-background-timer-throttling')
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 
+// The MCP server for AI clients on this computer: off until turned on in Settings, and then on 127.0.0.1 only.
+function local_mcp_for(api: ApiImplementation) {
+  return create_local_mcp({
+    name: 'x-music',
+    version: app.getVersion(),
+    instructions: mcp_instructions,
+    api: x_music_api,
+    is_read_only,
+    settings_file: join(app.getPath('userData'), 'mcp.json'),
+    default_port: 3919,
+    // A change made through MCP reaches the open window as if made there.
+    call: async (method, args) => {
+      const bridge = (history_channels as readonly string[]).includes(method) ? x_music_history_bridge : x_music_bridge
+      const result = await bridge.dispatch(api, method, args)
+      if (!is_read_only(method)) x_music_events.emit(BrowserWindow.getAllWindows(), 'changed', null)
+      return result
+    }
+  })
+}
+
 async function start(): Promise<void> {
   log.info('starting', { logging: describeLogging(), version: app.getVersion() })
 
@@ -94,8 +116,11 @@ async function start(): Promise<void> {
   log.info('library opened', { path })
   backups.start()
 
-  const { stopPlayer } = await registerIpc(db, { path, backups, trusted })
+  const { api, stopPlayer } = await registerIpc(db, { path, backups, trusted })
   x_music_backups_bridge.handle(ipcMain, backups.methods, { trusted, envelopes: true })
+  const local_mcp = local_mcp_for(api)
+  x_music_mcp_bridge.handle(ipcMain, local_mcp.methods, { trusted, envelopes: true })
+  void local_mcp.start()
 
   createWindow()
 
@@ -110,7 +135,7 @@ async function start(): Promise<void> {
     event.preventDefault()
     stopped = true
     backups.stop()
-    void Promise.race([stopPlayer(), new Promise((resolve) => setTimeout(resolve, 2000))]).finally(() => {
+    void Promise.race([Promise.all([stopPlayer(), local_mcp.stop()]), new Promise((resolve) => setTimeout(resolve, 2000))]).finally(() => {
       db.close()
       app.quit()
     })
