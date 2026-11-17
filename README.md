@@ -206,13 +206,13 @@ offered.
 
 The suite is described in DESIGN-SPEC §13. The load-bearing one:
 
-**`tests/ast-agreement.test.ts`** asserts that for any generated filter over any generated
+**`tests/ast_agreement.test.ts`** asserts that for any generated filter over any generated
 library, the SQL compiler and the native predicate return identical id sets. The fast path exists
 only because this test keeps it honest — it has already caught a three-valued-logic divergence where
 SQL silently dropped tracks with a NULL value from negated filters.
 
 Tests reach SQLite through Node's built-in `node:sqlite`, as the app does, and open the library
-through the same store code. `tests/library-upgrade.test.ts` builds a library at the old schema
+through the same store code. `tests/library_upgrade.test.ts` builds a library at the old schema
 with a row of every kind and checks that the upgrade keeps all of it.
 
 ## Layout

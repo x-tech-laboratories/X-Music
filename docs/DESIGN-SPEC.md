@@ -1501,7 +1501,7 @@ Vitest, with `fast-check` for property tests. Tests reach SQLite through Node's 
 
 ### 13.1 The load-bearing test
 
-`tests/ast-agreement.test.ts`: for any generated filter over any generated library, the SQL
+`tests/ast_agreement.test.ts`: for any generated filter over any generated library, the SQL
 compiler and the native predicate must return **identical id sets**. Two implementations of one
 semantics are only safe because this test holds them together — a live smart playlist that
 disagreed with the list it was derived from would be a maddening bug to chase (§4.2).
@@ -1520,12 +1520,12 @@ The SQL compiler wraps every negation in `COALESCE(..., 0)` to enforce it.
 
 | Suite | Asserts |
 |---|---|
-| `unit/filter-compile.test.ts` | Operator semantics, parameterization (no interpolation), set algebra, NULL ordering, rejection of type-invalid operators |
-| `unit/entity-model.test.ts` | The §3.4 invariants: tracks with zero media, one track with many media, stats surviving media deletion, cascade on track deletion, CUE ranges as ordinary rows, missing files flagged not deleted, album ids stable across match-key changes, FK enforcement and ids that cannot be null |
-| `unit/audio-hash.test.ts` | Hash unchanged by ID3v2 growth, ID3v1 addition and rename; FLAC STREAMINFO used when valid and ignored when zero; different audio distinguished |
-| `unit/fields.test.ts` | Field id uniqueness and **numeric id stability** — a reused id silently corrupts every library on disk, so the pins are a compatibility lock |
-| `unit/format.test.ts` | The format-string grammar, including bracketed-group elision and the renamer pattern end to end |
-| `unit/view.test.ts` | Virtualization arithmetic, anchored range selection, filter-stack collapse to an AST, multi-key sort priority |
+| `tests/filter_compile.test.ts` | Operator semantics, parameterization (no interpolation), set algebra, NULL ordering, rejection of type-invalid operators |
+| `tests/entity_model.test.ts` | The §3.4 invariants: tracks with zero media, one track with many media, stats surviving media deletion, cascade on track deletion, CUE ranges as ordinary rows, missing files flagged not deleted, album ids stable across match-key changes, FK enforcement and ids that cannot be null |
+| `tests/audio_hash.test.ts` | Hash unchanged by ID3v2 growth, ID3v1 addition and rename; FLAC STREAMINFO used when valid and ignored when zero; different audio distinguished |
+| `tests/fields.test.ts` | Field id uniqueness and **numeric id stability** — a reused id silently corrupts every library on disk, so the pins are a compatibility lock |
+| `tests/format.test.ts` | The format-string grammar, including bracketed-group elision and the renamer pattern end to end |
+| `tests/view.test.ts` | Virtualization arithmetic, anchored range selection, filter-stack collapse to an AST, multi-key sort priority |
 | `bench/query.bench.ts` | The §12 budgets |
 
 ### 13.3 Planned, not yet written
@@ -1545,7 +1545,7 @@ x-music/
 ├── src/
 │   ├── main/                 # Electron main process
 │   │   ├── db/               # opens the database file through node:sqlite
-│   │   ├── library/          # audio-hash, scanner, artwork files, (planned) watcher
+│   │   ├── library/          # audio_hash, scanner, artwork files, (planned) watcher
 │   │   ├── tags/             # (planned) TagIO interface + implementation + write journal
 │   │   ├── play/             # (planned) PlaybackEngine interface + mpv backend
 │   │   ├── services/         # (planned) MPRIS, scrobble, hotkeys, HTTP API
@@ -1734,7 +1734,7 @@ it later would be invasive across five subsystems at once.
 
 Under the track/media model, a CUE range is simply a `media` row that addresses part of a container:
 `uri` plus `subtrack_index`, `start_ms`, `end_ms`, with `UNIQUE(uri, subtrack_index)`. Whole-file
-media leave those at their defaults, so the common case pays nothing. `tests/entity-model.test.ts`
+media leave those at their defaults, so the common case pays nothing. `tests/entity_model.test.ts`
 pins the behaviour today, before any CUE parser exists.
 
 What remains is ordinary feature work, scheduled rather than architectural: a `.cue` parser, reading

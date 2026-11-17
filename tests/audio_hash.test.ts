@@ -6,7 +6,7 @@ import { mkdtemp, rm, writeFile, rename } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { hashAudio } from '@main/library/audio-hash'
+import { hashAudio } from '@main/library/audio_hash'
 
 let dir: string
 

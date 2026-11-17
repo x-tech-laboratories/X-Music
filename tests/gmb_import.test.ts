@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 
 import { parseGmbrc, defaultGmbrcPath } from '@shared/import/gmbrc'
-import { importGmbrc } from '@shared/import/gmb-import'
+import { importGmbrc } from '@shared/import/gmb_import'
 import { freshDb } from './sqlite'
 
 const HEADER = [

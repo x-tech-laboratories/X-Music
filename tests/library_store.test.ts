@@ -7,7 +7,7 @@ import fc from 'fast-check'
 
 import { clearLibraryBackedUp } from '@main/backups'
 import { folder_of } from '@shared/library/albums'
-import { join_path } from '@shared/import/gmb-import'
+import { join_path } from '@shared/import/gmb_import'
 import { record_history } from '@shared/library/history'
 import { createUpserter } from '@shared/library/identity'
 import {

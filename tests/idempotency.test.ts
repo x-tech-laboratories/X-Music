@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { parseGmbrc } from '@shared/import/gmbrc'
-import { importGmbrc } from '@shared/import/gmb-import'
+import { importGmbrc } from '@shared/import/gmb_import'
 import { createUpserter } from '@shared/library/identity'
 import { freshDb } from './sqlite'
 

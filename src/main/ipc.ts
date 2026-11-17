@@ -6,7 +6,7 @@ import type { Implementation, IpcMainEventLike } from '@x-tech-laboratories/x-li
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { defaultGmbrcPath, parseGmbrc } from '@shared/import/gmbrc'
-import { importGmbrc } from '@shared/import/gmb-import'
+import { importGmbrc } from '@shared/import/gmb_import'
 import {
   x_music_bridge, x_music_events, x_music_history_bridge, x_music_page_bridge,
   type XMusicApi, type XMusicEvents, type XMusicHistoryApi, type XMusicPageApi, type EventName, type FileResult
