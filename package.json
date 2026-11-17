@@ -22,7 +22,8 @@
     "app": "bash scripts/run.sh",
     "lint": "oxlint",
     "icons": "x-libs-icons",
-    "db:generate": "drizzle-kit generate --config src/shared/library/drizzle.config.ts && x-libs-bundle-migrations src/shared/library/migrations"
+    "db:generate": "drizzle-kit generate --config src/shared/library/drizzle.config.ts && x-libs-bundle-migrations src/shared/library/migrations",
+    "upgrade:dry-run": "node scripts/dry_run_upgrade.ts"
   },
   "dependencies": {
     "@x-tech-laboratories/halon": "^0.25.1",

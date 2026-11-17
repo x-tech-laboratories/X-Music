@@ -97,6 +97,7 @@ otherwise makes Electron run as bare node and die on the ESM entry point.
 | `npm run lint` | `oxlint` |
 | `npm run icons` | Generate `resources/icon.png` from `resources/icon.svg` |
 | `npm run app` | Build if needed and launch |
+| `npm run upgrade:dry-run -- <library.db>` | Try the upgrade of an older library on a copy and report on it |
 | `npm run db:generate` | Write a migration for a change to `src/shared/library/schema.ts` and bundle the migrations |
 
 Benchmarks default to 50k synthetic tracks (the §12 target); `X_MUSIC_BENCH_SIZE=20000 npm run bench`
@@ -149,6 +150,12 @@ backed up beside it.
 A library made by an older X-Music opens as it always did: it is backed up first, then converted in
 place to the current tables, every track, file, rating, play, playlist and merge kept, each with a new
 id. The conversion is all or nothing, so a library it cannot convert whole is left as it was.
+
+To try the conversion first, run `npm run upgrade:dry-run -- ~/.config/x-music/library.db`. It copies the
+library (and its write-ahead log) into a scratch folder, upgrades only the copy, and prints the time
+taken, the file size and the rows in each table before and after, any references it emptied, any
+merge whose undo would have reached a row that later took its number, and the integrity and
+foreign-key checks. The library it is given is only read. Close X-Music before running it.
 
 ### History
 
