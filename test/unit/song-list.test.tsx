@@ -87,6 +87,16 @@ describe('the whole library', () => {
     expect(screen.getByText('5,000 tracks')).toBeTruthy()
   })
 
+  it('draws only the cards in view of a long list on a phone', () => {
+    const before = window.matchMedia
+    window.matchMedia = ((query: string) => ({ matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia
+    show(tracks(5000))
+    render(<SongList />)
+    window.matchMedia = before
+
+    expect(screen.getAllByRole('row').length).toBeLessThan(200)
+  })
+
   it('keeps every cell on one line', () => {
     render(<SongList />)
 

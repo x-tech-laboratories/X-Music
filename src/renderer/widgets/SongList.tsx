@@ -98,7 +98,7 @@ export function SongList() {
   const positions = useMemo(() => new Map(order.map((id, index) => [id, index])), [order])
   const index_of = (track: TrackRow): number => positions.get(track.id) ?? 0
 
-  // The virtual rows are spaced by a drawn row's height, which the density and font decide.
+  // The virtual rows, or a phone's cards, are spaced by a drawn one's height, which the density, font and width decide.
   useLayoutEffect(() => {
     const drawn = body.current?.querySelector('tbody tr:not(.virtual-spacer)')
     const height = drawn?.getBoundingClientRect().height ?? 0
@@ -184,7 +184,7 @@ export function SongList() {
       <DataTable
         caption="Tracks"
         wrap_class={cx('fit', s.single_line)}
-        virtual={{ row_height }}
+        virtual={{ row_height, card_height: row_height }}
         columns={columns}
         rows={tracks}
         row_key={(track) => track.id}
