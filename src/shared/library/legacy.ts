@@ -91,6 +91,79 @@ const copies: Record<Exclude<Numbered, 'merge_journal'> | (typeof unnumbered)[nu
       width, height, bytes, found_at FROM legacy_artwork source ORDER BY source.id`
 }
 
+// ── References ───────────────────────────────────────────────────────────────
+
+// What the conversion did that the owner may want to know about.
+export interface UpgradeReport {
+  // References to a row that was already gone, emptied as the old schema's ON DELETE SET NULL would have.
+  nulled: { table: string; column: string; rows: number }[]
+  // Numbers in a merge still to undo that a later row had taken, given ids of their own so the undo leaves that row alone.
+  reused: { batch_id: string; kind: Numbered; old: number }[]
+}
+
+// The report in plain lines, one per column emptied and one per merge whose numbers were reused.
+export function describe_upgrade(report: UpgradeReport): string[] {
+  const batches = [...new Set(report.reused.map((each) => each.batch_id))]
+  return [
+    ...report.nulled.map(({ table, column, rows }) => `emptied ${table}.${column} in ${rows} ${rows === 1 ? 'row' : 'rows'}, which named a row that was gone`),
+    ...batches.map((batch) => {
+      const numbers = report.reused.filter((each) => each.batch_id === batch).map((each) => `${each.kind} ${each.old}`)
+      return `merge ${batch} named ${numbers.join(', ')}, which later rows had taken; undoing it leaves those rows alone`
+    })
+  ]
+}
+
+interface Reference {
+  table: string
+  column: string
+  target: Numbered
+}
+
+// Columns a row cannot do without; a row naming a missing one stops the conversion.
+const required: Reference[] = [
+  { table: 'media', column: 'track_id', target: 'tracks' },
+  { table: 'media_tags', column: 'media_id', target: 'media' },
+  { table: 'track_values', column: 'track_id', target: 'tracks' },
+  { table: 'track_values', column: 'value_id', target: 'values_' },
+  { table: 'track_extras', column: 'track_id', target: 'tracks' },
+  { table: 'play_history', column: 'track_id', target: 'tracks' },
+  { table: 'tag_writes', column: 'media_id', target: 'media' },
+  { table: 'playlist_tracks', column: 'playlist_id', target: 'playlists' },
+  { table: 'playlist_tracks', column: 'track_id', target: 'tracks' }
+]
+
+// Columns that may be empty; one naming a missing row becomes empty.
+const optional: Reference[] = [
+  { table: 'albums', column: 'album_artist_id', target: 'values_' },
+  { table: 'tracks', column: 'album_id', target: 'albums' },
+  { table: 'tracks', column: 'primary_media_id', target: 'media' },
+  { table: 'play_history', column: 'media_id', target: 'media' },
+  { table: 'playlists', column: 'parent_id', target: 'playlists' },
+  { table: 'artwork', column: 'album_id', target: 'albums' },
+  { table: 'artwork', column: 'track_id', target: 'tracks' }
+]
+
+const dangling = (database: SqlDatabase, { table, column, target }: Reference): number =>
+  first_row<{ total: number }>(
+    database,
+    `SELECT COUNT(*) AS total FROM legacy_${table} source
+     WHERE source.${column} IS NOT NULL AND NOT EXISTS (SELECT 1 FROM legacy_${target} named WHERE named.id = source.${column})`
+  )!.total
+
+const rows = (total: number): string => `${total} ${total === 1 ? 'row points' : 'rows point'}`
+
+// Refuses a library with rows that name nothing, saying where, and counts the optional references that will be emptied.
+function check_references(database: SqlDatabase): UpgradeReport['nulled'] {
+  const broken = required
+    .map((reference) => ({ reference, total: dangling(database, reference) }))
+    .filter(({ total }) => total > 0)
+    .map(({ reference, total }) => `${reference.table}.${reference.column}: ${rows(total)} at no ${reference.target} row`)
+  if (broken.length > 0) throw new Error(`the library cannot be converted without losing rows; ${broken.join('; ')}`)
+  return optional
+    .map((reference) => ({ table: reference.table, column: reference.column, rows: dangling(database, reference) }))
+    .filter((each) => each.rows > 0)
+}
+
 // ── The merge journal ────────────────────────────────────────────────────────
 
 // A merge's snapshot as the old schema wrote it; every id in it is an old number.
@@ -104,8 +177,10 @@ interface OldSnapshot {
   playlists: (Record<string, unknown> & { playlist_id: number; track_id: number })[]
 }
 
+type IdOf = (kind: Numbered, old: number | null) => string | null
+
 // The new ids by old number; a number the tables no longer hold, such as a track a merge absorbed, gets a fresh id of its own.
-function id_maps(database: SqlDatabase): (kind: Numbered, old: number | null) => string | null {
+function id_maps(database: SqlDatabase): IdOf {
   const maps = new Map<Numbered, Map<number, string>>(numbered.map((kind) => [kind, new Map()]))
   for (const row of all_rows<{ kind: Numbered; old: number; new: string }>(database, 'SELECT kind, old, new FROM legacy_ids')) {
     maps.get(row.kind)!.set(row.old, row.new)
@@ -119,8 +194,48 @@ function id_maps(database: SqlDatabase): (kind: Numbered, old: number | null) =>
   }
 }
 
+interface JournalEntry {
+  id: number
+  batch_id: string
+  at: number
+  survivor_id: number
+  snapshot: string
+  undone: number
+}
+
+// The numbers in a merge still to undo that now belong to a row made after it: an absorbed track's number on any live
+// track, a file's on one added after the merge, a play's on one that is not the survivor's.
+function reused_numbers(database: SqlDatabase, entry: JournalEntry, snapshot: OldSnapshot): Map<Numbered, Set<number>> {
+  const reused = new Map<Numbered, Set<number>>([['tracks', new Set()], ['media', new Set()], ['play_history', new Set()]])
+  if (entry.undone) return reused
+  for (const { id } of snapshot.tracks) {
+    if (id !== entry.survivor_id && first_row(database, 'SELECT 1 FROM legacy_tracks WHERE id = ?', id)) reused.get('tracks')!.add(id)
+  }
+  for (const { id } of snapshot.media) {
+    const live = first_row<{ added: number }>(database, 'SELECT added FROM legacy_media WHERE id = ?', id)
+    if (live && live.added > entry.at) reused.get('media')!.add(id)
+  }
+  for (const { id } of snapshot.history) {
+    const live = first_row<{ track_id: number }>(database, 'SELECT track_id FROM legacy_play_history WHERE id = ?', id)
+    if (live && live.track_id !== entry.survivor_id) reused.get('play_history')!.add(id)
+  }
+  return reused
+}
+
+// The usual mapping, except that a reused number gets an id of its own for this snapshot.
+function snapshot_ids(id_of: IdOf, reused: Map<Numbered, Set<number>>): IdOf {
+  const own = new Map<string, string>()
+  return (kind, old) => {
+    if (old === null || old === undefined || !reused.get(kind)?.has(old)) return id_of(kind, old)
+    const key = `${kind}:${old}`
+    let id = own.get(key)
+    if (id === undefined) own.set(key, (id = new_id()))
+    return id
+  }
+}
+
 // The snapshot with new ids; an album that no longer exists becomes none, as an undo would have found it.
-function rewrite_snapshot(snapshot: OldSnapshot, id_of: (kind: Numbered, old: number | null) => string | null, album_exists: (id: string | null) => boolean): unknown {
+function rewrite_snapshot(snapshot: OldSnapshot, id_of: IdOf, album_exists: (id: string | null) => boolean): unknown {
   const track = (old: number) => id_of('tracks', old)
   return {
     tracks: snapshot.tracks.map((row) => {
@@ -136,25 +251,30 @@ function rewrite_snapshot(snapshot: OldSnapshot, id_of: (kind: Numbered, old: nu
   }
 }
 
-function copy_merge_journal(database: SqlDatabase): void {
+function copy_merge_journal(database: SqlDatabase): UpgradeReport['reused'] {
   const id_of = id_maps(database)
+  const found: UpgradeReport['reused'] = []
   const album_exists = (id: string | null) => id !== null && first_row(database, 'SELECT 1 FROM albums WHERE id = ?', id) !== undefined
   const insert = database.prepare('INSERT INTO merge_journal (id, batch_id, at, survivor_id, snapshot, undone) VALUES (?, ?, ?, ?, ?, ?)')
-  const entries = all_rows<{ id: number; batch_id: string; at: number; survivor_id: number; snapshot: string; undone: number }>(
+  const entries = all_rows<JournalEntry>(
     database,
     'SELECT id, batch_id, at, survivor_id, snapshot, undone FROM legacy_merge_journal ORDER BY id'
   )
   for (const entry of entries) {
-    const snapshot = rewrite_snapshot(JSON.parse(entry.snapshot) as OldSnapshot, id_of, album_exists)
+    const old = JSON.parse(entry.snapshot) as OldSnapshot
+    const reused = reused_numbers(database, entry, old)
+    for (const [kind, numbers] of reused) for (const number of numbers) found.push({ batch_id: entry.batch_id, kind, old: number })
+    const snapshot = rewrite_snapshot(old, snapshot_ids(id_of, reused), album_exists)
     insert.run(id_of('merge_journal', entry.id)!, entry.batch_id, entry.at, id_of('tracks', entry.survivor_id)!, JSON.stringify(snapshot), entry.undone)
   }
+  return found
 }
 
 // ── Converting ───────────────────────────────────────────────────────────────
 
 const count = (database: SqlDatabase, table: string): number => first_row<{ total: number }>(database, `SELECT COUNT(*) AS total FROM ${table}`)!.total
 
-function convert(database: SqlDatabase): void {
+function convert(database: SqlDatabase): UpgradeReport {
   const tables = [...numbered, ...unnumbered]
 
   // The old tables step aside under new names; their indexes go, since index names are shared across tables.
@@ -163,6 +283,7 @@ function convert(database: SqlDatabase): void {
   for (const { name } of indexes) database.exec(`DROP INDEX ${name}`)
   // The old search table was never filled, so nothing is lost with it.
   database.exec('DROP TABLE IF EXISTS tracks_fts')
+  const nulled = check_references(database)
 
   for (const statement of migrations.slice(0, converted_migrations).flatMap((migration) => migration.statements)) database.exec(statement)
   database.exec('CREATE TABLE IF NOT EXISTS schema_versions (owner TEXT PRIMARY KEY, version INTEGER NOT NULL)')
@@ -171,8 +292,9 @@ function convert(database: SqlDatabase): void {
   database.exec('CREATE TEMP TABLE legacy_ids (kind TEXT NOT NULL, old INTEGER NOT NULL, new TEXT NOT NULL, PRIMARY KEY (kind, old))')
   for (const kind of numbered) database.exec(`INSERT INTO legacy_ids (kind, old, new) SELECT '${kind}', id, ${uuid_sql} FROM legacy_${kind} ORDER BY id`)
 
+  let reused: UpgradeReport['reused'] = []
   for (const table of tables) {
-    if (table === 'merge_journal') copy_merge_journal(database)
+    if (table === 'merge_journal') reused = copy_merge_journal(database)
     else database.exec(copies[table])
   }
 
@@ -190,11 +312,12 @@ function convert(database: SqlDatabase): void {
   if (broken.length > 0) throw new Error(`converting the library left ${broken.length} broken references`)
 
   database.exec(`PRAGMA user_version = ${converted_version}`)
+  return { nulled, reused }
 }
 
 // Runs whatever old steps the library missed, then converts it; foreign keys must be off, as SQLite asks for a schema change.
-export function upgrade_legacy(database: SqlDatabase): void {
+export function upgrade_legacy(database: SqlDatabase): UpgradeReport {
   database.exec('PRAGMA foreign_keys = OFF')
   migrate(database, legacy_steps)
-  in_transaction(database, () => convert(database))
+  return in_transaction(database, () => convert(database))
 }

@@ -10,7 +10,7 @@ import { json_backup_schedule } from '@x-tech-laboratories/x-libs/server/backup_
 import { sqlite_backups } from '@x-tech-laboratories/x-libs/server/sqlite_backups'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
-import { clear_library, needs_upgrade, open_library } from '@shared/library/store'
+import { clear_library, needs_upgrade, open_library, type UpgradeReport } from '@shared/library/store'
 
 import { log } from './log'
 
@@ -59,11 +59,13 @@ export function libraryBackups(database: () => SqlDatabase, path: string, restar
   }
 }
 
-// Opens the library, backing it up first when opening would upgrade its schema; gives back that backup, if one was taken.
-export async function openLibraryBackedUp(database: SqlDatabase, backups: Pick<LibraryBackups, 'create'>): Promise<Backup | null> {
+// Opens the library, backing it up first when opening would upgrade its schema; gives back that backup, if one was
+// taken, and what converting an older library did.
+export async function openLibraryBackedUp(
+  database: SqlDatabase, backups: Pick<LibraryBackups, 'create'>
+): Promise<{ backup: Backup | null; report: UpgradeReport | null }> {
   const backup = needs_upgrade(database) ? await backups.create() : null
-  open_library(database)
-  return backup
+  return { backup, report: open_library(database) }
 }
 
 // Clears the library after a backup of it, and not at all if the backup fails.

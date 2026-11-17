@@ -6,6 +6,7 @@ import { create_window } from '@x-tech-laboratories/x-libs/electron/window'
 import { take_staged_restore } from '@x-tech-laboratories/x-libs/server/sqlite_backups'
 
 import { x_music_backups_bridge } from '@shared/ipc'
+import { describe_upgrade } from '@shared/library/legacy'
 import { libraryBackups, openLibraryBackedUp } from './backups'
 import { openDatabase, libraryPath } from './db'
 import { registerIpc } from './ipc'
@@ -87,8 +88,9 @@ async function start(): Promise<void> {
   }))
 
   // A schema upgrade changes years of ratings and plays, so the library as it was is kept first.
-  const backup = await openLibraryBackedUp(db, backups)
+  const { backup, report } = await openLibraryBackedUp(db, backups)
   if (backup) log.info('backed up the library before upgrading it', { backup: backup.name })
+  for (const line of report ? describe_upgrade(report) : []) log.warn(line)
   log.info('library opened', { path })
   backups.start()
 

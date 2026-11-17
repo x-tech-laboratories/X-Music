@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { legacy_steps } from '@shared/library/legacy_steps'
-import { is_legacy } from '@shared/library/legacy'
+import { describe_upgrade, is_legacy } from '@shared/library/legacy'
 import { unmerge } from '@shared/library/merge'
 import { migrations } from '@shared/library/migrations/index'
 import { needs_upgrade, open_library } from '@shared/library/store'
@@ -200,10 +200,77 @@ describe('upgrading a library from the old schema', () => {
     db.exec("INSERT INTO media (id, track_id, kind, uri, added) VALUES (99, 999, 'file', '/music/orphan.flac', 0)")
     const before = counts(db)
 
-    expect(() => open_library(db)).toThrow(/would lose 1 of 6 rows in media/)
+    expect(() => open_library(db)).toThrow(/media\.track_id: 1 row points at no tracks row/)
 
     expect(is_legacy(db)).toBe(true)
     expect(counts(db)).toEqual(before)
     expect(one(db, "SELECT typeof(id) AS type FROM tracks WHERE title = 'So What'")).toEqual({ type: 'integer' })
   })
+
+  it('says which references it emptied because the row they named was gone', () => {
+    const db = legacyLibrary()
+    db.exec('PRAGMA foreign_keys = OFF')
+    db.exec("UPDATE tracks SET album_id = 99 WHERE title = 'Blue in Green'; UPDATE play_history SET media_id = 77 WHERE id = 3")
+
+    const report = open_library(db)
+
+    expect(report?.nulled).toEqual([{ table: 'tracks', column: 'album_id', rows: 1 }, { table: 'play_history', column: 'media_id', rows: 1 }])
+    expect(describe_upgrade(report!)[0]).toBe('emptied tracks.album_id in 1 row, which named a row that was gone')
+    expect(one(db, "SELECT album_id FROM tracks WHERE title = 'Blue in Green'")).toEqual({ album_id: null })
+  })
 })
+
+describe('upgrading a merge whose absorbed numbers were reused', () => {
+  // The old tables handed a deleted row's number to the next row made, so a merge's snapshot can name a live, unrelated row.
+  function reused(): TestDb {
+    const db = legacyLibrary()
+    db.exec(`
+      INSERT INTO tracks (id, title, rating, play_count, added, modified) VALUES (9, 'Unrelated new song', 100, 77, 20000, 20000);
+      INSERT INTO media (id, track_id, kind, uri, added) VALUES (6, 9, 'file', '/music/new.flac', 20000);
+      INSERT INTO play_history (track_id, at, kind) VALUES (9, 20000, 0);
+      INSERT INTO track_values (track_id, field_id, value_id, ordinal) VALUES (9, 1, 1, 0);
+      INSERT INTO track_extras (track_id, field_id, value) VALUES (9, 20, 'a note');
+      INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (1, 9, 5);`)
+    return db
+  }
+
+  it('brings the absorbed track back as its own row and leaves the new track alone', () => {
+    const db = reused()
+
+    const report = open_library(db)
+    const unrelated = trackId(db, 'Unrelated new song')
+    const result = unmerge(db, 'merge-9500-3')
+
+    expect(report?.reused).toContainEqual({ batch_id: 'merge-9500-3', kind: 'tracks', old: 9 })
+    expect(describe_upgrade(report!)).toEqual(['merge merge-9500-3 named tracks 9, which later rows had taken; undoing it leaves those rows alone'])
+    expect(result.restored).not.toContain(unrelated)
+    expect(one(db, 'SELECT title, rating, play_count FROM tracks WHERE id = ?', unrelated)).toEqual({ title: 'Unrelated new song', rating: 100, play_count: 77 })
+    expect(all(db, 'SELECT uri FROM media WHERE track_id = ?', unrelated)).toEqual([{ uri: '/music/new.flac' }])
+    expect(one(db, 'SELECT COUNT(*) AS n FROM play_history WHERE track_id = ?', unrelated)).toEqual({ n: 1 })
+    expect(one(db, 'SELECT COUNT(*) AS n FROM track_values WHERE track_id = ?', unrelated)).toEqual({ n: 1 })
+    expect(one(db, 'SELECT value FROM track_extras WHERE track_id = ?', unrelated)).toEqual({ value: 'a note' })
+    expect(one(db, 'SELECT position FROM playlist_tracks WHERE track_id = ?', unrelated)).toEqual({ position: 5 })
+    expect(one(db, 'SELECT title, rating, play_count FROM tracks WHERE id = ?', result.restored[0]!)).toEqual({ title: 'Absorbed', rating: 80, play_count: 5 })
+    expect(all(db, 'SELECT uri FROM media WHERE track_id = ?', result.restored[0]!)).toEqual([{ uri: '/music/merged-b.flac' }])
+  })
+
+  it('leaves a file or play whose number was reused with the track that has it now', () => {
+    const db = legacyLibrary()
+    db.exec(`
+      DELETE FROM media WHERE id = 5; DELETE FROM play_history WHERE id = 4;
+      INSERT INTO media (id, track_id, kind, uri, added) VALUES (5, 2, 'file', '/music/other.flac', 20000);
+      INSERT INTO play_history (id, track_id, at, kind) VALUES (4, 2, 20000, 0);`)
+
+    const report = open_library(db)
+    const blue = trackId(db, 'Blue in Green')
+    const result = unmerge(db, 'merge-9500-3')
+
+    expect(report?.reused).toEqual(expect.arrayContaining([
+      { batch_id: 'merge-9500-3', kind: 'media', old: 5 }, { batch_id: 'merge-9500-3', kind: 'play_history', old: 4 }
+    ]))
+    expect(all(db, 'SELECT uri FROM media WHERE track_id = ? ORDER BY uri', blue)).toEqual([{ uri: '/music/blue.flac' }, { uri: '/music/other.flac' }])
+    expect(all(db, 'SELECT at FROM play_history WHERE track_id = ? ORDER BY at', blue)).toEqual([{ at: 3000 }, { at: 20000 }])
+    expect(all(db, 'SELECT uri FROM media WHERE track_id = ?', result.restored[0]!)).toEqual([])
+  })
+})
+

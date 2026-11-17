@@ -64,9 +64,10 @@ describe('opening the library', () => {
     const db = bareDb(path)
     const backups = libraryBackups(() => db, path, () => {})
 
-    const backup = await openLibraryBackedUp(db, backups)
+    const { backup, report } = await openLibraryBackedUp(db, backups)
 
     expect(backup).not.toBeNull()
+    expect(report).toEqual({ nulled: [], reused: [] })
     const kept = new DatabaseSync(join(folder, 'backups', backup!.name), { readOnly: true })
     expect(kept.prepare('PRAGMA user_version').get()).toEqual({ user_version: 4 })
     expect(kept.prepare("SELECT id, play_count FROM tracks WHERE title = 'So What'").get()).toEqual({ id: 1, play_count: 42 })
@@ -80,8 +81,8 @@ describe('opening the library', () => {
     const db = bareDb(path)
     const backups = libraryBackups(() => db, path, () => {})
 
-    expect(await openLibraryBackedUp(db, backups)).toBeNull()
-    expect(await openLibraryBackedUp(db, backups)).toBeNull()
+    expect(await openLibraryBackedUp(db, backups)).toEqual({ backup: null, report: null })
+    expect(await openLibraryBackedUp(db, backups)).toEqual({ backup: null, report: null })
     expect(existsSync(join(folder, 'backups')) ? readdirSync(join(folder, 'backups')) : []).toEqual([])
     db.close()
   })

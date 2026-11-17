@@ -11,7 +11,7 @@ import type { GroupRow, LibraryStats, QueryRequest, Root, TrackRow } from '../ip
 import { compileFilter, compileGroupBy } from '../query/compile.ts'
 import { all_rows, drizzle_of, first_row, new_id, run } from './database.ts'
 import { install_history, track_history } from './history.ts'
-import { is_legacy, upgrade_legacy } from './legacy.ts'
+import { is_legacy, upgrade_legacy, type UpgradeReport } from './legacy.ts'
 import { migrations } from './migrations/index.ts'
 import { albums, media, roots, tracks } from './schema.ts'
 
@@ -32,16 +32,20 @@ export function needs_upgrade(database: SqlDatabase): boolean {
   return version > 0 && version < migrations.length
 }
 
-// Brings an open connection up to date and starts the track history; run once each time the library opens.
-export function open_library(database: SqlDatabase): void {
+export type { UpgradeReport }
+
+// Brings an open connection up to date and starts the track history; run once each time the library opens. Gives back
+// what converting an older library did, when it was one.
+export function open_library(database: SqlDatabase): UpgradeReport | null {
   // SQLite changes a schema with foreign keys off and checks them after.
   database.exec('PRAGMA foreign_keys = OFF')
-  if (is_legacy(database)) upgrade_legacy(database)
+  const report = is_legacy(database) ? upgrade_legacy(database) : null
   migrate_drizzle(database, library_owner, migrations)
   const broken = all_rows(database, 'PRAGMA foreign_key_check')
   if (broken.length > 0) throw new Error(`the library has ${broken.length} broken references`)
   database.exec('PRAGMA foreign_keys = ON')
   install_history(database)
+  return report
 }
 
 // ── Reading ──────────────────────────────────────────────────────────────────

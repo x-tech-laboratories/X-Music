@@ -318,4 +318,15 @@ describe('unmerge', () => {
   it('rejects an unknown batch', () => {
     expect(() => unmerge(db, 'nope')).toThrow(/no merge recorded/)
   })
+
+  it('refuses to bring a track back over a different track that has its id', () => {
+    const a = makeTrack({ title: 'Keeper' })
+    const b = makeTrack({ title: 'Duplicate' })
+    const r = mergeTracks(db, { ids: [a, b], survivor: a })
+    db.prepare("INSERT INTO tracks (id, title, rating, added, modified) VALUES (?, 'Someone else', 100, 5000, 0)").run(b)
+
+    expect(() => unmerge(db, r.batchId)).toThrow(/would overwrite a track this merge did not take/)
+    expect(one<{ title: string; rating: number }>('SELECT title, rating FROM tracks WHERE id = ?', b)).toEqual({ title: 'Someone else', rating: 100 })
+  })
 })
+

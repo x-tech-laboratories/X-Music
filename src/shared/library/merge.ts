@@ -469,6 +469,9 @@ export function unmerge(database: SqlDatabase, batchId: string): UnmergeResult {
         run(database, `UPDATE tracks SET ${trackColumns.filter((c) => c !== 'mb_recording_id').map((c) => `${c} = ?`).join(', ')}, modified = ? WHERE id = ?`,
           ...values.slice(0, -1), now, t.id)
       } else {
+        // A track with this id that was added at another time is not the one this merge took, so the undo stops.
+        const existing = first_row<{ added: number }>(database, 'SELECT added FROM tracks WHERE id = ?', t.id)
+        if (existing && existing.added !== t.added) throw new Error(`undoing ${batchId} would overwrite a track this merge did not take`)
         // Recreated with its own id, so media and history can point back; a history restore may have brought it back already.
         const updated = run(database, `UPDATE tracks SET ${trackColumns.map((c) => `${c} = ?`).join(', ')}, modified = ? WHERE id = ?`,
           ...values, now, t.id)
