@@ -63,6 +63,8 @@ export function PlayerBlock() {
   const shuffle = status?.shuffle ?? false
   const queued = status?.queue.length ?? 0
   const playing = status?.state === 'playing'
+  // A failure takes the time bar's place, since there is no position to show.
+  const failed = status?.state === 'error' && Boolean(status.error)
 
   return (
     <section className={s.player} aria-label="Player">
@@ -101,18 +103,18 @@ export function PlayerBlock() {
           <div className={cx(s.line, s.artist)} title={track?.artist ?? ''}>{track?.artist ?? '—'}</div>
           <div className={cx(s.line, s.album)} title={track?.album ?? ''}>{track?.album ?? '—'}</div>
 
-          {status?.state === 'error' && status.error && (
-            <div className={s.error} role="alert">
-              <span className={cx(s.line, 'tone-bad')} title={status.error}>{status.error}</span>
-              {track && <button onClick={() => void player.toggle()}>Try again</button>}
-            </div>
-          )}
-
-          <TimeBar duration_in_milliseconds={duration} />
+          {!failed && <TimeBar duration_in_milliseconds={duration} />}
         </div>
 
         <TrackCover track_id={track?.id ?? null} size={88} />
       </div>
+
+      {failed && (
+        <div className={s.error} role="alert">
+          {track && <button onClick={() => void player.toggle()}>Try again</button>}
+          <span className={cx(s.message, 'tone-bad')}>{status.error}</span>
+        </div>
+      )}
     </section>
   )
 }
