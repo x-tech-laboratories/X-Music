@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { PathInput } from '@x-tech-laboratories/x-libs/web/react/controls'
 import { PageHeading, Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
-import { ipc } from '../../lib/ipc'
+import { ipc } from '../lib/ipc'
 import { cx } from '@x-tech-laboratories/x-libs/web/dom'
 import type { ImportReport } from '@shared/ipc'
-import { library } from '../../stores/library'
+import { library } from '../stores/library'
 import s from './GmbImport.module.css'
 
 export function GmbImport({ ondone }: { ondone?: () => void }) {

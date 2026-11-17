@@ -1,40 +1,18 @@
-/* X-Music's layout on Halon: a window-filling frame, and the player's own token layer. No colour literals. */
+/* X-Music's own layout; the frame, colours and widget looks come from the contained Shell and Halon. */
 
-/* ── Player tokens (DESIGN-SPEC §5.4), derived from Halon's ─────────────────── */
+/* ── Sidebar: the views over the player and its lists ───────────────────────── */
 
-:root {
-  --row-hover: var(--surface-navigation-hover);
-  --column-header: var(--surface-secondary);
-  --column-separator: var(--border-default);
-}
-
-/* ── Frame: the window never scrolls, its panes do ──────────────────────────── */
-
-html, body, #app { height: 100%; }
-body { overflow: hidden; }
-
-.song-list-spacer, .statusbar-spacer { flex: 1; }
-
-.layout { height: calc(100vh - var(--frame-height) - var(--row-height)); min-height: 0; }
-.sidebar { padding: 0; }
 .player-column { display: grid; flex: 1; min-height: 0; }
 
-main {
-  display: grid;
-  min-height: 0;
-  height: calc(100vh - var(--frame-height) - var(--row-height) - var(--space-2));
-  padding: 0;
-  overflow: hidden;
-}
+/* ── Library: the panes fill main and scroll on their own ───────────────────── */
 
-.library-view { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; gap: var(--space-2); padding: var(--space-2); }
-.library-view > .empty { align-self: start; }
+body.contained main.library-main { display: grid; padding-bottom: var(--space-5); overflow: hidden; }
+
+.library-view { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--space-5); min-height: 0; }
 
 /* ── Song list ──────────────────────────────────────────────────────────────── */
 
-.song-list { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; gap: var(--space-2); }
+.song-list { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--space-2); min-height: 0; }
 .song-list-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.song-list-spacer { flex: 1; }
 .song-list-body { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; overflow: hidden; }
-.song-list-body > .table-tools { justify-content: flex-end; }
-.song-list td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.song-list tbody tr { cursor: default; }
