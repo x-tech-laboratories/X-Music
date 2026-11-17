@@ -65,8 +65,8 @@ node .../driver.mjs eval "JSON.stringify(window.__done??null)"
   Open it in one call, click the item in the next.
 - **`library:addRoot` ignores arguments and opens a native folder picker**, which blocks the main
   process forever with no way to dismiss it from CDP. Do not call it. Insert the row with sqlite
-  while the app is closed instead:
-  `sqlite3 "$X_MUSIC_DB" "INSERT OR IGNORE INTO roots (path, enabled) VALUES ('<dir>', 1);"`
+  while the app is closed instead, with an id of its own since rows have no numbered ids:
+  `sqlite3 "$X_MUSIC_DB" "INSERT OR IGNORE INTO roots (id, path, enabled) VALUES (lower(hex(randomblob(16))), '<dir>', 1);"`
 - **mpv inherits the DevTools listening socket.** Killing X-Music leaves an orphaned `mpv --idle`
   holding port 9222, and the next launch logs "Cannot start http server for devtools" and exposes no
   page target. Check with `ss -ltnp | grep 9222` and kill that mpv by pid — never `pkill -x mpv`,

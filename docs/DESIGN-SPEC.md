@@ -72,7 +72,7 @@ X-Music keeps the model and replaces the substrate:
 │  │ hashing  │ │          │ │ (taglib) │ │ (mpv)    │ │ hotkeys  │   │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └──────────┘   │
 │       └────────────┴────────────┴────────────┘                      │
-│              SQLite (WAL, STRICT) + FTS5                            │
+│  SQLite (WAL) + FTS5 through node:sqlite, store in src/shared       │
 │                                                                     │
 │  worker_threads: scan · hash · replaygain                           │
 └─────────────────────────────────────────────────────────────────────┘
@@ -376,7 +376,7 @@ same reversibility trick used for album identity in §17.1.
 
 ### 3.5.0 Resolving a file to a track — implemented
 
-Both the gmbrc importer and the filesystem scanner funnel through `src/main/library/identity.ts`, so
+Both the gmbrc importer and the filesystem scanner funnel through `src/shared/library/identity.ts`, so
 that running either twice is idempotent and running both does not produce two tracks for one song.
 
 Resolution order, stopping at the first match:
@@ -404,8 +404,8 @@ Two policies fall out of the sources being different:
   X-Music's own rating or play count, so `scanRoots` passes `statistics: false`.
 - **Multi-value fields are replaced, not appended**, or a second import doubles every genre.
 
-Play history needed a uniqueness constraint (migration 002: `UNIQUE(track_id, at, kind)`), without
-which re-importing appended a second copy of every play event.
+Play history needed a uniqueness constraint (`UNIQUE(track_id, at, kind)`), without which
+re-importing appended a second copy of every play event.
 
 `test/unit/idempotency.test.ts` and `test/unit/scan.test.ts` pin all of this. The first version of
 the importer failed these: it created 6 tracks from 3 on a second run, 3 of them orphans with no
@@ -413,60 +413,73 @@ media at all, because the track INSERT had no conflict clause while the media IN
 
 ### 3.5.1 Schema (abridged)
 
-The authoritative version is `src/main/db/migrations/001-initial.sql`.
+The store follows the X-Tech Application Standard: the tables are a Drizzle schema in
+`src/shared/library/schema.ts`, `drizzle-kit generate` writes each change as a migration under
+`src/shared/library/migrations/` (`npm run db:generate`, which also bundles them), and X-Libs'
+`migrate_drizzle` runs them under the owner `library` on X-Libs' `SqlDatabase`, which the main
+process meets with Node's `node:sqlite`. Queries go through Drizzle where it can express them; the
+filter compiler, grouping and the joins of the read-only views stay raw SQL.
 
-```sql
-CREATE TABLE tracks (
-  id              INTEGER PRIMARY KEY,
-  title           TEXT,
-  album_id        INTEGER REFERENCES albums(id) ON DELETE SET NULL,
-  year            INTEGER, track_number INTEGER, disc_number INTEGER, length_ms INTEGER,
+**Every row's id is a UUID** made where the row is made (`new_id()`), never an auto-incrementing
+number, so a library could one day be kept on more than one device without two of them handing out
+the same id. Field numbers (`track_values.field_id` and the like) are not row ids and stay integers.
 
-  mb_recording_id TEXT,
-  acoustid        TEXT,                            -- a hint, never a key
-  identity_source TEXT NOT NULL DEFAULT 'heuristic',
-  identity_key    TEXT,
-  pinned          INTEGER NOT NULL DEFAULT 0,      -- a human decided; do not re-derive
+```ts
+export const tracks = sqliteTable('tracks', {
+  id: text().primaryKey(),
+  title: text(),
+  album_id: text().references(() => albums.id, { onDelete: 'set null' }),
+  year: integer(), track_number: integer(), disc_number: integer(), length_ms: integer(),
 
-  rating          INTEGER,                         -- 0..100; NULL is unrated, which is not 0
-  play_count      INTEGER NOT NULL DEFAULT 0,
-  skip_count      INTEGER NOT NULL DEFAULT 0,
-  last_played     INTEGER, last_skipped INTEGER, bookmark_ms INTEGER,
+  mb_recording_id: text(),
+  acoustid: text(),                                 // a hint, never a key
+  identity_source: text().notNull().default('heuristic'),
+  identity_key: text(),
+  pinned: integer().notNull().default(0),           // a human decided; do not re-derive
 
-  added           INTEGER NOT NULL, modified INTEGER NOT NULL,
-  primary_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL
-) STRICT;
+  rating: integer(),                                // 0..100; null is unrated, which is not 0
+  play_count: integer().notNull().default(0),
+  skip_count: integer().notNull().default(0),
+  last_played: integer(), last_skipped: integer(), bookmark_ms: integer(),
 
-CREATE TABLE media (
-  id              INTEGER PRIMARY KEY,
-  track_id        INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
-  kind            TEXT NOT NULL,                   -- 'file' | 'stream'
-  uri             TEXT NOT NULL,
-  provider        TEXT,
+  added: integer().notNull(), modified: integer().notNull(),
+  primary_media_id: text().references(() => media.id, { onDelete: 'set null' })
+})
 
-  subtrack_index  INTEGER NOT NULL DEFAULT 0,      -- CUE ranges and chapters
-  start_ms        INTEGER, end_ms INTEGER,
-
-  audio_hash      BLOB,                            -- identity of the FILE (§3.5)
-  audio_hash_algo TEXT,
-
-  codec TEXT, bitrate INTEGER, samplerate INTEGER, channels INTEGER,
-  filesize INTEGER, mtime INTEGER,
-
-  present         INTEGER NOT NULL DEFAULT 1,      -- 0 = known but unreachable
-  quality_rank    INTEGER NOT NULL DEFAULT 0,      -- which source to prefer
-  added           INTEGER NOT NULL,
-  UNIQUE(uri, subtrack_index)
-) STRICT;
+export const media = sqliteTable('media', {
+  id: text().primaryKey(),
+  track_id: text().notNull().references(() => tracks.id, { onDelete: 'cascade' }),
+  kind: text().notNull(),                           // 'file' | 'stream'
+  uri: text().notNull(),
+  subtrack_index: integer().notNull().default(0),   // CUE ranges and chapters
+  start_ms: integer(), end_ms: integer(),
+  audio_hash: blob(),                               // identity of the FILE (§3.5)
+  present: integer().notNull().default(1),          // 0 = known but unreachable
+  quality_rank: integer().notNull().default(0),     // which source to prefer
+  added: integer().notNull()
+}, (table) => [uniqueIndex('media_uri_subtrack').on(table.uri, table.subtrack_index)])
 ```
 
 Plus `albums` (stable id, derived `match_key`, `pinned` — see §17.1), `values_` + `track_values`
 (interned multi-value fields), `track_extras` (user-defined and long-form fields, so a new field
 never means `ALTER TABLE` on a huge table), `media_tags` (raw per-source tags, so two files backing
-one track can disagree without the disagreement being lost), `tracks_fts` (contentless FTS5),
-`play_history`, `tag_writes` (the undo journal), `playlists`, `roots`, `settings`.
+one track can disagree without the disagreement being lost), `tracks_fts` (FTS5 keyed by the
+track's id, in a hand-written migration since Drizzle has no virtual tables), `play_history`,
+`tag_writes` (the undo journal), `playlists`, `roots`, `settings`, `merge_journal` (§9.4.3) and
+`artwork` (§7.3). X-Libs' history adds `track_versions` (§9.4.6).
 
-Settings: `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_keys=ON`, `STRICT` tables throughout.
+Settings: `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_keys=ON`. Drizzle cannot declare
+`STRICT` tables, so column types are kept by the typed schema, and every text key carries a
+`CHECK (id IS NOT NULL)`, since SQLite would otherwise let a text primary key be null.
+
+**Libraries made before the move to Drizzle upgrade in place.** Their tables had numbered ids, set
+by four hand-written steps counted in `user_version`. Opening such a library first runs any of those
+steps it missed (kept word for word in `legacy_steps.ts`), then `legacy.ts` converts it in one
+transaction: each old table steps aside, the Drizzle tables are made, every row gets a new UUID,
+every reference follows it, the merge journal's snapshots are rewritten so earlier merges can still
+be undone, and the conversion refuses to finish if any table would come out with fewer rows. The
+main process backs the library up through X-Libs' `sqlite_backups` before any schema upgrade, so the
+library as it was is kept beside it under `backups/`.
 
 ### 3.5.2 Field storage kinds
 
@@ -497,7 +510,7 @@ a synchronization surface, a memory footprint, a class of bugs where the two rep
 disagree, and a worker protocol to maintain.
 
 **Build one when, and only when**, a real library misses a §12 budget. The trigger is a measurement,
-not a hunch. The work is scoped and the seam already exists: `src/main/query/evaluate.ts` is a
+not a hunch. The work is scoped and the seam already exists: `src/shared/query/evaluate.ts` is a
 complete native predicate over an `IndexedTrack` shape, so an index would supply data to an
 evaluator that is already written and already tested against SQL.
 
@@ -924,7 +937,7 @@ have nowhere to live.
 files?", "which copy plays?", "is this one track or two?", "did my rating survive?") is answered by
 this one view. It is also read-only, so it carries none of the risk of the tag editor.
 
-`src/main/library/details.ts` gathers it; `SongProperties.tsx` renders it as a full-screen view
+`src/shared/library/details.ts` gathers it; `SongProperties.tsx` renders it as a full-screen view
 reached from the song list (select one track, then Properties, or Alt+Enter).
 
 Four sections: **Overview** (metadata, identity, statistics, loudness, merge provenance),
@@ -1036,7 +1049,7 @@ gains its strongest signal (§3.5.0). The scanner already reads the tag; nothing
 
 ### 7.3 Artwork — implemented
 
-`src/main/library/artwork.ts`. Sources in priority order: **embedded picture → folder image**. A
+`src/main/library/artwork.ts` finds the image; `src/shared/library/covers.ts` records the answer. Sources in priority order: **embedded picture → folder image**. A
 remote fetch is a later plugin (§11).
 
 - **Art belongs to the album where there is one, and to the track otherwise**, so every track on an
@@ -1218,7 +1231,7 @@ Original design notes, still applicable:
 
 ### 9.2 Deduplication — implemented
 
-`src/main/library/duplicates.ts`. Proposes groups; never changes anything. Four strategies, each
+`src/shared/library/duplicates.ts`. Proposes groups; never changes anything. Four strategies, each
 carrying its own confidence and a sentence explaining itself, because a proposal the user cannot
 evaluate is worse than none:
 
@@ -1263,7 +1276,7 @@ the same way the scan does (§9.1) rather than a single summary.
 gap the user has to be able to close: **select several tracks and merge them into one, choosing
 which value to keep wherever they disagree.**
 
-`src/main/library/merge.ts`, with `mergePreview`, `mergeTracks` and `unmerge`. Multi-select in the
+`src/shared/library/merge.ts`, with `mergePreview`, `mergeTracks` and `unmerge`. Multi-select in the
 song list, a merge dialog rendering the preview, and 20 tests including a full round-trip assertion
 that unmerge restores tracks, media, statistics, history, sets, extras and playlist positions
 exactly.
@@ -1284,7 +1297,7 @@ The survivor is one existing track; the others are absorbed and deleted.
 | Multi-value fields | Per-field choice of **union** (default) or one source's set. |
 | Rating | Default: the highest. A deliberate rating should not be lost to an unrated duplicate. |
 | Play count, skip count | Summed. They are counts of real events. |
-| Play history | Union, deduplicated by the migration-002 constraint. |
+| Play history | Union, deduplicated by the `UNIQUE(track_id, at, kind)` constraint. |
 | First played, added | Earliest. Last played, last skipped: latest. |
 | Playlists | Entries repointed to the survivor, then deduplicated within each playlist. |
 | Identity | Survivor gets `pinned = 1` and `identity_source = 'manual'`, so nothing re-splits it. |
@@ -1332,8 +1345,8 @@ same preview can be unit-tested without a DOM.
 #### 9.4.3 Undo
 
 A merge deletes rows, which makes it the most destructive operation in the app that does not touch a
-file. It must be reversible: the whole pre-merge state of every absorbed track is written to the
-existing `tag_writes`-style journal (or a sibling `merge_journal`) under one batch id, and
+file. It must be reversible: the whole pre-merge state of every participating track, its plays
+and playlist places included, is written to `merge_journal` under one batch id, and
 `unmerge(batchId)` restores it. **This is a prerequisite, not a follow-up** — shipping merge without
 undo would be shipping a way to quietly lose ratings and history.
 
@@ -1343,7 +1356,7 @@ undo would be shipping a way to quietly lose ratings and history.
   A user may pick another, but the default should rarely need changing.
 - **Union is the default for multi-value fields.** Keeping every genre is nearly always what was
   meant; taking one source's set is available but is the unusual choice.
-- **Play history unions and deduplicates** via the migration-002 constraint. Events dropped as exact
+- **Play history unions and deduplicates** via the unique play constraint. Events dropped as exact
   duplicates are recorded in the journal, so unmerge restores them rather than losing them
   permanently to a merge-and-undo cycle.
 - **Repointing playlists can list the survivor twice** in one playlist; the merge keeps its earliest
@@ -1355,6 +1368,29 @@ undo would be shipping a way to quietly lose ratings and history.
 
 Still to do: a merge-history view listing past merges with an undo control for each. `unmerge` works
 and is tested, but is currently only reachable immediately after merging.
+
+#### 9.4.6 Track history
+
+Every change to a track is kept as a version through X-Libs' `create_history`
+(`src/shared/library/history.ts`): triggers on `tracks`, `track_values`, `track_extras` and `media`
+note each track a write touches, and the main process records a version after every call it answers
+and after each counted play or skip. A version holds the track's columns, its set values and extras,
+and the ids of its files. A merge therefore shows as the survivor edited and each absorbed track
+deleted, and its undo as those tracks restored.
+
+- **Plays are a log, not an edit.** Play and skip counts, first and last played and the bookmark are
+  stored in each version but compared out, so listening makes no version, and restoring a version
+  leaves them as they are now.
+- **Restoring claims files, never lets them go.** A track brought back takes back the files its
+  version names, which also undoes part of a merge; files it has gained since stay with it.
+- **The merge keeps its own journal.** History restores one track at a time and leaves the play log
+  out, while an exact unmerge needs every track at once with its plays and playlist places.
+- Versions older than `history.keep_days` (a setting, a year by default) are pruned, each track
+  keeping its newest. The page reaches the history through `window.xMusicHistory`:
+  `list_versions(track_id)`, `list_recent_versions(limit)`, `restore_version(version_id)`,
+  `get_history_keep_days()` and `set_history_keep_days(days)`. The History page is still to come.
+- Clearing the library backs it up first, then empties the tracks along with their versions and the
+  merge journal, since nothing is left for them to bring back.
 
 #### 9.4.5 Where it connects
 
@@ -1460,8 +1496,7 @@ If real libraries turn out to cluster higher than assumed, §3.5.3 describes the
 ## 13. Testing
 
 Vitest, with `fast-check` for property tests. Tests reach SQLite through Node's built-in
-`node:sqlite` rather than `better-sqlite3`, so the suite never depends on which ABI the native
-module was last rebuilt for — the SQL under test is identical either way.
+`node:sqlite`, as the app does, and open the library through the same store code.
 
 ### 13.1 The load-bearing test
 
@@ -1485,7 +1520,7 @@ The SQL compiler wraps every negation in `COALESCE(..., 0)` to enforce it.
 | Suite | Asserts |
 |---|---|
 | `unit/filter-compile.test.ts` | Operator semantics, parameterization (no interpolation), set algebra, NULL ordering, rejection of type-invalid operators |
-| `unit/entity-model.test.ts` | The §3.4 invariants: tracks with zero media, one track with many media, stats surviving media deletion, cascade on track deletion, CUE ranges as ordinary rows, missing files flagged not deleted, album ids stable across match-key changes, FK and STRICT enforcement |
+| `unit/entity-model.test.ts` | The §3.4 invariants: tracks with zero media, one track with many media, stats surviving media deletion, cascade on track deletion, CUE ranges as ordinary rows, missing files flagged not deleted, album ids stable across match-key changes, FK enforcement and ids that cannot be null |
 | `unit/audio-hash.test.ts` | Hash unchanged by ID3v2 growth, ID3v1 addition and rename; FLAC STREAMINFO used when valid and ignored when zero; different audio distinguished |
 | `unit/fields.test.ts` | Field id uniqueness and **numeric id stability** — a reused id silently corrupts every library on disk, so the pins are a compatibility lock |
 | `unit/format.test.ts` | The format-string grammar, including bracketed-group elision and the renamer pattern end to end |
@@ -1508,10 +1543,8 @@ The SQL compiler wraps every negation in `COALESCE(..., 0)` to enforce it.
 x-music/
 ├── src/
 │   ├── main/                 # Electron main process
-│   │   ├── db/               # schema, migrations, pragmas, DAO
-│   │   │   └── migrations/   # 001-initial.sql — the authoritative schema
-│   │   ├── library/          # audio-hash, (planned) scanner, watcher, dedupe
-│   │   ├── query/            # compile.ts (AST→SQL), evaluate.ts (AST→predicate)
+│   │   ├── db/               # opens the database file through node:sqlite
+│   │   ├── library/          # audio-hash, scanner, artwork files, (planned) watcher
 │   │   ├── tags/             # (planned) TagIO interface + implementation + write journal
 │   │   ├── play/             # (planned) PlaybackEngine interface + mpv backend
 │   │   ├── services/         # (planned) MPRIS, scrobble, hotkeys, HTTP API
@@ -1528,6 +1561,9 @@ x-music/
 │   │   ├── filter.ts         # the filter AST
 │   │   ├── format.ts         # the format-string language
 │   │   ├── view.ts           # the filter stack
+│   │   ├── library/          # the store: Drizzle schema, migrations, identity, merge, history
+│   │   ├── query/            # compile.ts (AST→SQL), evaluate.ts (AST→predicate)
+│   │   ├── import/           # gmusicbrowser's gmbrc
 │   │   └── ipc.ts            # the IPC contract
 │   └── workers/              # (planned) scan, hash, replaygain
 ├── test/
@@ -1653,10 +1689,10 @@ primary key. Identity is *computed* into a `match_key` column, not used *as* the
 
 ```sql
 CREATE TABLE albums (
-  id         INTEGER PRIMARY KEY,        -- stable forever, survives rule changes
+  id         TEXT PRIMARY KEY,           -- a UUID, stable forever, survives rule changes
   match_key  TEXT NOT NULL,              -- derived; recomputed when the rule or tags change
   pinned     INTEGER NOT NULL DEFAULT 0, -- 1 = user merged/split this by hand; never auto-regroup
-  name       TEXT, album_artist_id INTEGER, year INTEGER,
+  name       TEXT, album_artist_id TEXT, year INTEGER,
   mb_release_id TEXT,
   UNIQUE(match_key)
 );
@@ -1948,7 +1984,7 @@ compiler that makes the field-descriptor and filter-AST systems genuinely hard t
 Every UI iteration crosses a compile boundary.
 
 **Stack B — TypeScript end to end. ← recommended**
-Electron · TypeScript · better-sqlite3 · node-taglib-sharp · mpv over JSON IPC · Preact.
+Electron · TypeScript · SQLite through `node:sqlite` · node-taglib-sharp · mpv over JSON IPC · React.
 *Best at:* velocity. One language, one type system, one build, shared types across the IPC boundary
 with zero codegen. Instant reload on both sides. One rendering engine, so §6.4's CSS restrictions
 evaporate — `:has()`, container queries and subgrid all become available, which measurably helps a
@@ -2055,9 +2091,8 @@ Building the skeleton tested three of this appendix's claims:
 - **The `shared/` payoff is real and larger than argued.** The filter AST is imported by the SQL
   compiler, the native predicate, the IPC contract and the UI that builds queries — one definition,
   no codegen, and a type error at any misuse. A.1 called this the main structural benefit; it is.
-- **The native-module concern was overstated for tests.** Node's built-in `node:sqlite` runs the
-  real SQL without `better-sqlite3`, so the test suite is free of ABI juggling entirely. Only the app
-  needs the Electron-ABI build, and `better-sqlite3` loaded under Electron without incident.
+- **The native-module concern went away.** Node's built-in `node:sqlite` runs the real SQL in the
+  tests and in Electron's main process alike, so nothing is rebuilt against Electron's ABI.
 - **The tag-library risk (A.3) is untested**, because tag I/O is not written yet. It remains the one
   place where Stack B is weakest, and the `TagIO` interface plus golden-file suite is still how that
   gets settled rather than assumed.
