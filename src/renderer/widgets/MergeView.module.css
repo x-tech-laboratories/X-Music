@@ -10,7 +10,7 @@
 }
 
 .head {
-  background: var(--column-header);
+  background: var(--surface-secondary);
   font-weight: 600;
   color: var(--text-secondary);
   position: sticky;
@@ -20,7 +20,7 @@
 
 .source { display: grid; gap: var(--space-2); }
 
-.source.survivor { background: color-mix(in srgb, var(--accent) 10%, var(--column-header)); }
+.source.survivor { background: color-mix(in srgb, var(--accent) 10%, var(--surface-secondary)); }
 
 .shead { display: flex; gap: var(--space-2); align-items: center; justify-content: space-between; }
 
@@ -50,7 +50,7 @@
 .clickable { cursor: pointer; width: 100%; height: auto; font: inherit; font-size: var(--text-caption);
              border-radius: 0; }
 
-.clickable:hover:not(:disabled) { background: var(--row-hover); }
+.clickable:hover:not(:disabled) { background: var(--surface-navigation-hover); }
 
 .chosen {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
@@ -71,7 +71,7 @@
 
 .result { border-right: 0; }
 
-.corner { background: var(--column-header); }
+.corner { background: var(--surface-secondary); }
 
 .h2 { margin: var(--space-7) 0 var(--space-2); font-size: var(--text-control);
       color: var(--text-heading); }

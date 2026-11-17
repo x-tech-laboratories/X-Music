@@ -13,8 +13,8 @@
   gap: var(--space-4);
   height: var(--row-height);
   padding: 0 var(--space-4);
-  background: var(--column-header);
-  border-bottom: var(--border-width) solid var(--column-separator);
+  background: var(--surface-secondary);
+  border-bottom: var(--border-width) solid var(--border-default);
 }
 
 .count { font-size: var(--text-caption); color: var(--text-tertiary); }
@@ -38,7 +38,7 @@
   cursor: pointer;
 }
 
-.row:hover:not(:disabled) { background: var(--row-hover); }
+.row:hover:not(:disabled) { background: var(--surface-navigation-hover); }
 
 .row.sel { background: var(--row-selected); color: var(--text-heading); }
 

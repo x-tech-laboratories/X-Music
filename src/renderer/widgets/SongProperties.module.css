@@ -90,4 +90,4 @@
   border-radius: var(--radius-small);
 }
 
-.history .entry:hover { background: var(--row-hover); }
+.history .entry:hover { background: var(--surface-navigation-hover); }
