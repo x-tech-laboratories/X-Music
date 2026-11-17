@@ -10,9 +10,10 @@
   },
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "npm run typecheck && electron-vite build",
-    "start": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "build": "npm run build:desktop",
+    "build:desktop": "tsc -b && electron-vite build",
+    "start:desktop": "electron-vite preview",
+    "typecheck": "tsc -b",
     "postinstall": "electron-rebuild -f -w better-sqlite3 || echo 'electron-rebuild skipped; run npm run rebuild:electron before npm run dev'",
     "test": "vitest run",
     "test:watch": "vitest",
