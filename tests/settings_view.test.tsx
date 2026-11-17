@@ -5,9 +5,9 @@ import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Dialogs } from '@x-tech-laboratories/x-libs/web/react/dialog'
-import { SettingsView } from '../src/web/views/SettingsView'
-import { library } from '../src/web/stores/library'
-import { install_bridge, type Call } from './bridge'
+import { SettingsView } from '../src/web/views/SettingsView.tsx'
+import { library } from '../src/web/stores/library.ts'
+import { install_bridge, type Call } from './bridge.ts'
 
 const info = { version: '0.1.2', electron: '43.0.0', chrome: '140.0', node: '24.0.0', platform: 'linux' }
 

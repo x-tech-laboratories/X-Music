@@ -1,7 +1,7 @@
 // Import: bringing a gmusicbrowser library in.
 
 import { PageHeading } from '@x-tech-laboratories/x-libs/web/react/layout'
-import { GmbImport } from '../widgets/GmbImport'
+import { GmbImport } from '../widgets/GmbImport.tsx'
 
 export function ImportView() {
   return (

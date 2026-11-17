@@ -2,8 +2,8 @@ import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 
 import { compileFilter, compileGroupBy } from '@shared/query/compile'
 import { and, or, not, leaf } from '@shared/filter'
-import { makeCorpus, FIXED_NOW, type Corpus } from './corpus'
-import { freshDb, loadCorpus, runQuery, type TestDb } from './sqlite'
+import { makeCorpus, FIXED_NOW, type Corpus } from './corpus.ts'
+import { freshDb, loadCorpus, runQuery, type TestDb } from './sqlite.ts'
 
 describe('filter compiler', () => {
   let db: TestDb

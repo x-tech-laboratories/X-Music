@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { resolveArtwork } from '@main/library/artwork'
-import { hasLiveLibrary, openLiveCopy } from './live'
+import { hasLiveLibrary, openLiveCopy } from './live.ts'
 
 describe.runIf(hasLiveLibrary())('artwork against the real library', () => {
   it('finds covers for real tracks', async () => {

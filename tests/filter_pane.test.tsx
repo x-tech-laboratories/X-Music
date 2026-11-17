@@ -5,9 +5,9 @@ import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { GroupRow } from '@shared/ipc'
-import { browse } from '../src/web/stores/library'
-import { FilterPane } from '../src/web/widgets/FilterPane'
-import { install_bridge } from './bridge'
+import { browse } from '../src/web/stores/library.ts'
+import { FilterPane } from '../src/web/widgets/FilterPane.tsx'
+import { install_bridge } from './bridge.ts'
 
 // ============================================================================
 // Setup

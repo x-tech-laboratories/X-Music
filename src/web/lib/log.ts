@@ -2,7 +2,7 @@
 // stream, in order, with one configuration; a renderer-only console is invisible from a terminal.
 
 import { create_logger, parse_level_spec, type Level, type Logger } from '@x-tech-laboratories/x-libs/log'
-import { page_ipc } from './ipc'
+import { page_ipc } from './ipc.ts'
 
 // The renderer cannot read the environment, so the main process states the level at start-up.
 let spec = parse_level_spec(undefined)

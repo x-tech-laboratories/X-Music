@@ -3,7 +3,7 @@
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { new_id } from '@shared/library/database'
-import { addTrack, freshDb, type TestDb } from './sqlite'
+import { addTrack, freshDb, type TestDb } from './sqlite.ts'
 
 let db: TestDb
 

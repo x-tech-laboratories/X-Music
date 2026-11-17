@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
-import { legacyLibrary } from './legacy'
+import { legacyLibrary } from './legacy.ts'
 
 const script = join(process.cwd(), 'scripts/dry_run_upgrade.ts')
 const digest = (path: string): string => createHash('sha256').update(readFileSync(path)).digest('hex')

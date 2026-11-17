@@ -7,7 +7,7 @@ import { new_id } from '@shared/library/database'
 import { open_library } from '@shared/library/store'
 import { regexp_matches } from '@shared/query/compile'
 import type { SqlValue } from '@x-tech-laboratories/x-libs/sql'
-import type { Corpus } from './corpus'
+import type { Corpus } from './corpus.ts'
 
 export type TestDb = InstanceType<typeof DatabaseSync>
 

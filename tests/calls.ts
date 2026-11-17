@@ -1,6 +1,6 @@
 // The stand-in bridge with every call recorded and answers that can read the call's arguments.
 
-import { install_bridge, type Call } from './bridge'
+import { install_bridge, type Call } from './bridge.ts'
 
 export type { Call }
 

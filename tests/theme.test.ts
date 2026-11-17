@@ -2,7 +2,7 @@
 // The theme choice lives in X-Music's prefs under the key it has always used.
 
 import { beforeEach, describe, expect, it } from 'vitest'
-import { theme } from '../src/web/lib/theme'
+import { theme } from '../src/web/lib/theme.ts'
 
 beforeEach(() => localStorage.clear())
 

@@ -4,10 +4,10 @@
 import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { App } from '../src/web/App'
-import { view_of } from '../src/web/views/Navigation'
-import { library } from '../src/web/stores/library'
-import { emit_event, install_bridge } from './bridge'
+import { App } from '../src/web/App.tsx'
+import { view_of } from '../src/web/views/Navigation.tsx'
+import { library } from '../src/web/stores/library.ts'
+import { emit_event, install_bridge } from './bridge.ts'
 
 // ============================================================================
 // Setup

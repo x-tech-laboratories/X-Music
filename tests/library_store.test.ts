@@ -13,7 +13,7 @@ import { createUpserter } from '@shared/library/identity'
 import {
   add_root, enabled_root_paths, library_stats, list_roots, mark_roots_scanned, remove_root
 } from '@shared/library/store'
-import { freshDb, type TestDb } from './sqlite'
+import { freshDb, type TestDb } from './sqlite.ts'
 
 let db: TestDb
 

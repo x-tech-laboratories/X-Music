@@ -7,8 +7,8 @@ import { Empty, use_resource } from '@x-tech-laboratories/x-libs/web/react/state
 import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
-import { player } from '../stores/player'
-import { library, type TrackId, type TrackName } from '../stores/library'
+import { player } from '../stores/player.ts'
+import { library, type TrackId, type TrackName } from '../stores/library.ts'
 import s from './TabbedLists.module.css'
 
 const tabs = [

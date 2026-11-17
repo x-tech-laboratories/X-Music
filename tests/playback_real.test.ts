@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { existsSync } from 'node:fs'
-import { hasLiveLibrary, openLiveCopy } from './live'
+import { hasLiveLibrary, openLiveCopy } from './live.ts'
 
 import { MpvEngine, findMpv } from '@main/play/mpv'
 import { Player } from '@main/play/player'

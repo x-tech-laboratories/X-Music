@@ -1,7 +1,7 @@
 // The filter stack, framework-free: plain TypeScript with no reactivity primitives, so a second front
 // end can reuse it unchanged. Selection, sorting and virtualization come from X-Libs.
 
-import { and, isGroup, type FilterNode } from './filter'
+import { and, isGroup, type FilterNode } from './filter.ts'
 
 export interface FilterChip {
   id: string

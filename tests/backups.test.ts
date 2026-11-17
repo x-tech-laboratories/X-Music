@@ -9,8 +9,8 @@ import { join } from 'node:path'
 import { take_staged_restore } from '@x-tech-laboratories/x-libs/server/sqlite_backups'
 
 import { libraryBackups, openLibraryBackedUp } from '@main/backups'
-import { legacyLibrary } from './legacy'
-import { bareDb } from './sqlite'
+import { legacyLibrary } from './legacy.ts'
+import { bareDb } from './sqlite.ts'
 
 let folder: string
 let path: string

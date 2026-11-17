@@ -6,9 +6,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Toasts } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import type { PlayerStatus } from '@shared/ipc'
-import { player, player_position, player_status } from '../src/web/stores/player'
-import { PlayerBlock } from '../src/web/widgets/PlayerBlock'
-import { record_calls } from './calls'
+import { player, player_position, player_status } from '../src/web/stores/player.ts'
+import { PlayerBlock } from '../src/web/widgets/PlayerBlock.tsx'
+import { record_calls } from './calls.ts'
 
 const idle: PlayerStatus = {
   state: 'paused', track: null, media: null, positionMs: 0, durationMs: 200_000, volume: 80,

@@ -5,8 +5,8 @@ import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { GmbPreview, ImportReport } from '@shared/ipc'
-import { ImportView } from '../src/web/views/ImportView'
-import { install_bridge, type Call } from './bridge'
+import { ImportView } from '../src/web/views/ImportView.tsx'
+import { install_bridge, type Call } from './bridge.ts'
 
 // ============================================================================
 // Setup

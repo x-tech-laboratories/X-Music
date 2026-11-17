@@ -8,7 +8,7 @@ import { homedir } from 'node:os'
 
 import { parseGmbrc, defaultGmbrcPath } from '@shared/import/gmbrc'
 import { importGmbrc } from '@shared/import/gmb_import'
-import { freshDb } from './sqlite'
+import { freshDb } from './sqlite.ts'
 
 const HEADER = [
   'added', 'album', 'album_artist_raw', 'artist', 'bitrate', 'channel', 'comment', 'compilation',

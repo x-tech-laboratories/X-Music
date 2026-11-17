@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os'
 
 import { on_path } from '@x-tech-laboratories/x-libs/agent/programs'
 
-import type { EngineListener, EngineState, LoadOptions, PlaybackEngine } from './engine'
+import type { EngineListener, EngineState, LoadOptions, PlaybackEngine } from './engine.ts'
 
 // Finds an mpv that can run: an explicit setting, then X_MUSIC_MPV, then the PATH.
 export async function findMpv(explicit?: string): Promise<string | null> {

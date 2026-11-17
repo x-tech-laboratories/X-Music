@@ -5,10 +5,10 @@ import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { api_method_names, type TrackRow } from '@shared/ipc'
-import { browse, library, results } from '../src/web/stores/library'
-import { player, player_status } from '../src/web/stores/player'
-import { SongList } from '../src/web/widgets/SongList'
-import { install_bridge } from './bridge'
+import { browse, library, results } from '../src/web/stores/library.ts'
+import { player, player_status } from '../src/web/stores/player.ts'
+import { SongList } from '../src/web/widgets/SongList.tsx'
+import { install_bridge } from './bridge.ts'
 
 // ============================================================================
 // Setup

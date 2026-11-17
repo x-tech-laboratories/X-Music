@@ -13,7 +13,7 @@ import type { PlayerMedia, PlayerStatus, PlayerTrack, RepeatMode } from '@shared
 import {
   count_play, count_skip, get_player_track, has_any_file, list_playable_files, set_file_present
 } from '@shared/library/plays'
-import type { LoadOptions, PlaybackEngine } from './engine'
+import type { LoadOptions, PlaybackEngine } from './engine.ts'
 
 export type { PlayerMedia, PlayerStatus, PlayerTrack, RepeatMode }
 

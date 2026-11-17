@@ -9,7 +9,7 @@ import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { open_library } from '@shared/library/store'
-import { bareDb, type TestDb } from './sqlite'
+import { bareDb, type TestDb } from './sqlite.ts'
 
 export const livePath = (): string => join(homedir(), '.config/x-music/library.db')
 

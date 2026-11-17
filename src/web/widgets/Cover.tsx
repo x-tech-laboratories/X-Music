@@ -4,7 +4,7 @@
 import { Cover, cover_source } from '@x-tech-laboratories/x-libs/web/react/media'
 import { Icon, MusicIcon } from '@x-tech-laboratories/x-libs/web/react/icons'
 import { use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
-import { page_ipc } from '../lib/ipc'
+import { page_ipc } from '../lib/ipc.ts'
 import s from './Cover.module.css'
 
 // Fills the width it is given; size is the picture's resolution in pixels.

@@ -6,7 +6,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { albumMatchKey, regroupAlbums } from '@shared/library/albums'
 import { new_id } from '@shared/library/database'
 import { createUpserter, type TrackCandidate } from '@shared/library/identity'
-import { freshDb, type TestDb } from './sqlite'
+import { freshDb, type TestDb } from './sqlite.ts'
 
 let db: TestDb
 let upsert: ReturnType<typeof createUpserter>

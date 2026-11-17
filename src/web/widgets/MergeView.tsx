@@ -18,8 +18,8 @@ import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge'
 import { ratingToStars } from '@shared/fields'
-import { ipc } from '../lib/ipc'
-import { library } from '../stores/library'
+import { ipc } from '../lib/ipc.ts'
+import { library } from '../stores/library.ts'
 
 type TrackId = MergePreview['ids'][number]
 

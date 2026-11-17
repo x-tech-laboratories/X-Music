@@ -5,8 +5,8 @@ import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { FileResult, Root, ScanReport } from '@shared/ipc'
-import { FoldersView } from '../src/web/views/FoldersView'
-import { install_bridge } from './bridge'
+import { FoldersView } from '../src/web/views/FoldersView.tsx'
+import { install_bridge } from './bridge.ts'
 
 // ============================================================================
 // Setup

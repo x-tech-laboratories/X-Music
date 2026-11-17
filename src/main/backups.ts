@@ -12,7 +12,7 @@ import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { clear_library, needs_upgrade, open_library, type UpgradeReport } from '@shared/library/store'
 
-import { log } from './log'
+import { log } from './log.ts'
 
 export interface LibraryBackups {
   methods: BackupMethods

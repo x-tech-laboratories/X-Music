@@ -8,8 +8,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { Dialogs } from '@x-tech-laboratories/x-libs/web/react/dialog'
 import { Toasts } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import type { MergeEntry, TrackSnapshot, Version } from '@shared/ipc'
-import { changes_between, HistoryView } from '../src/web/views/HistoryView'
-import { record_calls, type Call } from './calls'
+import { changes_between, HistoryView } from '../src/web/views/HistoryView.tsx'
+import { record_calls, type Call } from './calls.ts'
 
 // ============================================================================
 // Fixtures

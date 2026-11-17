@@ -10,7 +10,7 @@ import { use_store } from '@x-tech-laboratories/x-libs/web/react/store'
 import type { GroupRow } from '@shared/ipc'
 import { field, fieldsWith, ratingToStars } from '@shared/fields'
 import { sanitizePaneField } from '@shared/viewstate'
-import { browse, library, results } from '../stores/library'
+import { browse, library, results } from '../stores/library.ts'
 
 const FALLBACK_ROW_HEIGHT = 28
 

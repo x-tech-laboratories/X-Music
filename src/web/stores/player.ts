@@ -6,7 +6,7 @@ import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge
 import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import type { PlayerStatus, RepeatMode } from '@shared/ipc'
-import { ipc } from '../lib/ipc'
+import { ipc } from '../lib/ipc.ts'
 
 // ============================================================================
 // State

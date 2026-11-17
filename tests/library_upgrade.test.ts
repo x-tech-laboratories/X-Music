@@ -9,8 +9,8 @@ import { unmerge } from '@shared/library/merge'
 import { migrations } from '@shared/library/migrations/index'
 import { needs_upgrade, open_library } from '@shared/library/store'
 import { createUpserter } from '@shared/library/identity'
-import { counts, HASH, legacyLibrary, legacySchema, OLD_MERGE_SNAPSHOT } from './legacy'
-import { freshDb, type TestDb } from './sqlite'
+import { counts, HASH, legacyLibrary, legacySchema, OLD_MERGE_SNAPSHOT } from './legacy.ts'
+import { freshDb, type TestDb } from './sqlite.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 

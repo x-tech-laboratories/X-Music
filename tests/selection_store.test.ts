@@ -2,7 +2,7 @@
 // passing while the UI misbehaves is exactly the gap worth closing.
 
 import { describe, expect, it, beforeEach } from 'vitest'
-import { library, results } from '../src/web/stores/library'
+import { library, results } from '../src/web/stores/library.ts'
 import type { TrackRow } from '@shared/ipc'
 
 const rows = (n: number): TrackRow[] =>

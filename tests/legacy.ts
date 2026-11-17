@@ -4,7 +4,7 @@
 import { migrate } from '@x-tech-laboratories/x-libs/sql'
 
 import { legacy_steps } from '@shared/library/legacy_steps'
-import { bareDb, type TestDb } from './sqlite'
+import { bareDb, type TestDb } from './sqlite.ts'
 
 export const HASH = new Uint8Array([0xde, 0xad, 0xbe, 0xef, 0x01, 0x02])
 

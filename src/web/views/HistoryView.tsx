@@ -15,8 +15,8 @@ import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { MergeEntry, TrackSnapshot, TrackState, Version, VersionKind } from '@shared/ipc'
 import { BUILTIN_FIELDS, ratingToStars } from '@shared/fields'
-import { library } from '../stores/library'
-import { undo_merge } from '../widgets/MergeView'
+import { library } from '../stores/library.ts'
+import { undo_merge } from '../widgets/MergeView.tsx'
 
 type TrackVersion = Version<TrackSnapshot>
 

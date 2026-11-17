@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Toasts } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import type { MergePreview, MergeResult } from '@shared/ipc'
-import { MergeView } from '../src/web/widgets/MergeView'
-import { record_calls } from './calls'
+import { MergeView } from '../src/web/widgets/MergeView.tsx'
+import { record_calls } from './calls.ts'
 
 const preview: MergePreview = {
   ids: ['track-11', 'track-12'],

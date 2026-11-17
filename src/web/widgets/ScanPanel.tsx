@@ -12,9 +12,9 @@ import { format_duration } from '@x-tech-laboratories/x-libs/durations'
 import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { FileOutcome, FileResult, Root, ScanProgress, ScanReport } from '@shared/ipc'
-import { ipc, page_ipc } from '../lib/ipc'
-import { library } from '../stores/library'
-import { view_href } from '../views/Navigation'
+import { ipc, page_ipc } from '../lib/ipc.ts'
+import { library } from '../stores/library.ts'
+import { view_href } from '../views/Navigation.tsx'
 
 // ============================================================================
 // Outcomes

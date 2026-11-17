@@ -5,7 +5,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { list_recent_merges, mergePreview, mergeTracks, unmerge } from '@shared/library/merge'
 import { field } from '@shared/fields'
 import { new_id } from '@shared/library/database'
-import { freshDb, type TestDb } from './sqlite'
+import { freshDb, type TestDb } from './sqlite.ts'
 
 let db: TestDb
 

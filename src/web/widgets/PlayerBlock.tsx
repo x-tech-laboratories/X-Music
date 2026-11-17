@@ -12,8 +12,8 @@ import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { VolumeButton } from '@x-tech-laboratories/x-libs/web/react/volume'
 import type { RepeatMode } from '@shared/ipc'
 import { ratingToStars } from '@shared/fields'
-import { player, player_position, player_status } from '../stores/player'
-import { TrackCover } from './Cover'
+import { player, player_position, player_status } from '../stores/player.ts'
+import { TrackCover } from './Cover.tsx'
 import s from './PlayerBlock.module.css'
 
 // ============================================================================

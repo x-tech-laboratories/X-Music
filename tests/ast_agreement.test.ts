@@ -7,9 +7,9 @@ import fc from 'fast-check'
 
 import { compileFilter } from '@shared/query/compile'
 import { selectIds } from '@shared/query/evaluate'
-import { filterArb } from './arbitraries'
-import { makeCorpus, type Corpus } from './corpus'
-import { freshDb, loadCorpus, runQuery, type TestDb } from './sqlite'
+import { filterArb } from './arbitraries.ts'
+import { makeCorpus, type Corpus } from './corpus.ts'
+import { freshDb, loadCorpus, runQuery, type TestDb } from './sqlite.ts'
 
 describe('filter AST: SQL and native predicate agree', () => {
   let db: TestDb

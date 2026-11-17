@@ -9,12 +9,12 @@ import { take_staged_restore } from '@x-tech-laboratories/x-libs/server/sqlite_b
 import { is_read_only, mcp_instructions, x_music_api } from '@shared/api'
 import { history_channels, x_music_backups_bridge, x_music_bridge, x_music_events, x_music_history_bridge, x_music_mcp_bridge } from '@shared/ipc'
 import { describe_upgrade } from '@shared/library/legacy'
-import { libraryBackups, openLibraryBackedUp } from './backups'
-import { openDatabase, libraryPath } from './db'
-import { registerIpc, type ApiImplementation } from './ipc'
-import { trustedSender } from './sender'
-import { describeLogging, log } from './log'
-import { artCacheDir } from './artcache'
+import { libraryBackups, openLibraryBackedUp } from './backups.ts'
+import { openDatabase, libraryPath } from './db/index.ts'
+import { registerIpc, type ApiImplementation } from './ipc.ts'
+import { trustedSender } from './sender.ts'
+import { describeLogging, log } from './log.ts'
+import { artCacheDir } from './artcache.ts'
 
 const isDev = !app.isPackaged
 

@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { findFolderImage, imageSize, lookupArtwork, resolveArtwork, forgetMisses }
   from '@main/library/artwork'
 import { new_id } from '@shared/library/database'
-import { addTrack, freshDb, type TestDb } from './sqlite'
+import { addTrack, freshDb, type TestDb } from './sqlite.ts'
 
 let dir: string
 let cache: string

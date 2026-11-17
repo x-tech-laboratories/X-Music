@@ -6,8 +6,8 @@
 // nothing with no visible cause, so everything restored is checked against the current catalogue
 // and anything unrecognised is dropped.
 
-import { FIELDS_BY_ID } from './fields'
-import type { SortKey } from './filter'
+import { FIELDS_BY_ID } from './fields.ts'
+import type { SortKey } from './filter.ts'
 
 const known = (fieldId: unknown): fieldId is string =>
   typeof fieldId === 'string' && FIELDS_BY_ID.has(fieldId)

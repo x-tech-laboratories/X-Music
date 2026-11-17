@@ -14,7 +14,7 @@ import type { FileResult, ScanProgress, ScanReport } from '@shared/ipc'
 import { regroupAlbums, splitValues } from '@shared/library/albums'
 import { all_rows, first_row, run } from '@shared/library/database'
 import { createUpserter, type MediaCandidate, type TrackCandidate } from '@shared/library/identity'
-import { hashAudio, needsRehash } from './audio_hash'
+import { hashAudio, needsRehash } from './audio_hash.ts'
 
 export type { FileOutcome, FileResult, ScanProgress, ScanReport } from '@shared/ipc'
 

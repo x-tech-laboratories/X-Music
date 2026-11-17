@@ -4,8 +4,8 @@
 import { describe, expect, it } from 'vitest'
 import { and, leaf } from '@shared/filter'
 import { group_tracks, query_tracks } from '@shared/library/store'
-import { makeCorpus } from './corpus'
-import { freshDb, loadCorpus } from './sqlite'
+import { makeCorpus } from './corpus.ts'
+import { freshDb, loadCorpus } from './sqlite.ts'
 
 describe('song list row projection', () => {
   it('resolves every displayed column against the real schema', () => {

@@ -4,8 +4,8 @@
 import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, waitFor } from '@testing-library/react'
-import { TrackCover } from '../src/web/widgets/Cover'
-import { record_calls } from './calls'
+import { TrackCover } from '../src/web/widgets/Cover.tsx'
+import { record_calls } from './calls.ts'
 
 afterEach(cleanup)
 

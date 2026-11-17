@@ -15,9 +15,9 @@ import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import { ratingToStars } from '@shared/fields'
 import type { DuplicateGroup, DuplicateMember, DuplicateReason, MergeResult } from '@shared/ipc'
-import { ipc } from '../lib/ipc'
-import { library } from '../stores/library'
-import { MergeView } from './MergeView'
+import { ipc } from '../lib/ipc.ts'
+import { library } from '../stores/library.ts'
+import { MergeView } from './MergeView.tsx'
 
 type TrackId = DuplicateMember['trackId']
 

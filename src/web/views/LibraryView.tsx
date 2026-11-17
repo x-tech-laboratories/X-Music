@@ -4,10 +4,10 @@ import { Split } from '@x-tech-laboratories/x-libs/web/react/split'
 import { PageHeading } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { Empty, Failure, Skeleton } from '@x-tech-laboratories/x-libs/web/react/states'
 import { use_store } from '@x-tech-laboratories/x-libs/web/react/store'
-import { library, results } from '../stores/library'
-import { FilterPane } from '../widgets/FilterPane'
-import { SongList } from '../widgets/SongList'
-import { view_href } from './Navigation'
+import { library, results } from '../stores/library.ts'
+import { FilterPane } from '../widgets/FilterPane.tsx'
+import { SongList } from '../widgets/SongList.tsx'
+import { view_href } from './Navigation.tsx'
 
 // ============================================================================
 // Panes

@@ -5,10 +5,10 @@ import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { PlayerStatus, TrackDetails } from '@shared/ipc'
-import { results } from '../src/web/stores/library'
-import { player_status } from '../src/web/stores/player'
-import { TabbedLists } from '../src/web/widgets/TabbedLists'
-import { install_bridge } from './bridge'
+import { results } from '../src/web/stores/library.ts'
+import { player_status } from '../src/web/stores/player.ts'
+import { TabbedLists } from '../src/web/widgets/TabbedLists.tsx'
+import { install_bridge } from './bridge.ts'
 
 // ============================================================================
 // Setup

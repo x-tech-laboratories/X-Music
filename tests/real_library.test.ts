@@ -2,7 +2,7 @@
 // finder and merge preview behave on real data rather than only on fixtures.
 
 import { describe, expect, it } from 'vitest'
-import { hasLiveLibrary, openLiveCopy } from './live'
+import { hasLiveLibrary, openLiveCopy } from './live.ts'
 
 import { findDuplicates } from '@shared/library/duplicates'
 import { mergePreview } from '@shared/library/merge'

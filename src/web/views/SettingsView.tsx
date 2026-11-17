@@ -14,9 +14,9 @@ import { format_duration } from '@x-tech-laboratories/x-libs/durations'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { Theme } from '@x-tech-laboratories/x-libs/web/theme'
 import type { AppInfo } from '@shared/ipc'
-import { ipc } from '../lib/ipc'
-import { theme } from '../lib/theme'
-import { library } from '../stores/library'
+import { ipc } from '../lib/ipc.ts'
+import { theme } from '../lib/theme.ts'
+import { library } from '../stores/library.ts'
 
 export type Density = 'compact' | 'normal' | 'comfortable'
 

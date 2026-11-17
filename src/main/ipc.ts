@@ -21,14 +21,14 @@ import {
   add_root, enabled_root_paths, group_tracks, library_stats, list_roots, mark_roots_scanned,
   query_tracks, remove_root
 } from '@shared/library/store'
-import { artCacheDir, resizeImage } from './artcache'
-import { clearLibraryBackedUp, type LibraryBackups } from './backups'
-import { resolveArtwork, thumbnail } from './library/artwork'
-import { scanRoots } from './library/scan'
-import { logFromRenderer, logger } from './log'
-import { Player } from './play/player'
-import { MpvEngine, findMpv } from './play/mpv'
-import { NullEngine } from './play/engine'
+import { artCacheDir, resizeImage } from './artcache.ts'
+import { clearLibraryBackedUp, type LibraryBackups } from './backups.ts'
+import { resolveArtwork, thumbnail } from './library/artwork.ts'
+import { scanRoots } from './library/scan.ts'
+import { logFromRenderer, logger } from './log.ts'
+import { Player } from './play/player.ts'
+import { MpvEngine, findMpv } from './play/mpv.ts'
+import { NullEngine } from './play/engine.ts'
 
 // Every call other programs may make too, answered on the library and the player.
 export type ApiImplementation = Implementation<XMusicApi> & Implementation<XMusicHistoryApi>

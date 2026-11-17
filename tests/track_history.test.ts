@@ -12,7 +12,7 @@ import { createUpserter } from '@shared/library/identity'
 import { mergeTracks, unmerge } from '@shared/library/merge'
 import { count_play } from '@shared/library/plays'
 import { set_extra, write_set } from '@shared/library/values'
-import { freshDb, type TestDb } from './sqlite'
+import { freshDb, type TestDb } from './sqlite.ts'
 
 let db: TestDb
 

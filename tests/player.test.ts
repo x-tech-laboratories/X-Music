@@ -8,7 +8,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { new_id } from '@shared/library/database'
-import { addTrack, freshDb, type TestDb } from './sqlite'
+import { addTrack, freshDb, type TestDb } from './sqlite.ts'
 
 let db: TestDb
 let engine: NullEngine

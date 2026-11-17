@@ -12,7 +12,7 @@ import { FilterStack } from '@shared/view'
 import type { GroupRow, LibraryStats, TrackRow } from '@shared/ipc'
 import { field } from '@shared/fields'
 import { sanitizePaneValues, sanitizeSortKeys } from '@shared/viewstate'
-import { ipc } from '../lib/ipc'
+import { ipc } from '../lib/ipc.ts'
 
 // A track's id as the main process hands it over, never read as a number.
 export type TrackId = TrackRow['id']

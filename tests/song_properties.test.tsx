@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { Dialogs } from '@x-tech-laboratories/x-libs/web/react/dialog'
 import type { DetailMedia, TrackDetails } from '@shared/ipc'
-import { SongProperties } from '../src/web/widgets/SongProperties'
-import { record_calls } from './calls'
+import { SongProperties } from '../src/web/widgets/SongProperties.tsx'
+import { record_calls } from './calls.ts'
 
 const media: DetailMedia = {
   id: 'file-1', kind: 'file', uri: '/music/Example Band/First Light/01 Morning Tone.flac', provider: null, present: true, preferred: true,
