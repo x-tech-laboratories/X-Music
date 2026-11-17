@@ -6,8 +6,8 @@ import { test } from 'vitest'
 import { compileFilter, compileGroupBy } from '@shared/query/compile'
 import { selectIds } from '@shared/query/evaluate'
 import { and, or, leaf, not } from '@shared/filter'
-import { makeCorpus, FIXED_NOW } from '../test/helpers/corpus'
-import { freshDb, loadCorpus } from '../test/helpers/sqlite'
+import { makeCorpus, FIXED_NOW } from '../tests/corpus'
+import { freshDb, loadCorpus } from '../tests/sqlite'
 
 const SIZE = Number(process.env.X_MUSIC_BENCH_SIZE ?? 50_000)
 

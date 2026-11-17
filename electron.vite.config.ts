@@ -16,11 +16,11 @@ export default defineConfig({
     build: { rollupOptions: { input: { index: resolve('src/preload/index.ts') } } }
   },
   renderer: {
-    root: resolve('src/renderer'),
+    root: resolve('src/web'),
     plugins: [react()],
     resolve: {
-      alias: { '@shared': shared, '@renderer': resolve('src/renderer') }
+      alias: { '@shared': shared, '@web': resolve('src/web') }
     },
-    build: { rollupOptions: { input: { index: resolve('src/renderer/index.html') } } }
+    build: { rollupOptions: { input: { index: resolve('src/web/index.html') } } }
   }
 })

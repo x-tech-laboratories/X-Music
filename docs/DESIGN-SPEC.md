@@ -129,7 +129,7 @@ module, the boundary is typechecked end to end with no codegen step.
 arguments as they cross from the page's world into the preload's isolated world — a clone that
 happens *before* any preload code runs. So an argument that structured clone rejects, such as a
 Proxy, fails with "An object could not be cloned" no matter what the preload does; the flattening
-has to happen in the renderer. Every call therefore goes through `src/renderer/lib/ipc.ts`
+has to happen in the renderer. Every call therefore goes through `src/web/lib/ipc.ts`
 rather than touching `window.xMusic` directly.
 
 The symptom is easy to misread: the handler never runs, so nothing appears in the main process log,
@@ -267,7 +267,7 @@ is generic over it:
 | Format strings | `{any_field}` resolves through the same descriptor lookup (§5.5) |
 | Tag round-trip | A user field with a `tags` mapping writes to files; without one it lives only in the database |
 
-`test/unit/fields.test.ts` already asserts the invariants this depends on — unique ids, a stable
+`tests/fields.test.ts` already asserts the invariants this depends on — unique ids, a stable
 numeric id for every multi-value and extra field, and an expression for every computed field.
 
 **What is still missing to make the promise true end to end:**
@@ -407,7 +407,7 @@ Two policies fall out of the sources being different:
 Play history needed a uniqueness constraint (`UNIQUE(track_id, at, kind)`), without which
 re-importing appended a second copy of every play event.
 
-`test/unit/idempotency.test.ts` and `test/unit/scan.test.ts` pin all of this. The first version of
+`tests/idempotency.test.ts` and `tests/scan.test.ts` pin all of this. The first version of
 the importer failed these: it created 6 tracks from 3 on a second run, 3 of them orphans with no
 media at all, because the track INSERT had no conflict clause while the media INSERT did.
 
@@ -841,7 +841,7 @@ in a component stylesheet.
 
 Themes ship as a directory: `theme.json` (tokens) + optional `theme.css` (overrides) + optional
 assets. Halon's light and dark come from the package, and the player layer above is derived from
-them in `src/renderer/app.css`.
+them in `src/web/app.css`.
 
 Metric tokens (spacing scale, radii, control heights, density modes) follow Halon's
 `THEME-DESIGN-GUIDE.md` §4 rather than being reinvented — including its three density levels, which
@@ -1481,7 +1481,7 @@ with no in-memory index at all** (§3.5.3).
 | Install size | — | ~150 MB | — |
 
 Measured figures are means from `bench/query.bench.ts` on the development machine, over the
-synthetic corpus in `test/helpers/corpus.ts`. Every query path has roughly 3× headroom against its
+synthetic corpus in `tests/corpus.ts`. Every query path has roughly 3× headroom against its
 budget.
 
 ### 12.1 Above 50k: degradation, not a wall
@@ -1501,7 +1501,7 @@ Vitest, with `fast-check` for property tests. Tests reach SQLite through Node's 
 
 ### 13.1 The load-bearing test
 
-`test/property/ast-agreement.test.ts`: for any generated filter over any generated library, the SQL
+`tests/ast-agreement.test.ts`: for any generated filter over any generated library, the SQL
 compiler and the native predicate must return **identical id sets**. Two implementations of one
 semantics are only safe because this test holds them together — a live smart playlist that
 disagreed with the list it was derived from would be a maddening bug to chase (§4.2).
@@ -1552,7 +1552,7 @@ x-music/
 │   │   ├── ipc.ts            # channel handlers, typed by the shared contract
 │   │   └── index.ts          # app lifecycle and window
 │   ├── preload/              # contextBridge, exposing only declared channels
-│   ├── renderer/             # UI — deliberately thin (§2.4)
+│   ├── web/                  # UI — deliberately thin (§2.4)
 │   │   ├── widgets/          # Sidebar, SongList, FilterPane, Stars, PlayerBar
 │   │   ├── stores/           # thin reactive wrappers over shared/
 │   │   ├── layout/           # (planned) layout engine and inspector
@@ -1567,10 +1567,7 @@ x-music/
 │   │   ├── import/           # gmusicbrowser's gmbrc
 │   │   └── ipc.ts            # the IPC contract
 │   └── workers/              # (planned) scan, hash, replaygain
-├── test/
-│   ├── helpers/              # corpus generator, node:sqlite harness, fast-check arbitraries
-│   ├── property/             # the AST-agreement test
-│   └── unit/
+├── tests/                    # one *.test.ts per behaviour, and the helpers they share
 ├── bench/                    # performance budget benchmarks
 ├── layouts/  fields/  docs/  cli/
 ├── flake.nix                 # pins node, electron and mpv
@@ -1737,7 +1734,7 @@ it later would be invasive across five subsystems at once.
 
 Under the track/media model, a CUE range is simply a `media` row that addresses part of a container:
 `uri` plus `subtrack_index`, `start_ms`, `end_ms`, with `UNIQUE(uri, subtrack_index)`. Whole-file
-media leave those at their defaults, so the common case pays nothing. `test/unit/entity-model.test.ts`
+media leave those at their defaults, so the common case pays nothing. `tests/entity-model.test.ts`
 pins the behaviour today, before any CUE parser exists.
 
 What remains is ordinary feature work, scheduled rather than architectural: a `.cue` parser, reading

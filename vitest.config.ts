@@ -9,7 +9,7 @@ export default defineConfig({
     }
   },
   test: {
-    include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
+    include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     benchmark: { include: ['bench/**/*.bench.ts'] },
     coverage: {
       provider: 'v8',
