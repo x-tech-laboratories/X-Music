@@ -25,7 +25,7 @@ sleep 8
 grep -i "devtools listening" $SP/launch.out
 ```
 
-`scripts/run.sh` pins read-only, finds mpv and Electron, and builds first if `out/` is missing.
+`scripts/run.sh` finds mpv and Electron, and builds first if `out/` is missing.
 Point it at a scratch database with `X_MUSIC_DB=/tmp/x-music.db` rather than touching
 `~/.config/x-music/library.db`.
 

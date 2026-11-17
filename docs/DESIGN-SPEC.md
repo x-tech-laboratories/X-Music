@@ -795,8 +795,7 @@ default's type. Storage being unavailable entirely is handled the same way. X-Li
 
 These are deliberately *not* in the library database. They are per-machine view state, not library
 data, and putting them in SQLite would mean they travelled with a library export where they do not
-belong. Settings that describe the library — watched roots, read-only mode — do live in the
-database.
+belong. Settings that describe the library, such as its watched roots, do live in the database.
 
 ### 5.4 Theming
 
@@ -952,24 +951,6 @@ transform-based (`translate3d` on a spacer), not `position: absolute` per row. S
 
 ## 7. Tag management
 
-### 7.0 Read-only mode
-
-**X-Music starts read-only and stays that way until told otherwise.** A music library is often
-irreplaceable, and the failure mode of a tag writer with a bug is silent, widespread and permanent.
-
-Enforcement is a chokepoint, not a convention: every filesystem-mutating operation passes through
-`assertWritable(operation, path)` in `src/main/safety.ts`, which throws unless the path lies inside
-X-Music's own data directory. Tag writing, file organizing, artwork embedding and deletion are all
-downstream of it, so a new call site cannot forget to check.
-
-- Default: read-only. A missing or malformed `X_MUSIC_ALLOW_WRITES` keeps protection on.
-- `X_MUSIC_FORCE_READ_ONLY=1` pins the mode so the UI cannot disable it at all.
-- The state is surfaced in the menu bar, not buried in preferences.
-- `scripts/run.sh` pins read-only unless the caller explicitly opts out.
-
-Covered by `test/unit/safety.test.ts`, including that a sibling directory such as
-`~/.config/x-music-backup` is not mistaken for X-Music's own data directory.
-
 ### 7.1 Reading and writing
 
 `lofty-rs` is the tag layer: ID3v1/v2.2–2.4, Vorbis comments (FLAC/Ogg/Opus), MP4 `ilst`, APE,
@@ -1007,12 +988,9 @@ The user tags in Picard, saves, and returns; X-Music rescans just those paths an
 changes. The path to the Picard binary is a setting, discovered from `PATH` by default. This is
 close to free and covers most real use.
 
-**2. Notice what Picard did (the part that needs care).** Picard *writes* files, which collides with
-two of X-Music's invariants:
+**2. Notice what Picard did (the part that needs care).** Picard *writes* files, which X-Music has to
+account for:
 
-- **Read-only mode (§7.0) does not protect against this** — the writes come from another process.
-  That is fine and intended, but the UI must say so plainly: handing off to Picard means files will
-  be modified by a tool that is not bound by X-Music's read-only setting.
 - **`audio_hash` is unaffected**, because it excludes metadata regions (§3.5). This is where that
   decision pays off: a Picard retag changes `mtime` and `filesize` but not the audio, so the rescan
   matches the existing media by hash, and **ratings and play history survive tagging**. A
@@ -1040,7 +1018,7 @@ gains its strongest signal (§3.5.0). The scanner already reads the tag; nothing
 2. A "Tag with Picard" action on a track selection and on an album.
 3. A targeted rescan — `scanRoots` already takes a root list, so scanning specific paths is a small
    generalization.
-4. A clear warning in the hand-off dialog that Picard writes to files regardless of read-only mode.
+4. A clear warning in the hand-off dialog that Picard writes to files.
 
 ### 7.2 Mass tagging
 
@@ -1208,8 +1186,8 @@ the scanner writes to the music tree.
 What works today:
 
 - Multiple roots, added through Settings → Folders, with a progress-reporting scan.
-- Tag reading via `music-metadata`, which is **read-only by construction** — a good fit for the
-  read-only posture in §7.0, and it defers the tag-writer decision (Appendix A.3) entirely.
+- Tag reading via `music-metadata`, which is **read-only by construction**, so it defers the
+  tag-writer decision (Appendix A.3) entirely.
 - **Unchanged files take a cheap path**: a matching `uri` + `mtime` + `filesize` skips parsing and
   hashing altogether, which is what makes a rescan fast.
 - **Move detection** via `audio_hash`: a renamed file keeps its track, rating and play history.

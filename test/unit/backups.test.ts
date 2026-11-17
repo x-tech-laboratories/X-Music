@@ -1,5 +1,5 @@
 // The library database is what years of ratings, play counts and merges live in, so its backups
-// are checked end to end: taken beside it, kept inside X-Music's own data, and restored on restart.
+// are checked end to end: taken beside it and restored on restart.
 
 import { describe, expect, it, beforeEach } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
@@ -9,7 +9,6 @@ import { join } from 'node:path'
 import { take_staged_restore } from '@x-tech-laboratories/x-libs/server/sqlite_backups'
 
 import { libraryBackups } from '@main/backups'
-import { ReadOnlyError, initSafety, setReadOnly } from '@main/safety'
 
 let folder: string
 let path: string
@@ -17,8 +16,6 @@ let path: string
 beforeEach(() => {
   folder = mkdtempSync(join(tmpdir(), 'x-music-backups-'))
   path = join(folder, 'library.db')
-  initSafety([folder])
-  setReadOnly(true)
 })
 
 function library(): DatabaseSync {
@@ -28,7 +25,7 @@ function library(): DatabaseSync {
 }
 
 describe('library backups', () => {
-  it('takes a backup into backups beside the database, even in read-only mode', async () => {
+  it('takes a backup into backups beside the database', async () => {
     const db = library()
     const backups = libraryBackups(db as never, path, () => {})
 
@@ -55,16 +52,6 @@ describe('library backups', () => {
     expect(take_staged_restore(path)).toBe(true)
     db = new DatabaseSync(path)
     expect(db.prepare('SELECT title FROM tracks').get()).toEqual({ title: 'Blue in Green' })
-    db.close()
-  })
-
-  it('refuses to write backups outside X-Music\'s own data in read-only mode', async () => {
-    initSafety([join(folder, 'elsewhere')])
-    const db = library()
-    const backups = libraryBackups(db as never, path, () => {})
-
-    await expect(backups.methods.create_backup()).rejects.toThrow(ReadOnlyError)
-    backups.stop()
     db.close()
   })
 })

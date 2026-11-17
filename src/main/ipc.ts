@@ -10,7 +10,6 @@ import {
 } from '@shared/ipc'
 import { compileFilter, compileGroupBy } from './query/compile'
 import { stats, type DB } from './db'
-import { safetyStatus } from './safety'
 import { defaultGmbrcPath, parseGmbrc } from './import/gmbrc'
 import { importGmbrc } from './import/gmb-import'
 import { scanRoots } from './library/scan'
@@ -95,8 +94,6 @@ export function registerIpc(db: DB): { stopPlayer: () => Promise<void> } {
     'fields:list': () => [...BUILTIN_FIELDS],
 
     'theme:list': () => ['halon-light', 'halon-dark'],
-
-    'app:safety': () => safetyStatus(),
 
     'import:gmbDefaultPath': () => defaultGmbrcPath(homedir()),
 

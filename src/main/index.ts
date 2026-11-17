@@ -8,7 +8,6 @@ import { x_music_backups_bridge } from '@shared/ipc'
 import { libraryBackups } from './backups'
 import { openLibrary, libraryPath } from './db'
 import { registerIpc } from './ipc'
-import { assertWritable, initSafety, safetyStatus } from './safety'
 import { describeLogging, log } from './log'
 import { artCacheDir } from './artcache'
 
@@ -25,8 +24,6 @@ function createWindow(): BrowserWindow {
     default_size: { width: 1400, height: 900 },
     min_size: { width: 900, height: 560 },
     state_file: join(app.getPath('userData'), 'window.json'),
-    // The window's size and place are X-Music's own data, so the write guard lets them through.
-    before_write: (path) => assertWritable('window-state', path),
     native_theme: nativeTheme,
     shell,
     screen,
@@ -50,9 +47,6 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 
 app.whenReady().then(() => {
-  // X-Music's own directories are the only paths it may ever write to (see safety.ts).
-  initSafety([app.getPath('userData'), join(app.getPath('temp'), 'x-music')])
-
   log.info('starting', { logging: describeLogging(), version: app.getVersion() })
 
   // The url carries the cache path; only files inside the cache directory are served.
@@ -71,8 +65,6 @@ app.whenReady().then(() => {
   // A backup restored in Settings waits beside the database until now, when nothing has it open.
   if (take_staged_restore(libraryPath())) log.info('restored a backup', { path: libraryPath() })
   const db = openLibrary()
-  const safety = safetyStatus()
-  log.info(safety.reason)
   log.info('library opened', { path: libraryPath() })
   const { stopPlayer } = registerIpc(db)
   // A restore staged in Settings is taken in by starting again, once its reply has gone back to the page.

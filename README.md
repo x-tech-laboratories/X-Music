@@ -30,7 +30,7 @@ implemented yet. See the roadmap in DESIGN-SPEC §15.
 | Renderer shell (React on the X-Libs widgets and Halon) | working |
 | Playback (mpv, queue, repeat/shuffle, play counting) | working |
 | MPRIS, media keys, crossfade | not started |
-| Tag writing | not started (read-only by default) |
+| Tag writing | not started |
 | Filesystem watching | not started |
 | Merge tracks, with per-field resolution and undo | working |
 | Duplicate detection (hash, MBID, tags, fuzzy) | working |
@@ -74,7 +74,7 @@ otherwise makes Electron run as bare node and die on the ESM entry point.
 | `npm run bench` | Performance budget benchmarks |
 | `npm run typecheck` | `tsc` for main/preload and for the renderer |
 | `npm run lint` | `oxlint` |
-| `npm run app` | Build if needed and launch, read-only |
+| `npm run app` | Build if needed and launch |
 | `npm run rebuild:electron` | Rebuild `better-sqlite3` against Electron's ABI |
 
 Benchmarks default to 50k synthetic tracks (the §12 target); `X_MUSIC_BENCH_SIZE=20000 npm run bench`
@@ -101,12 +101,6 @@ and unhandled rejections are reported automatically.
 
 A malformed `X_MUSIC_LOG` falls back to the default rather than silencing logging.
 
-### Read-only by default
-
-X-Music starts read-only and `npm run app` pins it with `X_MUSIC_FORCE_READ_ONLY=1`. Every
-filesystem-mutating operation goes through `assertWritable()` in `src/main/safety.ts`, which throws
-unless the path is inside X-Music's own data directory. Point it at a real music library safely.
-
 ### Getting your library in
 
 Settings → Import reads a gmusicbrowser `gmbrc`, defaulting to the standard location for your
@@ -126,8 +120,7 @@ The library database, `library.db` in X-Music's profile folder (`~/.config/x-mus
 backed up once a day into `backups` beside it, keeping the last 14. Settings → Backups backs up by
 hand, changes that, and restores a backup: the current database is backed up first, and X-Music
 restarts to take the restored one in. Only the database is backed up; your music files are never
-copied or touched. A database moved elsewhere with `X_MUSIC_DB` is backed up beside it only while
-writes are enabled, since read-only mode keeps X-Music to its own folder.
+copied or touched. A database moved elsewhere with `X_MUSIC_DB` is backed up beside it.
 
 Playlists have no history of their own yet: X-Music does not edit them, they only arrive from a
 gmusicbrowser import, and a merge's changes to them come back with Undo this merge. They gain one when

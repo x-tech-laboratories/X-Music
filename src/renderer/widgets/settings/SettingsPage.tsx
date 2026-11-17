@@ -9,7 +9,7 @@ import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
 import { format_duration } from '@x-tech-laboratories/x-libs/durations'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { Theme } from '@x-tech-laboratories/x-libs/web/theme'
-import type { AppInfo, SafetyStatus } from '@shared/ipc'
+import type { AppInfo } from '@shared/ipc'
 import { ipc } from '../../lib/ipc'
 import { theme } from '../../lib/theme'
 import { library } from '../../stores/library'
@@ -40,14 +40,12 @@ function use_theme(): Theme {
 
 export function SettingsPage({
   info = null,
-  safety = null,
   density = 'normal',
   initialSection = 'library',
   onclose,
   onDensity
 }: {
   info?: AppInfo | null
-  safety?: SafetyStatus | null
   density?: Density
   initialSection?: Section
   onclose: () => void
@@ -84,18 +82,7 @@ export function SettingsPage({
             ? [plural(stats.tracks, 'track'), plural(stats.media, 'file'), plural(stats.albums, 'album'),
                format_duration(stats.totalMs / 1000, { largest_unit: 'days' }),
                ...(stats.missing > 0 ? [`${stats.missing} missing`] : [])].join(' · ')
-            : null],
-          ['File safety', safety ? (
-            <>
-              <strong className={safety.readOnly ? 'tone-good' : undefined}>{safety.readOnly ? 'Read-only' : 'Writes enabled'}</strong>
-              <span className="setting-hint"> {safety.reason} </span>
-              <span className="setting-hint">
-                {safety.pinned
-                  ? <>Pinned by the environment. Unset <code>X_MUSIC_FORCE_READ_ONLY</code> to change it.</>
-                  : 'X-Music cannot write tags yet, so this is a guarantee rather than a preference.'}
-              </span>
-            </>
-          ) : null]
+            : null]
         ]} />
         <SettingRow label="Danger zone" hint="Removes every track, playlist and statistic. Files are untouched.">
           <button className="danger" onClick={clear_library}>Clear library database</button>

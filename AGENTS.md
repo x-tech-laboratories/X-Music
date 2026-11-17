@@ -12,7 +12,6 @@ in `docs/DESIGN-SPEC.md`, and every feature should match it.
 
 ## Rules
 
-- X-Music is read-only by default. Every filesystem write must go through `assertWritable()` in `src/main/safety.ts`.
 - Code in `src/shared/` stays framework-free and DOM-free; it is imported by both main and renderer.
 - Tests reach SQLite through `node:sqlite`, never `better-sqlite3`.
 - Keep the SQL compiler and the native filter predicate in agreement; `test/property/ast-agreement.test.ts` must pass.

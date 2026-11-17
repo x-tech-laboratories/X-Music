@@ -43,12 +43,6 @@ export interface QueryRequest {
   offset?: number
 }
 
-export interface SafetyStatus {
-  readOnly: boolean
-  pinned: boolean
-  reason: string
-}
-
 export interface GmbPreview {
   path: string
   exists: boolean
@@ -280,7 +274,6 @@ export interface XMusicApi {
   'library:explain': (req: QueryRequest) => { sql: string; params: unknown[] }
   'fields:list': () => FieldDescriptor[]
   'theme:list': () => string[]
-  'app:safety': () => SafetyStatus
   'import:gmbDefaultPath': () => string
   'import:gmbBrowse': () => string | null
   'import:gmbPreview': (path: string) => GmbPreview
@@ -349,7 +342,7 @@ export type ApiArgs<C extends Channel> = Parameters<XMusicApi[C]>
 export type ApiResult<C extends Channel> = ReturnType<XMusicApi[C]>
 
 export const CHANNELS: readonly Channel[] = [
-  'app:info', 'app:safety', 'library:stats', 'library:query', 'library:groupBy',
+  'app:info', 'library:stats', 'library:query', 'library:groupBy',
   'library:explain', 'library:reset', 'fields:list', 'theme:list',
   'import:gmbDefaultPath', 'import:gmbBrowse', 'import:gmbPreview', 'import:gmbRun',
   'library:roots', 'library:addRoot', 'library:removeRoot', 'library:scan', 'library:scanCancel',

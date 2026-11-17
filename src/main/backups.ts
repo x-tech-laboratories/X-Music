@@ -11,17 +11,13 @@ import { sqlite_backups } from '@x-tech-laboratories/x-libs/server/sqlite_backup
 
 import type { DB } from './db'
 import { log } from './log'
-import { assertWritable } from './safety'
 
 export function libraryBackups(db: DB, path: string, restart: () => void): { methods: BackupMethods; stop: () => void } {
   const folder = join(dirname(path), 'backups')
   const scheduleFile = join(dirname(path), 'backup-schedule.json')
 
   const kept = sqlite_backups({
-    folder: () => {
-      assertWritable('backup', folder)
-      return folder
-    },
+    folder: () => folder,
     naming: backup_naming('library', '.db'),
     // better-sqlite3's statement types are narrower than X-Libs' SqlDatabase, though the calls are the same.
     database: () => db as never,
@@ -41,7 +37,6 @@ export function libraryBackups(db: DB, path: string, restart: () => void): { met
       remove_backup: kept.remove,
       get_backup_schedule: schedule.get,
       set_backup_schedule: (next) => {
-        assertWritable('backup', scheduleFile)
         schedule.set(next)
         void backingUp.check()
       }

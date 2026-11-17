@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launches the built app against a scratch database, read-only.
+# Launches the built app against a scratch database.
 #
 # VSCode's integrated terminal exports ELECTRON_RUN_AS_NODE, which makes the Electron binary run as
 # bare node and die on the ESM entry point. Clear it before doing anything else.
@@ -11,11 +11,6 @@ cd "$(dirname "$0")/.."
 : "${X_MUSIC_DB:=$HOME/.config/x-music/library.db}"
 export X_MUSIC_DB
 mkdir -p "$(dirname "$X_MUSIC_DB")"
-
-# Pin read-only unless the caller has deliberately opted out.
-if [[ "${X_MUSIC_ALLOW_WRITES:-}" != "1" ]]; then
-  export X_MUSIC_FORCE_READ_ONLY=1
-fi
 
 # The app runs outside the dev shell, so point it at an mpv if one is not on PATH.
 if [[ -z "${X_MUSIC_MPV:-}" ]]; then

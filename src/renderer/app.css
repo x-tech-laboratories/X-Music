@@ -13,7 +13,7 @@
 html, body, #app { height: 100%; }
 body { overflow: hidden; }
 
-.topbar-spacer, .song-list-spacer, .statusbar-spacer { flex: 1; }
+.song-list-spacer, .statusbar-spacer { flex: 1; }
 
 .layout { height: calc(100vh - var(--frame-height) - var(--row-height)); min-height: 0; }
 .sidebar { padding: 0; }

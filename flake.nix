@@ -59,7 +59,6 @@
             makeWrapper ${electron}/bin/electron $out/bin/x-music \
               --add-flags $out/lib/x-music \
               --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.mpv ]} \
-              --set-default X_MUSIC_ALLOW_WRITES 1 \
               --unset ELECTRON_RUN_AS_NODE
             runHook postInstall
           '';
