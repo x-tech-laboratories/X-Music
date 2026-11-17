@@ -34,12 +34,14 @@ function Queue({ queue }: { queue: TrackId[] }) {
 
   const title_of = (row: Queued): string => row.name?.title || 'Untitled track'
   const rows: Queued[] = queue.map((id, position) => ({ position, id, name: names.data?.get(id) }))
+  // The queue plays in its own order, so its columns neither sort, filter nor group.
+  const fixed = { sortable: false, filterable: false, groupable: false }
   const columns: TableColumn<Queued>[] = [
-    { id: 'position', label: 'Position', header: '#', cell: (row) => row.position + 1, class: 'number', width: 40, sortable: false },
-    { id: 'title', label: 'Title', cell: title_of, sortable: false },
-    { id: 'artist', label: 'Artist', cell: (row) => row.name?.artist ?? '', sortable: false },
+    { ...fixed, id: 'position', label: 'Position', header: '#', cell: (row) => row.position + 1, class: 'number', width: 48 },
+    { ...fixed, id: 'title', label: 'Title', cell: title_of },
+    { ...fixed, id: 'artist', label: 'Artist', cell: (row) => row.name?.artist ?? '' },
     {
-      id: 'remove', label: 'Remove', header: '', width: 48, sortable: false, cell: (row) => (
+      ...fixed, id: 'remove', label: 'Remove', header: '', width: 64, cell: (row) => (
         <button type="button" className="icon" aria-label={`Remove ${title_of(row)} from the queue`} onClick={() => void player.dequeue(row.position)}>
           <Icon icon={CloseIcon} />
         </button>
