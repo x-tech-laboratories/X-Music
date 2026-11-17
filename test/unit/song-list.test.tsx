@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
-// The song list on the X-Libs table: playing, keyboard selection and sorting reach the stores.
+// The song list on the X-Libs table: the whole library reachable, playing, keyboard selection, sorting and the filter chips.
 
+import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { TrackRow } from '@shared/ipc'
-import { library } from '../../src/renderer/stores/library'
+import { browse, library, results } from '../../src/renderer/stores/library'
 import { player } from '../../src/renderer/stores/player'
 import { SongList } from '../../src/renderer/widgets/SongList'
+import { install_bridge } from '../helpers/bridge'
 
 // ============================================================================
 // Setup
@@ -20,28 +22,37 @@ const tracks = (count: number): TrackRow[] =>
     track_number: index + 1, length_ms: 61_000, rating: null, play_count: 0
   }))
 
+const stats = (count: number) => ({ tracks: count, media: count, albums: 1, missing: 0, totalMs: 0, schemaVersion: 4, path: '/tmp/x.db' })
+
 const calls = new Map<string, ReturnType<typeof vi.fn>>()
 
-const bridge = new Proxy({}, {
-  get: (_target, channel: string) => {
-    if (!calls.has(channel)) {
-      const answer = channel === 'library:query' ? tracks(3)
-        : channel === 'library:explain' ? { sql: '' }
-        : channel.startsWith('player:') ? { state: 'idle', track: null, media: null, positionMs: 0, durationMs: null, volume: 80, repeat: 'off', shuffle: false, queue: [], contextLength: 0, contextIndex: -1 }
-        : null
-      calls.set(channel, vi.fn(async () => answer))
-    }
-    return calls.get(channel)
+// A bridge that records every call and answers the library's query with the given tracks.
+function bridge(listed: TrackRow[]): void {
+  calls.clear()
+  const answers: Record<string, unknown> = {
+    'library:query': listed,
+    'library:stats': stats(listed.length),
+    'library:groupBy': [],
+    'player:status': { state: 'idle', track: null, media: null, positionMs: 0, durationMs: null, volume: 80, repeat: 'off', shuffle: false, queue: [], contextLength: 0, contextIndex: -1 }
   }
-})
+  const proxy = new Proxy({}, {
+    get: (_target, channel: string) => {
+      if (!calls.has(channel)) calls.set(channel, vi.fn(async () => answers[channel] ?? answers['player:status']))
+      return calls.get(channel)
+    }
+  })
+  Object.assign(window, { xMusic: proxy, xMusicEvents: { on: () => () => {} } })
+}
+
+function show(listed: TrackRow[]): void {
+  results.set({ stats: stats(listed.length), tracks: listed, order: listed.map((track) => track.id), error: null })
+}
 
 beforeEach(() => {
-  calls.clear()
-  // jsdom lays nothing out, so there is nothing to scroll.
-  Element.prototype.scrollIntoView = () => {}
-  Object.assign(window, { xMusic: bridge, xMusicEvents: { on: () => () => {} } })
-  ;(library as unknown as { tracks: TrackRow[] }).tracks = tracks(3)
-  library.clearSelection()
+  bridge(tracks(3))
+  show(tracks(3))
+  browse.set({ sort: [], panes: {}, search: '' })
+  library.clear_selection()
   player.status = null
 })
 
@@ -50,7 +61,43 @@ afterEach(cleanup)
 const row = (title: string): HTMLElement => screen.getByText(title).closest('tr')!
 
 // ============================================================================
-// Behaviour
+// The whole library
+// ============================================================================
+
+describe('the whole library', () => {
+  it('asks for every track, with no limit on how many', async () => {
+    install_bridge()
+    bridge(tracks(3))
+
+    await library.refresh()
+
+    expect(calls.get('library:query')).toHaveBeenCalledTimes(1)
+    expect(calls.get('library:query')!.mock.calls[0]![0]).not.toHaveProperty('limit')
+  })
+
+  it('draws only the rows in view of a long list and reaches the last one by keyboard', () => {
+    show(tracks(5000))
+    render(<SongList />)
+
+    expect(screen.getAllByRole('row').length).toBeLessThan(200)
+    fireEvent.click(row('Track 1'))
+    fireEvent.keyDown(row('Track 1'), { key: 'End' })
+
+    expect(row('Track 5000')).toBeTruthy()
+    expect(screen.getByText('5,000 tracks')).toBeTruthy()
+  })
+
+  it('keeps every cell on one line', () => {
+    render(<SongList />)
+
+    const wrap = screen.getByRole('table').closest('.table-wrap')!
+    expect(wrap.classList.contains('fit')).toBe(true)
+    expect(wrap.classList.contains('virtual')).toBe(true)
+  })
+})
+
+// ============================================================================
+// Playing and picking
 // ============================================================================
 
 describe('song list', () => {
@@ -76,8 +123,23 @@ describe('song list', () => {
     fireEvent.click(row('Track 1'))
     fireEvent.keyDown(row('Track 1'), { key: 'ArrowDown', shiftKey: true })
 
-    expect(library.selectedIds().sort()).toEqual([10, 20])
+    expect(library.selected_ids()).toEqual([10, 20])
     expect(row('Track 2').getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('shows the picked rows in X-Libs\' selection bar, which queues them and lets them go', () => {
+    render(<SongList />)
+
+    fireEvent.click(row('Track 1'))
+    fireEvent.click(row('Track 3'), { ctrlKey: true })
+    const bar = screen.getByRole('toolbar', { name: 'Selected rows' })
+    expect(within(bar).getByText('2 selected')).toBeTruthy()
+
+    fireEvent.click(within(bar).getByRole('button', { name: 'Add to queue' }))
+    expect(calls.get('player:enqueue')).toHaveBeenCalledWith({ trackIds: [10, 30], position: 'end' })
+
+    fireEvent.click(within(bar).getByRole('button', { name: 'Clear selection' }))
+    expect(screen.queryByRole('toolbar', { name: 'Selected rows' })).toBeNull()
   })
 
   it('asks the library for a new sort when a header is clicked', async () => {
@@ -96,18 +158,53 @@ describe('song list', () => {
     expect(row('Track 1').classList.contains('now-playing')).toBe(false)
   })
 
-  it('lights the stars of a rating with Halon\'s rating classes', () => {
-    ;(library as unknown as { tracks: TrackRow[] }).tracks = [{ ...tracks(1)[0], rating: 60 }]
+  it('draws a rating as stars', () => {
+    show([{ ...tracks(1)[0]!, rating: 60 }])
     render(<SongList />)
 
-    const rating = screen.getByRole('slider', { name: 'Rating' })
-    expect(rating.classList.contains('rating')).toBe(true)
-    expect(rating.querySelectorAll('.star.on')).toHaveLength(3)
+    expect(screen.getByRole('slider', { name: 'Rating' }).getAttribute('aria-valuetext')).toBe('3 stars')
   })
 
   it('shows lengths as clock times', () => {
     render(<SongList />)
 
     expect(screen.getAllByText('1:01')).toHaveLength(3)
+  })
+
+  it('says so when no track passes the filters', () => {
+    show([])
+    render(<SongList />)
+
+    expect(screen.getByText('No tracks match.')).toBeTruthy()
+  })
+})
+
+// ============================================================================
+// Filters
+// ============================================================================
+
+describe('filter chips', () => {
+  it('names each chip\'s remove button and takes the filter off with it', async () => {
+    browse.set({ sort: [], panes: { genre: ['Jazz'] }, search: '' })
+    render(<SongList />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove the filter Genre: Jazz' }))
+
+    await vi.waitFor(() => expect(browse.get().panes).toEqual({}))
+    expect(calls.get('library:query')).toHaveBeenCalledWith(expect.objectContaining({ filter: expect.anything() }))
+  })
+
+  it('says how many of the library\'s tracks the filters let through', () => {
+    results.set({ stats: stats(40), tracks: tracks(3), order: [10, 20, 30], error: null })
+    render(<SongList />)
+
+    expect(screen.getByText('3 of 40 tracks')).toBeTruthy()
+  })
+
+  it('names the keys as X-Libs writes them, each in a key cap', () => {
+    render(<SongList />)
+
+    expect(screen.getByText(/or a double-click plays, right-click for more/)).toBeTruthy()
+    expect(screen.getByText('Enter').tagName).toBe('KBD')
   })
 })
