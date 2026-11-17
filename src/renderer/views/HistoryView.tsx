@@ -12,7 +12,7 @@ import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge'
 import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
-import { plural, stamp } from '@x-tech-laboratories/x-libs/web/format'
+import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { MergeEntry, TrackSnapshot, TrackState, Version, VersionKind } from '@shared/ipc'
 import { BUILTIN_FIELDS, ratingToStars } from '@shared/fields'
 import { library } from '../stores/library'
@@ -37,7 +37,7 @@ const merge_labels: Record<'merged' | 'undone', [text: string, tone: Tone]> = {
   undone: ['Merge undone', 'none']
 }
 
-const when = (milliseconds: number): string => stamp(milliseconds / 1000)
+const when = (milliseconds: number): string => new Date(milliseconds).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 const failure = (error: unknown): string => clean_error_message(describe_error(error))
 
@@ -77,7 +77,7 @@ const shown_columns: [column: keyof TrackState, name: string, text: (value: neve
   ['loved', 'Loved', yes_no],
   ['compilation', 'Compilation', yes_no],
   ['bpm', 'BPM', (value: number | null) => (value === null ? '' : String(value))],
-  ['pinned', 'Kept apart from automatic matching', yes_no],
+  ['pinned', 'Pinned', yes_no],
   ['mb_recording_id', 'MusicBrainz recording', (value: string | null) => value ?? ''],
   ['acoustid', 'AcoustID', (value: string | null) => value ?? ''],
   ['rg_track_gain', 'Track gain', (value: number | null) => (value === null ? '' : `${value} dB`)],
@@ -128,7 +128,7 @@ function VersionChanges({ version, limit }: { version: TrackVersion; limit?: num
   if (whole !== undefined || version.previous === null) return <span className="muted">{whole ?? 'Added to the library.'}</span>
 
   const changes = changes_between(version.previous, version.snapshot)
-  if (changes.length === 0) return <span className="muted">Nothing you would see changed.</span>
+  if (changes.length === 0) return <span className="muted">{version.kind === 'restored' ? 'Back as it was.' : 'Nothing you would see changed.'}</span>
   const shown = limit === undefined ? changes : changes.slice(0, limit)
   return (
     <div>
@@ -144,7 +144,7 @@ function VersionChanges({ version, limit }: { version: TrackVersion; limit?: num
 
 function TrackCell({ snapshot }: { snapshot: TrackSnapshot }) {
   const by = artists(snapshot)
-  return <>{track_name(snapshot)}{by && <> <span className="muted small">{by}</span></>}</>
+  return <span>{track_name(snapshot)}{by && <> <span className="muted small">{by}</span></>}</span>
 }
 
 // ============================================================================
@@ -205,10 +205,10 @@ function TrackHistoryDialog({ track_id, name, on_close, on_changed }: { track_id
     return version.kind === 'deleted' ? null : <button onClick={() => restore(version, restored)}>Restore</button>
   }
   const columns: TableColumn<TrackVersion>[] = [
-    { label: 'When', cell: (version) => when(Date.parse(version.changed_at)), sort: (version) => version.changed_at, width: 190 },
-    { label: 'Change', cell: (version) => <StateBadge labels={version_labels} state={version.kind} />, text: (version) => version_labels[version.kind][0], width: 120 },
-    { label: 'What changed', cell: (version) => <VersionChanges version={version} />, sortable: false, width: 420 },
-    { label: 'Actions', id: 'actions', header: <span className="visually-hidden">Actions</span>, cell: (version) => <div className="row-actions">{action(version)}</div>, sortable: false, hideable: false }
+    { label: 'When', cell: (version) => when(Date.parse(version.changed_at)), sort: (version) => version.changed_at },
+    { label: 'Change', cell: (version) => <StateBadge labels={version_labels} state={version.kind} />, text: (version) => version_labels[version.kind][0] },
+    { label: 'What changed', cell: (version) => <VersionChanges version={version} />, sortable: false },
+    { label: 'Actions', id: 'actions', header: <span className="visually-hidden">Actions</span>, class: 'actions-cell', cell: (version) => <div className="row-actions">{action(version)}</div>, sortable: false, hideable: false }
   ]
 
   return (
@@ -216,7 +216,7 @@ function TrackHistoryDialog({ track_id, name, on_close, on_changed }: { track_id
       <Loaded resource={versions}>
         {(list) => (list.length === 0
           ? <Empty title="No history yet." />
-          : <DataTable caption={`History of ${name}`} columns={columns} rows={list} row_key={(version) => version.id} manual_sorting column_hiding={false} fill_last_column />)}
+          : <DataTable caption={`History of ${name}`} columns={columns} rows={list} row_key={(version) => version.id} manual_sorting column_hiding={false} />)}
       </Loaded>
     </Dialog>
   )
@@ -266,33 +266,32 @@ export function HistoryView() {
   }
 
   const columns: TableColumn<HistoryRow>[] = [
-    { label: 'When', cell: (row) => when(row.at), sort: (row) => row.at, width: 190 },
+    { label: 'When', cell: (row) => when(row.at), sort: (row) => row.at, width: 180 },
     {
       label: 'Change',
       cell: (row) => (row.type === 'version'
         ? <StateBadge labels={version_labels} state={row.version.kind} />
         : <StateBadge labels={merge_labels} state={row.merge.undone ? 'undone' : 'merged'} />),
-      text: (row) => (row.type === 'version' ? version_labels[row.version.kind][0] : merge_labels[row.merge.undone ? 'undone' : 'merged'][0]),
-      width: 130
+      text: (row) => (row.type === 'version' ? version_labels[row.version.kind][0] : merge_labels[row.merge.undone ? 'undone' : 'merged'][0])
     },
     {
       label: 'Track',
       cell: (row) => (row.type === 'version' ? <TrackCell snapshot={row.version.snapshot} /> : row.merge.survivor_title ?? 'Untitled track'),
-      text: (row) => (row.type === 'version' ? track_name(row.version.snapshot) : row.merge.survivor_title ?? ''),
-      width: 260
+      text: (row) => (row.type === 'version' ? track_name(row.version.snapshot) : row.merge.survivor_title ?? '')
     },
     {
       label: 'What changed',
       cell: (row) => (row.type === 'version'
         ? <VersionChanges version={row.version} limit={3} />
         : <span>Took in {row.merge.absorbed.map((track) => track.title ?? 'an untitled track').join(', ')}</span>),
-      sortable: false,
-      width: 380
+      sortable: false
     },
     {
       label: 'Actions',
       id: 'actions',
       header: <span className="visually-hidden">Actions</span>,
+      class: 'actions-cell',
+      width: 200,
       sortable: false,
       hideable: false,
       cell: (row) => {
@@ -319,14 +318,14 @@ export function HistoryView() {
           value={show}
           on_change={set_show}
         />
-        <Select label="Changes shown" options={limits} value={limit} on_change={set_limit} />
+        <Select label="Changes shown" bare options={limits} value={limit} on_change={set_limit} />
       </Toolbar>
       <Loaded resource={changes} lines={8}>
         {(rows) => {
           const shown = show === 'everything' ? rows : rows.filter((row) => (show === 'merges' ? row.type === 'merge' : row.type === 'version'))
           return shown.length === 0
             ? <Empty title={show === 'merges' ? 'No merges yet.' : 'No changes yet.'} hint="Edits, imports, merges and restores show here as they happen." />
-            : <DataTable caption="Latest changes" columns={columns} rows={shown} row_key={row_key} manual_sorting fill_last_column />
+            : <DataTable caption="Latest changes" columns={columns} rows={shown} row_key={row_key} manual_sorting />
         }}
       </Loaded>
     </div>
