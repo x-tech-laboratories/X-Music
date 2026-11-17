@@ -34,7 +34,7 @@
   gap: var(--space-2);
   align-items: center;
   padding: var(--space-2) var(--space-4);
-  background: var(--column-header);
+  background: var(--surface-secondary);
   border-bottom: var(--border-width) solid var(--border-default);
 }
 
@@ -57,7 +57,7 @@
   font-size: var(--text-caption);
 }
 
-.row:hover { background: var(--row-hover); }
+.row:hover { background: var(--surface-navigation-hover); }
 
 .file {
   min-width: 0;

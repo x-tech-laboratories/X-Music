@@ -17,7 +17,7 @@
   border-radius: var(--radius-small);
 }
 
-.item:hover { background: var(--row-hover); }
+.item:hover { background: var(--surface-navigation-hover); }
 
 .position { color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 

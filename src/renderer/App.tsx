@@ -1,8 +1,7 @@
-// The window: the player and its lists in the sidebar, the library browser beside them, after gmusicbrowser's "Lists, Library & Context".
+// The window: the views and the player with its lists in the sidebar, the current view beside them, after gmusicbrowser's "Lists, Library & Context".
 
-import { useEffect, useState } from 'react'
-import { Tabs } from '@x-tech-laboratories/x-libs/web/react/layout'
-import { Shell } from '@x-tech-laboratories/x-libs/web/react/shell'
+import { Fragment, useEffect, useState } from 'react'
+import { Shell, use_route } from '@x-tech-laboratories/x-libs/web/react/shell'
 import { use_shortcuts } from '@x-tech-laboratories/x-libs/web/react/shortcuts'
 import { Split } from '@x-tech-laboratories/x-libs/web/react/split'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
@@ -11,6 +10,7 @@ import { one_of } from '@x-tech-laboratories/x-libs/web/prefs'
 import { format_duration } from '@x-tech-laboratories/x-libs/durations'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { AppInfo } from '@shared/ipc'
+import app_icon from '../../resources/icon.svg'
 import { ipc } from './lib/ipc'
 import { configureLogging, log } from './lib/log'
 import { theme } from './lib/theme'
@@ -18,9 +18,12 @@ import { library } from './stores/library'
 import { player } from './stores/player'
 import { PlayerBlock } from './widgets/PlayerBlock'
 import { TabbedLists } from './widgets/TabbedLists'
-import { FilterPane } from './widgets/FilterPane'
-import { SongList } from './widgets/SongList'
-import { SettingsPage, type Section, type Density } from './widgets/settings/SettingsPage'
+import { DuplicatesView } from './views/DuplicatesView'
+import { FoldersView } from './views/FoldersView'
+import { ImportView } from './views/ImportView'
+import { LibraryView } from './views/LibraryView'
+import { Navigation, view_href, view_labels, view_of, type ViewId } from './views/Navigation'
+import { SettingsView, type Density } from './views/SettingsView'
 
 // ============================================================================
 // Shortcuts
@@ -39,15 +42,34 @@ const focus_search = (): void => {
 }
 
 // ============================================================================
+// Status bar
+// ============================================================================
+
+function StatusBar() {
+  use_watch(library.data)
+  const stats = library.stats
+  if (library.error) return <span className="tone-bad">{library.error}</span>
+  if (!stats) return null
+  return (
+    <>
+      <span>{plural(stats.tracks, 'track')}</span>
+      <span>{plural(stats.media, 'file')}</span>
+      <span>{plural(stats.albums, 'album')}</span>
+      {stats.missing > 0 && <span className="tone-warn">{stats.missing.toLocaleString()} missing</span>}
+      <span>{format_duration(stats.totalMs / 1000, { largest_unit: 'days' })}</span>
+    </>
+  )
+}
+
+// ============================================================================
 // App
 // ============================================================================
 
 export function App() {
   const [info, set_info] = useState<AppInfo | null>(null)
   const [density, set_density] = use_pref<Density>('x-music.pref.density', 'normal', one_of('compact', 'normal', 'comfortable'))
-  const [right_tab, set_right_tab] = useState<'library' | 'context'>('library')
-  const [settings_section, set_settings_section] = useState<Section | null>(null)
-  use_watch(library.data)
+  const route = use_route()
+  const view = view_of(route.parts)
 
   useEffect(() => {
     // Renderer failures are invisible from the terminal otherwise, so they go to the main log.
@@ -71,14 +93,15 @@ export function App() {
     log.debug('renderer booting')
     set_info(await ipc('app:info'))
     await library.refresh()
-
-    // Open settings on the Import tab when there is nothing to look at yet.
-    if ((library.stats?.tracks ?? 0) === 0) set_settings_section('import')
   }
 
   useEffect(() => {
     document.documentElement.setAttribute('data-density', density)
   }, [density])
+
+  useEffect(() => {
+    document.title = `${view_labels[view]} · X-Music`
+  }, [view])
 
   use_shortcuts([
     { keys: 'ctrl+space', run: () => void player.toggle() },
@@ -90,93 +113,46 @@ export function App() {
     { keys: '/', run: focus_search }
   ])
 
-  const player_column = (
-    <div className="player-column">
-      <Split
-        storage_key="x-music.split.vbleft"
-        axis="vertical"
-        specs={[{ min: 150, max: 320 }, { min: 120, grow: true }]}
-        preferred={[196, undefined]}
-        panes={[<PlayerBlock key="player" />, <TabbedLists key="lists" />]}
-      />
-    </div>
-  )
-
-  const panes_row = (
-    <Split
-      storage_key="x-music.split.hpfp"
-      specs={[{ min: 90 }, { min: 90 }, { min: 90, grow: true }]}
-      panes={[
-        <FilterPane key="fp0" id="fp0" field="genre" />,
-        <FilterPane key="fp1" id="fp1" field="album_artist" />,
-        <FilterPane key="fp2" id="fp2" field="album" />
-      ]}
-    />
-  )
-
-  const stats = library.stats
-
-  const status_bar = (
+  const sidebar = (
     <>
-      {library.error ? (
-        <span className="tone-bad">{library.error}</span>
-      ) : stats && (
-        <>
-          <span>{plural(stats.tracks, 'track')}</span>
-          <span>{plural(stats.media, 'file')}</span>
-          <span>{plural(stats.albums, 'album')}</span>
-          {stats.missing > 0 && <span className="tone-warn">{stats.missing.toLocaleString()} missing</span>}
-          <span>{format_duration(stats.totalMs / 1000, { largest_unit: 'days' })}</span>
-        </>
-      )}
-      <span className="statusbar-spacer" />
-      {info && <span className="muted">Electron {info.electron} · Chromium {info.chrome}</span>}
+      <Navigation current={view} />
+      <div className="player-column">
+        <Split
+          storage_key="x-music.split.vbleft"
+          axis="vertical"
+          specs={[{ min: 150, max: 320 }, { min: 120, grow: true }]}
+          preferred={[196, undefined]}
+          panes={[<PlayerBlock key="player" />, <TabbedLists key="lists" />]}
+        />
+      </div>
     </>
   )
 
   return (
     <Shell
       brand="X-Music"
-      sidebar={player_column}
+      brand_icon={app_icon}
+      brand_href={view_href('library')}
+      sidebar={sidebar}
       sidebar_width={{ default_width: 420, min: 280, max: 720, storage_key: 'x-music.sidebar-width' }}
       theme={theme}
-      user=""
-      settings={{ href: '#settings', active: settings_section !== null, on_open: () => set_settings_section('library') }}
-      status_bar={status_bar}
+      settings={{ href: view_href('settings'), active: view === 'settings' }}
+      status_bar={<StatusBar />}
+      main_class={view === 'library' ? 'library-main' : undefined}
+      view_key={view}
+      contained
     >
-      <div className="library-view">
-        <Tabs
-          label="Views"
-          items={[{ id: 'library', label: 'Library' }, { id: 'context', label: 'Context' }]}
-          active={right_tab}
-          on_select={set_right_tab}
-        />
-
-        {right_tab === 'library' ? (
-          <Split
-            storage_key="x-music.split.vpright"
-            axis="vertical"
-            specs={[{ min: 90, max: 480 }, { min: 160, grow: true }]}
-            preferred={[190, undefined]}
-            panes={[panes_row, <SongList key="songs" />]}
-          />
-        ) : (
-          <div className="empty">
-            <p>Context panel — lyrics, artist info and related tracks land in a later milestone.</p>
-          </div>
-        )}
-
-      </div>
-
-      {settings_section !== null && (
-        <SettingsPage
-          info={info}
-          density={density}
-          initialSection={settings_section}
-          onclose={() => set_settings_section(null)}
-          onDensity={set_density}
-        />
-      )}
+      <Fragment key={view}>{view_content(view, { info, density, on_density: set_density })}</Fragment>
     </Shell>
   )
+}
+
+function view_content(view: ViewId, settings: { info: AppInfo | null; density: Density; on_density: (density: Density) => void }) {
+  switch (view) {
+    case 'library': return <LibraryView />
+    case 'folders': return <FoldersView />
+    case 'import': return <ImportView />
+    case 'duplicates': return <DuplicatesView />
+    case 'settings': return <SettingsView {...settings} />
+  }
 }

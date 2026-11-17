@@ -209,7 +209,7 @@ export function SongList() {
         {tracks.length === 0 && (
           <div className="empty">
             <p className="empty-title">No tracks match.</p>
-            <p>Import your gmusicbrowser library from Settings, or clear the active filters.</p>
+            <p>Clear the active filters, or add music under Folders or Import.</p>
           </div>
         )}
       </div>
