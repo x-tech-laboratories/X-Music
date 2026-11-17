@@ -1,6 +1,6 @@
 // The app's views as rows at the top of the sidebar, each at its own route such as #/folders.
 
-import { CopyIcon, DownloadIcon, FolderIcon, Icon, MusicIcon, type IconGlyph } from '@x-tech-laboratories/x-libs/web/react/icons'
+import { CopyIcon, DownloadIcon, FolderIcon, HistoryIcon, Icon, MusicIcon, type IconGlyph } from '@x-tech-laboratories/x-libs/web/react/icons'
 import { link } from '@x-tech-laboratories/x-libs/web/router'
 
 // ============================================================================
@@ -11,7 +11,8 @@ export const views = [
   { id: 'library', label: 'Library', icon: MusicIcon },
   { id: 'folders', label: 'Folders', icon: FolderIcon },
   { id: 'import', label: 'Import', icon: DownloadIcon },
-  { id: 'duplicates', label: 'Duplicates', icon: CopyIcon }
+  { id: 'duplicates', label: 'Duplicates', icon: CopyIcon },
+  { id: 'history', label: 'History', icon: HistoryIcon }
 ] as const satisfies readonly { id: string; label: string; icon: IconGlyph }[]
 
 export type ViewId = (typeof views)[number]['id'] | 'settings'

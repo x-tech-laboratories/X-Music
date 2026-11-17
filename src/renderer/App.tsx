@@ -20,6 +20,7 @@ import { PlayerBlock } from './widgets/PlayerBlock'
 import { TabbedLists } from './widgets/TabbedLists'
 import { DuplicatesView } from './views/DuplicatesView'
 import { FoldersView } from './views/FoldersView'
+import { HistoryView } from './views/HistoryView'
 import { ImportView } from './views/ImportView'
 import { LibraryView } from './views/LibraryView'
 import { Navigation, view_href, view_labels, view_of, type ViewId } from './views/Navigation'
@@ -153,6 +154,7 @@ function view_content(view: ViewId, settings: { info: AppInfo | null; density: D
     case 'folders': return <FoldersView />
     case 'import': return <ImportView />
     case 'duplicates': return <DuplicatesView />
+    case 'history': return <HistoryView />
     case 'settings': return <SettingsView {...settings} />
   }
 }

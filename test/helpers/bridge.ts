@@ -40,6 +40,14 @@ export function install_bridge(answers: Record<string, unknown> = {}): void {
       create_backup: async () => undefined,
       restore_backup: async () => undefined,
       remove_backup: async () => undefined
+    },
+    xMusicHistory: {
+      list_versions: async () => [],
+      list_recent_versions: async () => [],
+      list_recent_merges: async () => [],
+      restore_version: async () => undefined,
+      get_history_keep_days: async () => 365,
+      set_history_keep_days: async () => undefined
     }
   })
 }

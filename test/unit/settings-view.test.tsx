@@ -26,7 +26,7 @@ describe('settings view', () => {
     const categories = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
     expect(categories).toEqual(['General', 'Data', 'About'])
     const outline = screen.getByRole('navigation', { name: 'Settings sections' })
-    expect(within(outline).getAllByRole('link').map((link) => link.textContent)).toEqual(['Appearance', 'Library database', 'Backups', 'X-Music'])
+    expect(within(outline).getAllByRole('link').map((link) => link.textContent)).toEqual(['Appearance', 'Library database', 'History', 'Backups', 'X-Music'])
     for (const name of ['Folders', 'Import', 'Duplicates']) expect(screen.queryByRole('heading', { name })).toBeNull()
   })
 
@@ -47,6 +47,19 @@ describe('settings view', () => {
     expect(screen.getByText(/1,200 tracks/)).toBeTruthy()
     expect(screen.getByText('0.1.2')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Clear library…' })).toBeTruthy()
+  })
+
+  it('keeps changes for the days set, a year unless changed', async () => {
+    const set_history_keep_days = vi.fn(async () => undefined)
+    Object.assign(window.xMusicHistory, { set_history_keep_days })
+    render(<SettingsView info={info} density="normal" on_density={() => undefined} />)
+
+    const field = await screen.findByDisplayValue('365')
+    expect(field.getAttribute('aria-label')).toBe('Keep changes for')
+    fireEvent.change(field, { target: { value: '90' } })
+    fireEvent.blur(field)
+
+    await waitFor(() => expect(set_history_keep_days).toHaveBeenCalledWith(90))
   })
 
   it('clears the library only once the dialog is confirmed', async () => {

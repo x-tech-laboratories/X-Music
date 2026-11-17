@@ -2,7 +2,7 @@
 // the round-trip through unmerge is the test that matters most here.
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { mergePreview, mergeTracks, unmerge } from '@shared/library/merge'
+import { list_recent_merges, mergePreview, mergeTracks, unmerge } from '@shared/library/merge'
 import { field } from '@shared/fields'
 import { new_id } from '@shared/library/database'
 import { freshDb, type TestDb } from '../helpers/sqlite'
@@ -330,3 +330,32 @@ describe('unmerge', () => {
   })
 })
 
+
+describe('listing merges', () => {
+  it('lists the latest merges newest first, with the tracks each took and whether it was undone', () => {
+    const keeper = makeTrack({ title: 'So What' })
+    const copy = makeTrack({ title: 'So What (copy)' })
+    const other = makeTrack({ title: 'Blue in Green' })
+    const other_copy = makeTrack({ title: 'Blue in Green' })
+    const first = mergeTracks(db, { ids: [keeper, copy], survivor: keeper })
+    const second = mergeTracks(db, { ids: [other, other_copy], survivor: other })
+    db.prepare('UPDATE merge_journal SET at = 1000 WHERE batch_id = ?').run(first.batchId)
+    db.prepare('UPDATE merge_journal SET at = 2000 WHERE batch_id = ?').run(second.batchId)
+    unmerge(db, first.batchId)
+
+    expect(list_recent_merges(db, 10)).toEqual([
+      { batch_id: second.batchId, at: 2000, survivor_id: other, survivor_title: 'Blue in Green', absorbed: [{ id: other_copy, title: 'Blue in Green' }], undone: false },
+      { batch_id: first.batchId, at: 1000, survivor_id: keeper, survivor_title: 'So What', absorbed: [{ id: copy, title: 'So What (copy)' }], undone: true }
+    ])
+    expect(list_recent_merges(db, 1).map((merge) => merge.batch_id)).toEqual([second.batchId])
+  })
+
+  it('names a survivor that is gone by its title before the merge', () => {
+    const keeper = makeTrack({ title: 'Freddie Freeloader' })
+    const copy = makeTrack({ title: 'Freddie Freeloader' })
+    mergeTracks(db, { ids: [keeper, copy], survivor: keeper })
+    db.prepare('DELETE FROM tracks WHERE id = ?').run(keeper)
+
+    expect(list_recent_merges(db, 10)[0]!.survivor_title).toBe('Freddie Freeloader')
+  })
+})
