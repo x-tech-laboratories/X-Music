@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-// A track's properties: its facts, its sources, its raw tags and its history, each a section of the page.
+// A track's properties: its facts, its sources, its raw tags and its plays, each a section of the page, and its history.
 
 import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { Dialogs } from '@x-tech-laboratories/x-libs/web/react/dialog'
 import type { DetailMedia, TrackDetails } from '@shared/ipc'
 import { SongProperties } from '../../src/renderer/widgets/SongProperties'
 import { record_calls } from '../helpers/calls'
@@ -68,8 +69,22 @@ describe('song properties', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Raw tags' }))
     expect(screen.getByText('Example Band, Guest')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plays and skips' }))
     expect(screen.getByText('Never played')).toBeTruthy()
+  })
+
+  it('opens the track\'s history from its History button', async () => {
+    record_calls({ 'tracks:details': details })
+    const list_versions = vi.fn(async () => [])
+    Object.assign(window, { xMusicHistory: { list_versions } })
+
+    render(<><SongProperties trackId="track-7" onclose={() => undefined} /><Dialogs /></>)
+    await screen.findByRole('heading', { level: 2, name: 'All metadata' })
+    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+
+    expect(await screen.findByText('No history yet.')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'History of Morning Tone' })).toBeTruthy()
+    expect(list_versions).toHaveBeenCalledWith('track-7')
   })
 
   it('says when the track no longer exists, and closes', async () => {

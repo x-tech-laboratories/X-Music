@@ -43,6 +43,7 @@ describe('view_of', () => {
     expect(view_of(['folders'])).toBe('folders')
     expect(view_of(['import'])).toBe('import')
     expect(view_of(['duplicates'])).toBe('duplicates')
+    expect(view_of(['history'])).toBe('history')
     expect(view_of(['settings'])).toBe('settings')
     expect(view_of(['nowhere'])).toBe('library')
   })
@@ -57,8 +58,8 @@ describe('navigation', () => {
     render(<App />)
 
     const rows = within(views_nav()).getAllByRole('link')
-    expect(rows.map((row) => row.textContent)).toEqual(['Library', 'Folders', 'Import', 'Duplicates'])
-    expect(rows.map((row) => row.getAttribute('href'))).toEqual(['#/library', '#/folders', '#/import', '#/duplicates'])
+    expect(rows.map((row) => row.textContent)).toEqual(['Library', 'Folders', 'Import', 'Duplicates', 'History'])
+    expect(rows.map((row) => row.getAttribute('href'))).toEqual(['#/library', '#/folders', '#/import', '#/duplicates', '#/history'])
     expect(rows.every((row) => row.querySelector('svg[aria-hidden="true"]') !== null)).toBe(true)
     expect(within(views_nav()).getByRole('link', { name: 'Library' }).getAttribute('aria-current')).toBe('page')
     expect(await screen.findByRole('heading', { level: 1, name: 'Library' })).toBeTruthy()
@@ -67,7 +68,7 @@ describe('navigation', () => {
   it('shows each view at its route and marks its row', async () => {
     render(<App />)
 
-    for (const [hash, name] of [['#/folders', 'Folders'], ['#/import', 'Import'], ['#/duplicates', 'Duplicates']]) {
+    for (const [hash, name] of [['#/folders', 'Folders'], ['#/import', 'Import'], ['#/duplicates', 'Duplicates'], ['#/history', 'History']]) {
       go_to(hash)
       expect(await screen.findByRole('heading', { level: 1, name })).toBeTruthy()
       expect(within(views_nav()).getByRole('link', { name }).getAttribute('aria-current')).toBe('page')
