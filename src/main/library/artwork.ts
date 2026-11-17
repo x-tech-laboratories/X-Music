@@ -10,19 +10,13 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 
 import { dirname, extname, join } from 'node:path'
 import { parseFile } from 'music-metadata'
 
-import type { Db } from './identity'
+import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
-export type ArtSource = 'embedded' | 'folder' | 'none'
+import {
+  album_of, lookup_artwork, no_artwork, present_file_paths, record_artwork, type Artwork
+} from '@shared/library/covers'
 
-export interface Artwork {
-  source: ArtSource
-  /** Absolute path to the cached image, or null when nothing was found. */
-  path: string | null
-  origin: string | null
-  width: number | null
-  height: number | null
-  hash: string | null
-}
+export { forget_misses as forgetMisses, lookup_artwork as lookupArtwork, type ArtSource, type Artwork } from '@shared/library/covers'
 
 /**
  * Filenames worth trying, most specific first. Matching is case-insensitive and extension-agnostic,
@@ -185,68 +179,31 @@ export function thumbnail(
   }
 }
 
-interface Row {
-  source: string
-  path: string | null
-  origin: string | null
-  width: number | null
-  height: number | null
-  hash: string | null
-}
-
-const toArtwork = (row: Row): Artwork => ({
-  source: row.source as ArtSource,
-  path: row.path,
-  origin: row.origin,
-  width: row.width,
-  height: row.height,
-  hash: row.hash
-})
-
-/** The recorded answer for a track, if one exists. */
-export function lookupArtwork(db: Db, trackId: number): Artwork | null {
-  const row = db.prepare(`
-    SELECT a.source, a.path, a.origin, a.width, a.height, a.hash
-    FROM tracks t
-    LEFT JOIN artwork a ON a.album_id = t.album_id OR a.track_id = t.id
-    WHERE t.id = ? AND a.id IS NOT NULL
-    ORDER BY a.track_id IS NULL
-    LIMIT 1`).get(trackId as never) as Row | undefined
-
-  return row ? toArtwork(row) : null
-}
-
 /**
  * Finds art for a track and records the outcome. Embedded images win over a folder image, because a
  * file that carries its own cover is more specific than a picture shared by a directory.
  */
 export async function resolveArtwork(
-  db: Db,
-  trackId: number,
+  database: SqlDatabase,
+  trackId: string,
   opts: ArtworkOptions
 ): Promise<Artwork> {
-  const existing = lookupArtwork(db, trackId)
+  const existing = lookup_artwork(database, trackId)
   // A recorded miss stands until something changes; re-searching every play would be wasteful.
   if (existing) return existing
 
-  const track = db.prepare('SELECT album_id AS albumId FROM tracks WHERE id = ?')
-    .get(trackId as never) as { albumId: number | null } | undefined
-  if (!track) return { source: 'none', path: null, origin: null, width: null, height: null, hash: null }
+  const track = album_of(database, trackId)
+  if (!track) return no_artwork
 
-  const media = db.prepare(`
-    SELECT uri FROM media WHERE track_id = ? AND kind = 'file' AND present = 1
-    ORDER BY quality_rank DESC, id`).all(trackId as never) as { uri: string }[]
+  const paths = present_file_paths(database, trackId)
+  let found: Artwork = no_artwork
 
-  let found: Artwork = {
-    source: 'none', path: null, origin: null, width: null, height: null, hash: null
-  }
-
-  for (const m of media) {
-    const embedded = await readEmbedded(m.uri)
+  for (const path of paths) {
+    const embedded = await readEmbedded(path)
     if (embedded) {
       const stored = store(opts.cacheDir, embedded.data, embedded.mime)
       found = {
-        source: 'embedded', path: stored.path, origin: m.uri,
+        source: 'embedded', path: stored.path, origin: path,
         width: stored.size?.width ?? null, height: stored.size?.height ?? null, hash: stored.hash
       }
       break
@@ -254,8 +211,8 @@ export async function resolveArtwork(
   }
 
   if (found.source === 'none') {
-    for (const m of media) {
-      const image = findFolderImage(m.uri)
+    for (const path of paths) {
+      const image = findFolderImage(path)
       if (!image) continue
       try {
         const data = readFileSync(image)
@@ -271,22 +228,7 @@ export async function resolveArtwork(
     }
   }
 
-  // Record against the album when there is one, so every track on it shares the answer.
-  db.prepare(`
-    INSERT INTO artwork (album_id, track_id, source, origin, hash, path, width, height, bytes, found_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT DO NOTHING`).run(
-    (track.albumId ?? null) as never,
-    (track.albumId === null ? trackId : null) as never,
-    found.source as never,
-    found.origin as never,
-    found.hash as never,
-    found.path as never,
-    found.width as never,
-    found.height as never,
-    (found.path ? readFileSize(found.path) : null) as never,
-    Date.now() as never
-  )
+  record_artwork(database, trackId, track.album_id, found, found.path ? readFileSize(found.path) : null, Date.now())
 
   return found
 }
@@ -297,12 +239,4 @@ function readFileSize(path: string): number | null {
   } catch {
     return null
   }
-}
-
-/** Clears recorded misses, so a newly added cover is picked up without wiping real entries. */
-export function forgetMisses(db: Db): number {
-  const before = (db.prepare("SELECT COUNT(*) AS n FROM artwork WHERE source = 'none'")
-    .get() as { n: number }).n
-  db.prepare("DELETE FROM artwork WHERE source = 'none'").run()
-  return before
 }

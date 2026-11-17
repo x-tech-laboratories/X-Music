@@ -93,7 +93,7 @@ export function ScanPanel() {
     }
   }
 
-  async function remove(id: number): Promise<void> {
+  async function remove(id: string): Promise<void> {
     await ipc('library:removeRoot', id)
     await roots.reload(true)
   }

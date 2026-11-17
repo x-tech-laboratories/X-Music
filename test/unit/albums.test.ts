@@ -3,26 +3,27 @@
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 
-import { albumMatchKey, regroupAlbums } from '@main/library/albums'
-import { createUpserter, type TrackCandidate } from '@main/library/identity'
+import { albumMatchKey, regroupAlbums } from '@shared/library/albums'
+import { new_id } from '@shared/library/database'
+import { createUpserter, type TrackCandidate } from '@shared/library/identity'
 import { freshDb, type TestDb } from '../helpers/sqlite'
 
 let db: TestDb
 let upsert: ReturnType<typeof createUpserter>
 
 const albums = (): number => (db.prepare('SELECT COUNT(*) AS n FROM albums').get() as { n: number }).n
-const albumOf = (trackId: number): number =>
-  (db.prepare('SELECT album_id AS a FROM tracks WHERE id = ?').get(trackId) as { a: number }).a
+const albumOf = (trackId: string): string =>
+  (db.prepare('SELECT album_id AS a FROM tracks WHERE id = ?').get(trackId) as { a: string }).a
 
 /** Imports one track at `uri`, returning its track id. */
-function add(t: TrackCandidate, uri: string): number {
+function add(t: TrackCandidate, uri: string): string {
   const sets = { artist: t.artist ? [t.artist] : [], album_artist: t.albumArtist ? [t.albumArtist] : [] }
   return upsert({ sets, ...t }, { uri }, { metadata: true }).trackId
 }
 
 beforeEach(() => {
   db = freshDb()
-  upsert = createUpserter(db as never)
+  upsert = createUpserter(db)
 })
 
 afterEach(() => db.close())
@@ -73,7 +74,7 @@ describe('regrouping', () => {
     const ids = ['P', 'Q', 'R'].map((artist, i) => add({ album: 'Soundtrack', artist, year: 2000 }, `/m/${i}.mp3`))
     expect(new Set(ids.map(albumOf)).size).toBe(3)
 
-    const r = regroupAlbums(db as never)
+    const r = regroupAlbums(db)
     expect(r.compilationsFound).toBe(1)
     expect(new Set(ids.map(albumOf)).size).toBe(1)
     expect(albums()).toBe(1)
@@ -83,7 +84,7 @@ describe('regrouping', () => {
   it('leaves two artists on separate albums', () => {
     add({ album: 'Split', artist: 'P', year: 2000 }, '/m/1.mp3')
     add({ album: 'Split', artist: 'Q', year: 2000 }, '/m/2.mp3')
-    expect(regroupAlbums(db as never).compilationsFound).toBe(0)
+    expect(regroupAlbums(db).compilationsFound).toBe(0)
     expect(albums()).toBe(2)
   })
 
@@ -91,7 +92,7 @@ describe('regrouping', () => {
     for (const [i, artist] of ['P', 'Q', 'R'].entries()) {
       add({ album: 'Hits', artist, albumArtist: 'Band', year: 2000 }, `/m/${i}.mp3`)
     }
-    expect(regroupAlbums(db as never).compilationsFound).toBe(0)
+    expect(regroupAlbums(db).compilationsFound).toBe(0)
     expect(albums()).toBe(1)
   })
 
@@ -109,13 +110,13 @@ describe('regrouping', () => {
       { album: 'Solo', artist: 'S; T', year: 1990 }
     ]
     const ids = tracks.map((t, i) => add(t, `/m/${i}.mp3`))
-    regroupAlbums(db as never)
+    regroupAlbums(db)
     const before = ids.map(albumOf)
     const count = albums()
 
     // A rescan reads the split artist tag differently from the importer.
     tracks.forEach((t, i) => add({ ...t, artist: t.artist.split(';')[0]! }, `/m/${i}.mp3`))
-    regroupAlbums(db as never)
+    regroupAlbums(db)
 
     expect(ids.map(albumOf)).toEqual(before)
     expect(albums()).toBe(count)
@@ -126,20 +127,20 @@ describe('regrouping', () => {
     add({ album: 'New Name', artist: 'P' }, '/m/1.mp3')
     expect(albums()).toBe(2)
 
-    expect(regroupAlbums(db as never).albumsRemoved).toBe(1)
+    expect(regroupAlbums(db).albumsRemoved).toBe(1)
     expect(albums()).toBe(1)
     expect(albumOf(id)).not.toBeNull()
   })
 
   it('keeps an empty album that is pinned or that an undoable merge refers to', () => {
-    db.prepare("INSERT INTO albums (match_key, name, pinned, added) VALUES ('pinned', 'P', 1, 0)").run()
-    db.prepare("INSERT INTO albums (match_key, name, added) VALUES ('journaled', 'J', 0)").run()
-    const journaled = (db.prepare("SELECT id FROM albums WHERE match_key = 'journaled'").get() as { id: number }).id
-    db.prepare("INSERT INTO albums (match_key, name, added) VALUES ('orphan', 'O', 0)").run()
-    db.prepare('INSERT INTO merge_journal (batch_id, at, survivor_id, snapshot) VALUES (?, 0, 1, ?)')
-      .run('b1', JSON.stringify({ tracks: [{ id: 9, album_id: journaled }] }))
+    db.prepare("INSERT INTO albums (id, match_key, name, pinned, added) VALUES (?, 'pinned', 'P', 1, 0)").run(new_id())
+    const journaled = new_id()
+    db.prepare("INSERT INTO albums (id, match_key, name, added) VALUES (?, 'journaled', 'J', 0)").run(journaled)
+    db.prepare("INSERT INTO albums (id, match_key, name, added) VALUES (?, 'orphan', 'O', 0)").run(new_id())
+    db.prepare('INSERT INTO merge_journal (id, batch_id, at, survivor_id, snapshot) VALUES (?, ?, 0, ?, ?)')
+      .run(new_id(), 'b1', new_id(), JSON.stringify({ tracks: [{ id: new_id(), album_id: journaled }] }))
 
-    regroupAlbums(db as never)
+    regroupAlbums(db)
     const keys = (db.prepare('SELECT match_key AS k FROM albums ORDER BY k').all() as { k: string }[]).map((r) => r.k)
     expect(keys).toEqual(['journaled', 'pinned'])
   })

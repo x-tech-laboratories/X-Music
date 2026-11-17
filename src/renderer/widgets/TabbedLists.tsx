@@ -21,8 +21,8 @@ export function TabbedLists() {
   use_watch(library.data)
   const [tab, set_tab] = useState<Tab>('queue')
 
-  const title_of = (id: number): string => library.tracks.find((track) => track.id === id)?.title ?? `Track ${id}`
-  const artist_of = (id: number): string => library.tracks.find((track) => track.id === id)?.artist ?? ''
+  const title_of = (id: string): string => library.tracks.find((track) => track.id === id)?.title ?? `Track ${id}`
+  const artist_of = (id: string): string => library.tracks.find((track) => track.id === id)?.artist ?? ''
 
   const status = player.status
   const queue = status?.queue ?? []

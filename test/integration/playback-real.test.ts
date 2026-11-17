@@ -3,30 +3,29 @@
 
 import { describe, expect, it } from 'vitest'
 import { existsSync } from 'node:fs'
-import { DatabaseSync } from 'node:sqlite'
-import { copyLiveLibrary, hasLiveLibrary } from '../helpers/live'
+import { hasLiveLibrary, openLiveCopy } from '../helpers/live'
 
 import { MpvEngine, findMpv } from '@main/play/mpv'
 import { Player } from '@main/play/player'
 
-const mpv = findMpv() ?? undefined
+const mpv = (await findMpv()) ?? undefined
 
 describe.runIf(hasLiveLibrary() && mpv)('playback against the real library', () => {
   it('loads a real track and the position advances', async () => {
-    const db = new DatabaseSync(copyLiveLibrary('x-music-play-check.db'))
+    const db = openLiveCopy('x-music-play-check.db')
 
     const row = db.prepare(`
       SELECT t.id, t.title, m.uri, COUNT(m.id) AS files
       FROM tracks t JOIN media m ON m.track_id = t.id
       WHERE m.present = 1 GROUP BY t.id ORDER BY files DESC LIMIT 1`).get() as
-      { id: number; title: string; uri: string; files: number }
+      { id: string; title: string; uri: string; files: number }
 
     console.log(`  track ${row.id} "${row.title}" — ${row.files} file(s)`)
     console.log(`  uri: ${row.uri}`)
     console.log(`  exists on disk: ${existsSync(row.uri)}`)
 
     const engine = new MpvEngine({ binary: mpv })
-    const player = new Player(db as never, engine, { replayGain: 'track' })
+    const player = new Player(db, engine, { replayGain: 'track' })
 
     const states: string[] = []
     player.subscribe((e, p) => {
@@ -69,7 +68,7 @@ describe.runIf(hasLiveLibrary() && mpv)('playback against the real library', () 
     // resolves. A timeout rather than a hang is the point of this assertion.
     await engine.setVolume(0)
 
-    const db = new DatabaseSync(copyLiveLibrary('x-music-play-check.db'))
+    const db = openLiveCopy('x-music-play-check.db')
     const uri = (db.prepare('SELECT uri FROM media WHERE present = 1 LIMIT 1').get() as
       { uri: string }).uri
 

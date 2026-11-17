@@ -40,7 +40,7 @@ const hashExplanation = (algo: string | null): string => ({
   'sha256-file': 'Hashed over the whole file, so editing tags will change it. Weaker for move detection.'
 } as Record<string, string>)[algo ?? ''] ?? 'Not hashed yet; scan this folder to enable move detection.'
 
-export function SongProperties({ trackId, onclose }: { trackId: number; onclose: () => void }) {
+export function SongProperties({ trackId, onclose }: { trackId: string; onclose: () => void }) {
   const [section, setSection] = useState<Section>('overview')
   const resource = use_resource(() => ipc('tracks:details', trackId), [trackId])
   const details = resource.data

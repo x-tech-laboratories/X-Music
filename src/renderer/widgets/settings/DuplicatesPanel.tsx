@@ -42,7 +42,7 @@ export function DuplicatesPanel() {
   const [busy, setBusy] = useState(false)
   const [ran, setRan] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [merging, setMerging] = useState<number[] | null>(null)
+  const [merging, setMerging] = useState<string[] | null>(null)
   const [tolerance, setTolerance] = use_pref('x-music.pref.duplicates.toleranceSeconds', 3, is_number_in(0, 60))
 
   // Fuzzy is off by default: on a real library it proposes far more than anyone can review.

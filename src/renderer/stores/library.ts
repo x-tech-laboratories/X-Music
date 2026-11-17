@@ -41,7 +41,7 @@ class LibraryStore {
   private readonly paneValues = new Map<string, string[]>()
   /** Last clicked row per pane, so shift can extend from it. */
   private readonly paneAnchor = new Map<string, number>()
-  private readonly selection = new Selection<number>()
+  private readonly selection = new Selection<string>()
 
   get stats(): LibraryStats | null { return this.statsValue }
   set stats(v: LibraryStats | null) { this.statsValue = v; this.data.bump() }
@@ -117,11 +117,11 @@ class LibraryStore {
   }
 
   // ── selection ──────────────────────────────────────────────────────────
-  isSelected(id: number): boolean {
+  isSelected(id: string): boolean {
     return this.selection.has(id)
   }
 
-  selectedIds(): number[] {
+  selectedIds(): string[] {
     return this.selection.ids()
   }
 

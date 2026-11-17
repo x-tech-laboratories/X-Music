@@ -3,7 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { TrackRow } from '@shared/ipc'
+import { CHANNELS, type TrackRow } from '@shared/ipc'
 import { library } from '../../src/renderer/stores/library'
 import { player } from '../../src/renderer/stores/player'
 import { SongList } from '../../src/renderer/widgets/SongList'
@@ -14,7 +14,7 @@ import { SongList } from '../../src/renderer/widgets/SongList'
 
 const tracks = (count: number): TrackRow[] =>
   Array.from({ length: count }, (_, index) => ({
-    id: (index + 1) * 10,
+    id: `track-${(index + 1) * 10}`,
     title: `Track ${index + 1}`,
     artist: 'A', album: 'B', year: 2000,
     track_number: index + 1, length_ms: 61_000, rating: null, play_count: 0
@@ -22,24 +22,23 @@ const tracks = (count: number): TrackRow[] =>
 
 const calls = new Map<string, ReturnType<typeof vi.fn>>()
 
-const bridge = new Proxy({}, {
-  get: (_target, channel: string) => {
-    if (!calls.has(channel)) {
-      const answer = channel === 'library:query' ? tracks(3)
-        : channel === 'library:explain' ? { sql: '' }
-        : channel.startsWith('player:') ? { state: 'idle', track: null, media: null, positionMs: 0, durationMs: null, volume: 80, repeat: 'off', shuffle: false, queue: [], contextLength: 0, contextIndex: -1 }
-        : null
-      calls.set(channel, vi.fn(async () => answer))
-    }
-    return calls.get(channel)
+// A fresh bridge per test, with every channel answering as the main process would.
+function bridge(): Record<string, ReturnType<typeof vi.fn>> {
+  for (const channel of CHANNELS) {
+    const answer = channel === 'library:query' ? tracks(3)
+      : channel === 'library:explain' ? { sql: '' }
+      : channel.startsWith('player:') ? { state: 'idle', track: null, media: null, positionMs: 0, durationMs: null, volume: 80, repeat: 'off', shuffle: false, queue: [], contextLength: 0, contextIndex: -1 }
+      : null
+    calls.set(channel, vi.fn(async () => answer))
   }
-})
+  return Object.fromEntries(calls)
+}
 
 beforeEach(() => {
   calls.clear()
   // jsdom lays nothing out, so there is nothing to scroll.
   Element.prototype.scrollIntoView = () => {}
-  Object.assign(window, { xMusic: bridge, xMusicEvents: { on: () => () => {} } })
+  Object.assign(window, { xMusic: bridge(), xMusicEvents: { on: () => () => {} } })
   ;(library as unknown as { tracks: TrackRow[] }).tracks = tracks(3)
   library.clearSelection()
   player.status = null
@@ -59,7 +58,7 @@ describe('song list', () => {
 
     fireEvent.doubleClick(row('Track 2'))
 
-    expect(calls.get('player:playTrack')).toHaveBeenCalledWith({ trackId: 20, context: [10, 20, 30], index: 1 })
+    expect(calls.get('player:playTrack')).toHaveBeenCalledWith({ trackId: 'track-20', context: ['track-10', 'track-20', 'track-30'], index: 1 })
   })
 
   it('plays the row under the keyboard cursor on Enter', () => {
@@ -67,7 +66,7 @@ describe('song list', () => {
 
     fireEvent.keyDown(row('Track 3'), { key: 'Enter' })
 
-    expect(calls.get('player:playTrack')).toHaveBeenCalledWith({ trackId: 30, context: [10, 20, 30], index: 2 })
+    expect(calls.get('player:playTrack')).toHaveBeenCalledWith({ trackId: 'track-30', context: ['track-10', 'track-20', 'track-30'], index: 2 })
   })
 
   it('extends the selection with Shift and an arrow key', () => {
@@ -76,7 +75,7 @@ describe('song list', () => {
     fireEvent.click(row('Track 1'))
     fireEvent.keyDown(row('Track 1'), { key: 'ArrowDown', shiftKey: true })
 
-    expect(library.selectedIds().sort()).toEqual([10, 20])
+    expect(library.selectedIds().sort()).toEqual(['track-10', 'track-20'])
     expect(row('Track 2').getAttribute('aria-selected')).toBe('true')
   })
 
@@ -89,7 +88,7 @@ describe('song list', () => {
   })
 
   it('marks the playing track with Halon\'s now-playing row', () => {
-    player.status = { state: 'playing', track: { id: 20 }, positionMs: 0, durationMs: 61_000 } as unknown as typeof player.status
+    player.status = { state: 'playing', track: { id: 'track-20' }, positionMs: 0, durationMs: 61_000 } as unknown as typeof player.status
     render(<SongList />)
 
     expect(row('Track 2').classList.contains('now-playing')).toBe(true)

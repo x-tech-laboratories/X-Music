@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 
-import { compileFilter, compileGroupBy } from '@main/query/compile'
+import { compileFilter, compileGroupBy } from '@shared/query/compile'
 import { and, or, not, leaf } from '@shared/filter'
 import { makeCorpus, FIXED_NOW, type Corpus } from '../helpers/corpus'
 import { freshDb, loadCorpus, runQuery, type TestDb } from '../helpers/sqlite'

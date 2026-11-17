@@ -10,7 +10,7 @@ export function Cover({
   trackId = null,
   size = 88,
   rounded = true
-}: { trackId?: number | null; size?: number; rounded?: boolean }) {
+}: { trackId?: string | null; size?: number; rounded?: boolean }) {
   const [url, setUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 

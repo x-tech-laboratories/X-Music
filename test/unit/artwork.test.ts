@@ -8,7 +8,8 @@ import { join } from 'node:path'
 
 import { findFolderImage, imageSize, lookupArtwork, resolveArtwork, forgetMisses }
   from '@main/library/artwork'
-import { freshDb, type TestDb } from '../helpers/sqlite'
+import { new_id } from '@shared/library/database'
+import { addTrack, freshDb, type TestDb } from '../helpers/sqlite'
 
 let dir: string
 let cache: string
@@ -23,21 +24,16 @@ function png(width: number, height: number, fill = 0): Buffer {
   return buf
 }
 
-const lastId = (): number =>
-  (db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id
-
-function makeTrack(uri: string, album?: string): number {
-  let albumId: number | null = null
+function makeTrack(uri: string, album?: string): string {
+  let albumId: string | null = null
   if (album) {
-    db.prepare('INSERT OR IGNORE INTO albums (match_key, name, added) VALUES (?, ?, 0)')
-      .run(album, album)
-    albumId = (db.prepare('SELECT id FROM albums WHERE match_key = ?').get(album) as { id: number }).id
+    db.prepare('INSERT OR IGNORE INTO albums (id, match_key, name, added) VALUES (?, ?, ?, 0)')
+      .run(new_id(), album, album)
+    albumId = (db.prepare('SELECT id FROM albums WHERE match_key = ?').get(album) as { id: string }).id
   }
-  db.prepare('INSERT INTO tracks (title, album_id, added, modified) VALUES (?, ?, 0, 0)')
-    .run('Song', albumId)
-  const id = lastId()
-  db.prepare(`INSERT INTO media (track_id, kind, uri, present, added) VALUES (?, 'file', ?, 1, 0)`)
-    .run(id, uri)
+  const id = addTrack(db, { title: 'Song', album_id: albumId })
+  db.prepare(`INSERT INTO media (id, track_id, kind, uri, present, added) VALUES (?, ?, 'file', ?, 1, 0)`)
+    .run(new_id(), id, uri)
   return id
 }
 
@@ -102,7 +98,7 @@ describe('resolveArtwork', () => {
     await writeFile(join(dir, 'kob', 'cover.png'), png(500, 500, 7))
     const id = makeTrack(join(dir, 'kob', '01.flac'), 'Kind of Blue')
 
-    const art = await resolveArtwork(db as never, id, { cacheDir: cache })
+    const art = await resolveArtwork(db, id, { cacheDir: cache })
 
     expect(art.source).toBe('folder')
     expect(art.path).toContain(cache)
@@ -116,10 +112,10 @@ describe('resolveArtwork', () => {
     const a = makeTrack(join(dir, 'shared', '01.flac'), 'Shared')
     const b = makeTrack(join(dir, 'shared', '02.flac'), 'Shared')
 
-    await resolveArtwork(db as never, a, { cacheDir: cache })
+    await resolveArtwork(db, a, { cacheDir: cache })
 
     // The second track finds the album's recorded answer without searching again.
-    expect(lookupArtwork(db as never, b)?.source).toBe('folder')
+    expect(lookupArtwork(db, b)?.source).toBe('folder')
     expect((db.prepare('SELECT COUNT(*) AS n FROM artwork').get() as { n: number }).n).toBe(1)
   })
 
@@ -127,10 +123,10 @@ describe('resolveArtwork', () => {
     await mkdir(join(dir, 'bare'), { recursive: true })
     const id = makeTrack(join(dir, 'bare', '01.flac'), 'Bare')
 
-    const art = await resolveArtwork(db as never, id, { cacheDir: cache })
+    const art = await resolveArtwork(db, id, { cacheDir: cache })
     expect(art.source).toBe('none')
     expect(art.path).toBeNull()
-    expect(lookupArtwork(db as never, id)?.source).toBe('none')
+    expect(lookupArtwork(db, id)?.source).toBe('none')
   })
 
   it('attaches art to the track itself when it has no album', async () => {
@@ -138,7 +134,7 @@ describe('resolveArtwork', () => {
     await writeFile(join(dir, 'single', 'front.png'), png(200, 200, 9))
     const id = makeTrack(join(dir, 'single', 'loose.flac'))
 
-    await resolveArtwork(db as never, id, { cacheDir: cache })
+    await resolveArtwork(db, id, { cacheDir: cache })
     const row = db.prepare('SELECT album_id, track_id FROM artwork').get() as
       { album_id: number | null; track_id: number | null }
     expect(row.album_id).toBeNull()
@@ -151,9 +147,9 @@ describe('resolveArtwork', () => {
     await writeFile(join(dir, 'x', 'cover.png'), png(100, 100, 5))
     await writeFile(join(dir, 'y', 'cover.png'), png(100, 100, 5))
 
-    const a = await resolveArtwork(db as never, makeTrack(join(dir, 'x', '1.flac'), 'X'),
+    const a = await resolveArtwork(db, makeTrack(join(dir, 'x', '1.flac'), 'X'),
       { cacheDir: cache })
-    const b = await resolveArtwork(db as never, makeTrack(join(dir, 'y', '1.flac'), 'Y'),
+    const b = await resolveArtwork(db, makeTrack(join(dir, 'y', '1.flac'), 'Y'),
       { cacheDir: cache })
 
     expect(a.hash).toBe(b.hash)
@@ -163,11 +159,11 @@ describe('resolveArtwork', () => {
   it('forgets misses so newly added covers are picked up', async () => {
     await mkdir(join(dir, 'later'), { recursive: true })
     const id = makeTrack(join(dir, 'later', '01.flac'), 'Later')
-    expect((await resolveArtwork(db as never, id, { cacheDir: cache })).source).toBe('none')
+    expect((await resolveArtwork(db, id, { cacheDir: cache })).source).toBe('none')
 
     await writeFile(join(dir, 'later', 'cover.png'), png(120, 120, 4))
-    expect(forgetMisses(db as never)).toBe(1)
+    expect(forgetMisses(db)).toBe(1)
 
-    expect((await resolveArtwork(db as never, id, { cacheDir: cache })).source).toBe('folder')
+    expect((await resolveArtwork(db, id, { cacheDir: cache })).source).toBe('folder')
   })
 })

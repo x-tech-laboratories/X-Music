@@ -1,7 +1,7 @@
 // A deterministic synthetic library. Every test that needs data builds it from here so that a
 // failure is reproducible from its seed alone.
 
-import type { IndexedTrack } from '@main/query/evaluate'
+import type { IndexedTrack } from '@shared/query/evaluate'
 
 export type CorpusTrack = IndexedTrack & { albumName: string | null }
 
@@ -41,7 +41,8 @@ export function makeCorpus(n: number, seed = 42): Corpus {
     const moodCount = Math.floor(r() * 2)
 
     tracks.push({
-      id: i,
+      // Zero-padded, so ids sort as the tracks were made and ties in top and bottom stay readable.
+      id: `track-${String(i).padStart(5, '0')}`,
       scalars: {
         title: maybe(`Track ${i}`, 0.05),
         album: albumName,

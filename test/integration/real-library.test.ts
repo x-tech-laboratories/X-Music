@@ -2,21 +2,20 @@
 // finder and merge preview behave on real data rather than only on fixtures.
 
 import { describe, expect, it } from 'vitest'
-import { DatabaseSync } from 'node:sqlite'
-import { copyLiveLibrary, hasLiveLibrary } from '../helpers/live'
+import { hasLiveLibrary, openLiveCopy } from '../helpers/live'
 
-import { findDuplicates } from '@main/library/duplicates'
-import { mergePreview } from '@main/library/merge'
+import { findDuplicates } from '@shared/library/duplicates'
+import { mergePreview } from '@shared/library/merge'
 
 describe.runIf(hasLiveLibrary())('against the real library on this machine', () => {
   it('finds duplicates and previews a merge without throwing', () => {
     // Copy first: this test must never touch the live database.
-    const db = new DatabaseSync(copyLiveLibrary('x-music-real-check.db'))
+    const db = openLiveCopy('x-music-real-check.db')
 
     const total = (db.prepare('SELECT COUNT(*) AS n FROM tracks').get() as { n: number }).n
     expect(total).toBeGreaterThan(0)
 
-    const groups = findDuplicates(db as never)
+    const groups = findDuplicates(db)
     const byReason: Record<string, number> = {}
     for (const g of groups) byReason[g.reason] = (byReason[g.reason] ?? 0) + 1
     console.log(`  by reason: ${JSON.stringify(byReason)}`)
@@ -35,7 +34,7 @@ describe.runIf(hasLiveLibrary())('against the real library on this machine', () 
 
     if (groups.length > 0) {
       const ids = groups[0]!.members.map((m) => m.trackId)
-      const p = mergePreview(db as never, ids)
+      const p = mergePreview(db, ids)
 
       expect(p.ids).toEqual(ids)
       expect(p.fields.length).toBeGreaterThan(0)

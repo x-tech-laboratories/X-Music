@@ -4,11 +4,13 @@
 // back the track, where each one is, which will actually play, and how the track came to be
 // identified the way it is (DESIGN-SPEC §6.5). Read-only.
 
-import { BUILTIN_FIELDS } from '@shared/fields'
-import type { Db } from './identity'
+import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
+
+import { BUILTIN_FIELDS } from '../fields.ts'
+import { all_rows, first_row, to_hex } from './database.ts'
 
 export interface DetailMedia {
-  id: number
+  id: string
   kind: string
   uri: string
   provider: string | null
@@ -47,10 +49,10 @@ export interface HistoryEntry {
 }
 
 export interface TrackDetails {
-  id: number
+  id: string
   title: string | null
   album: string | null
-  albumId: number | null
+  albumId: string | null
 
   identity: {
     source: string
@@ -98,8 +100,8 @@ const fieldNameById = (): Map<number, { id: string; name: string }> => {
   return map
 }
 
-export function trackDetails(db: Db, trackId: number): TrackDetails | null {
-  const t = db.prepare(`
+export function trackDetails(database: SqlDatabase, trackId: string): TrackDetails | null {
+  const t = first_row<Record<string, unknown>>(database, `
     SELECT t.id, t.title, t.album_id AS albumId, t.year, t.track_number AS trackNumber,
            t.disc_number AS discNumber, t.length_ms AS lengthMs, t.compilation, t.bpm,
            t.identity_source AS identitySource, t.identity_key AS identityKey, t.pinned,
@@ -109,25 +111,23 @@ export function trackDetails(db: Db, trackId: number): TrackDetails | null {
            t.last_skipped AS lastSkipped, t.added, t.modified, t.bookmark_ms AS bookmarkMs,
            t.rg_track_gain AS rgTrackGain, t.rg_album_gain AS rgAlbumGain,
            (SELECT a.name FROM albums a WHERE a.id = t.album_id) AS album
-    FROM tracks t WHERE t.id = ?`).get(trackId as never) as Record<string, unknown> | undefined
+    FROM tracks t WHERE t.id = ?`, trackId)
 
   if (!t) return null
 
   const names = fieldNameById()
 
   // Multi-value fields, collapsed for display but marked so the UI can say they are sets.
-  const setRows = db.prepare(`
+  const setRows = all_rows<{ fieldId: number; value: string }>(database, `
     SELECT tv.field_id AS fieldId, vv.value FROM track_values tv
     JOIN values_ vv ON vv.id = tv.value_id
-    WHERE tv.track_id = ? ORDER BY tv.field_id, tv.ordinal`).all(trackId as never) as
-    { fieldId: number; value: string }[]
+    WHERE tv.track_id = ? ORDER BY tv.field_id, tv.ordinal`, trackId)
 
   const sets = new Map<number, string[]>()
   for (const r of setRows) sets.set(r.fieldId, [...(sets.get(r.fieldId) ?? []), r.value])
 
-  const extraRows = db.prepare(
-    'SELECT field_id AS fieldId, value FROM track_extras WHERE track_id = ?')
-    .all(trackId as never) as { fieldId: number; value: string }[]
+  const extraRows = all_rows<{ fieldId: number; value: string }>(database,
+    'SELECT field_id AS fieldId, value FROM track_extras WHERE track_id = ?', trackId)
 
   const fields: DetailField[] = []
 
@@ -160,25 +160,24 @@ export function trackDetails(db: Db, trackId: number): TrackDetails | null {
   }
 
   // ── sources ──────────────────────────────────────────────────────────────
-  const mediaRows = db.prepare(`
+  const mediaRows = all_rows<Record<string, unknown>>(database, `
     SELECT id, kind, uri, provider, present, codec, container, bitrate,
            bitrate_mode AS bitrateMode, samplerate, channels, bits_per_sample AS bitsPerSample,
            filesize, mtime, last_seen AS lastSeen, quality_rank AS qualityRank,
            audio_hash AS audioHash, audio_hash_algo AS audioHashAlgo,
            subtrack_index AS subtrackIndex, start_ms AS startMs, end_ms AS endMs
     FROM media WHERE track_id = ?
-    ORDER BY present DESC, quality_rank DESC, id`).all(trackId as never) as Record<string, unknown>[]
+    ORDER BY present DESC, quality_rank DESC, added, id`, trackId)
 
-  const tagRows = db.prepare(`
+  const tagRows = all_rows<{ mediaId: string; fieldId: number; value: string | null }>(database, `
     SELECT media_id AS mediaId, field_id AS fieldId, value FROM media_tags
     WHERE media_id IN (SELECT id FROM media WHERE track_id = ?)
-    ORDER BY media_id, field_id, ordinal`).all(trackId as never) as
-    { mediaId: number; fieldId: number; value: string | null }[]
+    ORDER BY media_id, field_id, ordinal`, trackId)
 
   const media: DetailMedia[] = mediaRows.map((m, index) => {
     const hash = m.audioHash as Uint8Array | null
     return {
-      id: m.id as number,
+      id: m.id as string,
       kind: m.kind as string,
       uri: m.uri as string,
       provider: (m.provider ?? null) as string | null,
@@ -196,7 +195,7 @@ export function trackDetails(db: Db, trackId: number): TrackDetails | null {
       mtime: (m.mtime ?? null) as number | null,
       lastSeen: (m.lastSeen ?? null) as number | null,
       qualityRank: (m.qualityRank ?? 0) as number,
-      audioHashHex: hash ? Buffer.from(hash).toString('hex') : null,
+      audioHashHex: hash ? to_hex(hash) : null,
       audioHashAlgo: (m.audioHashAlgo ?? null) as string | null,
       subtrackIndex: (m.subtrackIndex ?? 0) as number,
       startMs: (m.startMs ?? null) as number | null,
@@ -208,18 +207,15 @@ export function trackDetails(db: Db, trackId: number): TrackDetails | null {
   })
 
   // ── history ──────────────────────────────────────────────────────────────
-  const historyTotal = (db.prepare('SELECT COUNT(*) AS n FROM play_history WHERE track_id = ?')
-    .get(trackId as never) as { n: number }).n
+  const historyTotal = first_row<{ n: number }>(database, 'SELECT COUNT(*) AS n FROM play_history WHERE track_id = ?', trackId)!.n
 
-  const history = (db.prepare(
-    'SELECT at, kind FROM play_history WHERE track_id = ? ORDER BY at DESC LIMIT ?')
-    .all(trackId as never, HISTORY_LIMIT as never) as { at: number; kind: number }[])
+  const history = all_rows<{ at: number; kind: number }>(database,
+    'SELECT at, kind FROM play_history WHERE track_id = ? ORDER BY at DESC LIMIT ?', trackId, HISTORY_LIMIT)
     .map((r) => ({ at: r.at, kind: r.kind === 1 ? 'skip' as const : 'play' as const }))
 
-  const merges = (db.prepare(`
+  const merges = all_rows<{ batchId: string; at: number; snapshot: string }>(database, `
     SELECT batch_id AS batchId, at, snapshot FROM merge_journal
-    WHERE survivor_id = ? AND undone = 0 ORDER BY at DESC`).all(trackId as never) as
-    { batchId: string; at: number; snapshot: string }[])
+    WHERE survivor_id = ? AND undone = 0 ORDER BY at DESC`, trackId)
     .map((m) => {
       let absorbed = 0
       try {
@@ -231,10 +227,10 @@ export function trackDetails(db: Db, trackId: number): TrackDetails | null {
     })
 
   return {
-    id: t.id as number,
+    id: t.id as string,
     title: (t.title ?? null) as string | null,
     album: (t.album ?? null) as string | null,
-    albumId: (t.albumId ?? null) as number | null,
+    albumId: (t.albumId ?? null) as string | null,
     identity: {
       source: (t.identitySource ?? 'heuristic') as string,
       key: (t.identityKey ?? null) as string | null,

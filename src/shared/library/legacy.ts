@@ -1,0 +1,200 @@
+// Brings a library made before ids every device can make onto the Drizzle schema, in one transaction that keeps every
+// row: each old number gets a new id, every reference follows it, and the merge journal's snapshots are rewritten to
+// match, so an earlier merge can still be undone.
+
+// ── Imports ──────────────────────────────────────────────────────────────────
+
+import { in_transaction, migrate, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
+
+import { all_rows, first_row, new_id, run } from './database.ts'
+import { legacy_steps } from './legacy_steps.ts'
+import { migrations } from './migrations/index.ts'
+
+// ── Detecting ────────────────────────────────────────────────────────────────
+
+// How many of the Drizzle migrations the conversion stands in for; later ones run as usual.
+export const converted_migrations = 2
+
+// The legacy steps counted SQLite's user_version from 1; the conversion leaves it one past them.
+const converted_version = legacy_steps.length + 1
+
+function user_version(database: SqlDatabase): number {
+  return (first_row<{ user_version: number }>(database, 'PRAGMA user_version') ?? { user_version: 0 }).user_version
+}
+
+export function is_legacy(database: SqlDatabase): boolean {
+  const version = user_version(database)
+  return version > 0 && version < converted_version
+}
+
+// ── Tables ───────────────────────────────────────────────────────────────────
+
+// Every table of the old schema, each with its own numbered rows or not.
+const numbered = ['values_', 'albums', 'tracks', 'media', 'play_history', 'tag_writes', 'playlists', 'roots', 'merge_journal', 'artwork'] as const
+const unnumbered = ['media_tags', 'track_values', 'track_extras', 'playlist_tracks', 'settings'] as const
+type Numbered = (typeof numbered)[number]
+
+// A version 4 UUID made by SQLite itself, so a whole table's ids come from one statement.
+const uuid_sql = `lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))), 2) || '-'
+  || substr('89ab', 1 + (abs(random()) % 4), 1) || substr(lower(hex(randomblob(2))), 2) || '-' || lower(hex(randomblob(6)))`
+
+// The new id of an old row, or null when the old value was null or names nothing.
+const mapped = (kind: Numbered, column: string) => `(SELECT legacy_ids.new FROM legacy_ids WHERE legacy_ids.kind = '${kind}' AND legacy_ids.old = ${column})`
+
+// Each table's copy; a column naming a row it must have joins on its new id, so a broken reference shows as a lost row.
+const copies: Record<Exclude<Numbered, 'merge_journal'> | (typeof unnumbered)[number], string> = {
+  values_: `INSERT INTO values_ (id, field_id, value, sort_key, colour, mb_id)
+    SELECT ${mapped('values_', 'source.id')}, field_id, value, sort_key, colour, mb_id FROM legacy_values_ source ORDER BY source.id`,
+  albums: `INSERT INTO albums (id, match_key, pinned, name, edition, album_artist_id, year, disc_total, mb_release_id, mb_release_group_id, is_compilation, rg_album_gain, added)
+    SELECT ${mapped('albums', 'source.id')}, match_key, pinned, name, edition, ${mapped('values_', 'source.album_artist_id')}, year, disc_total,
+      mb_release_id, mb_release_group_id, is_compilation, rg_album_gain, added FROM legacy_albums source ORDER BY source.id`,
+  tracks: `INSERT INTO tracks (id, title, album_id, year, track_number, disc_number, length_ms, compilation, bpm, mb_recording_id, acoustid,
+      identity_source, identity_key, pinned, rating, play_count, skip_count, first_played, last_played, last_skipped, bookmark_ms, loved,
+      rg_track_gain, rg_album_gain, added, modified, primary_media_id)
+    SELECT ${mapped('tracks', 'source.id')}, title, ${mapped('albums', 'source.album_id')}, year, track_number, disc_number, length_ms, compilation, bpm,
+      mb_recording_id, acoustid, identity_source, identity_key, pinned, rating, play_count, skip_count, first_played, last_played,
+      last_skipped, bookmark_ms, loved, rg_track_gain, rg_album_gain, added, modified, ${mapped('media', 'source.primary_media_id')}
+    FROM legacy_tracks source ORDER BY source.id`,
+  media: `INSERT INTO media (id, track_id, kind, uri, provider, subtrack_index, start_ms, end_ms, audio_hash, audio_hash_algo, codec, container,
+      bitrate, bitrate_mode, samplerate, channels, bits_per_sample, filesize, mtime, present, last_seen, quality_rank, added)
+    SELECT ${mapped('media', 'source.id')}, track.new, source.kind, uri, provider, subtrack_index, start_ms, end_ms, audio_hash, audio_hash_algo, codec,
+      container, bitrate, bitrate_mode, samplerate, channels, bits_per_sample, filesize, mtime, present, last_seen, quality_rank, added
+    FROM legacy_media source JOIN legacy_ids track ON track.kind = 'tracks' AND track.old = source.track_id ORDER BY source.id`,
+  media_tags: `INSERT INTO media_tags (media_id, field_id, ordinal, value)
+    SELECT owner.new, field_id, ordinal, value FROM legacy_media_tags source
+    JOIN legacy_ids owner ON owner.kind = 'media' AND owner.old = source.media_id`,
+  track_values: `INSERT INTO track_values (track_id, field_id, value_id, ordinal)
+    SELECT track.new, field_id, interned.new, ordinal FROM legacy_track_values source
+    JOIN legacy_ids track ON track.kind = 'tracks' AND track.old = source.track_id
+    JOIN legacy_ids interned ON interned.kind = 'values_' AND interned.old = source.value_id`,
+  track_extras: `INSERT INTO track_extras (track_id, field_id, value)
+    SELECT track.new, field_id, value FROM legacy_track_extras source
+    JOIN legacy_ids track ON track.kind = 'tracks' AND track.old = source.track_id`,
+  play_history: `INSERT INTO play_history (id, track_id, media_id, at, kind, position_ms)
+    SELECT ${mapped('play_history', 'source.id')}, track.new, ${mapped('media', 'source.media_id')}, at, source.kind, position_ms FROM legacy_play_history source
+    JOIN legacy_ids track ON track.kind = 'tracks' AND track.old = source.track_id ORDER BY source.id`,
+  tag_writes: `INSERT INTO tag_writes (id, batch_id, media_id, field_id, old_value, new_value, at, applied)
+    SELECT ${mapped('tag_writes', 'source.id')}, CAST(batch_id AS TEXT), owner.new, field_id, old_value, new_value, at, applied FROM legacy_tag_writes source
+    JOIN legacy_ids owner ON owner.kind = 'media' AND owner.old = source.media_id ORDER BY source.id`,
+  playlists: `INSERT INTO playlists (id, name, kind, definition, parent_id, position, created, modified)
+    SELECT ${mapped('playlists', 'source.id')}, name, source.kind, definition, ${mapped('playlists', 'source.parent_id')}, position, created, modified
+    FROM legacy_playlists source ORDER BY source.id`,
+  playlist_tracks: `INSERT INTO playlist_tracks (playlist_id, track_id, position)
+    SELECT list.new, track.new, position FROM legacy_playlist_tracks source
+    JOIN legacy_ids list ON list.kind = 'playlists' AND list.old = source.playlist_id
+    JOIN legacy_ids track ON track.kind = 'tracks' AND track.old = source.track_id`,
+  roots: `INSERT INTO roots (id, path, include, exclude, slow, enabled, last_scan)
+    SELECT ${mapped('roots', 'source.id')}, path, include, exclude, slow, enabled, last_scan FROM legacy_roots source ORDER BY source.id`,
+  settings: 'INSERT INTO settings (key, value) SELECT key, value FROM legacy_settings',
+  artwork: `INSERT INTO artwork (id, album_id, track_id, source, origin, hash, path, width, height, bytes, found_at)
+    SELECT ${mapped('artwork', 'source.id')}, ${mapped('albums', 'source.album_id')}, ${mapped('tracks', 'source.track_id')}, source, origin, hash, path,
+      width, height, bytes, found_at FROM legacy_artwork source ORDER BY source.id`
+}
+
+// ── The merge journal ────────────────────────────────────────────────────────
+
+// A merge's snapshot as the old schema wrote it; every id in it is an old number.
+interface OldSnapshot {
+  tracks: (Record<string, unknown> & { id: number; album_id: number | null })[]
+  sets: (Record<string, unknown> & { track_id: number })[]
+  extras: (Record<string, unknown> & { track_id: number })[]
+  media: { id: number; track_id: number }[]
+  history: { id: number; track_id: number }[]
+  historyDeleted?: (Record<string, unknown> & { track_id: number })[]
+  playlists: (Record<string, unknown> & { playlist_id: number; track_id: number })[]
+}
+
+// The new ids by old number; a number the tables no longer hold, such as a track a merge absorbed, gets a fresh id of its own.
+function id_maps(database: SqlDatabase): (kind: Numbered, old: number | null) => string | null {
+  const maps = new Map<Numbered, Map<number, string>>(numbered.map((kind) => [kind, new Map()]))
+  for (const row of all_rows<{ kind: Numbered; old: number; new: string }>(database, 'SELECT kind, old, new FROM legacy_ids')) {
+    maps.get(row.kind)!.set(row.old, row.new)
+  }
+  return (kind, old) => {
+    if (old === null || old === undefined) return null
+    const map = maps.get(kind)!
+    let id = map.get(old)
+    if (id === undefined) map.set(old, (id = new_id()))
+    return id
+  }
+}
+
+// The snapshot with new ids; an album that no longer exists becomes none, as an undo would have found it.
+function rewrite_snapshot(snapshot: OldSnapshot, id_of: (kind: Numbered, old: number | null) => string | null, album_exists: (id: string | null) => boolean): unknown {
+  const track = (old: number) => id_of('tracks', old)
+  return {
+    tracks: snapshot.tracks.map((row) => {
+      const album_id = id_of('albums', row.album_id)
+      return { ...row, id: track(row.id), album_id: album_exists(album_id) ? album_id : null }
+    }),
+    sets: snapshot.sets.map((row) => ({ ...row, track_id: track(row.track_id) })),
+    extras: snapshot.extras.map((row) => ({ ...row, track_id: track(row.track_id) })),
+    media: snapshot.media.map((row) => ({ id: id_of('media', row.id), track_id: track(row.track_id) })),
+    history: snapshot.history.map((row) => ({ id: id_of('play_history', row.id), track_id: track(row.track_id) })),
+    historyDeleted: (snapshot.historyDeleted ?? []).map((row) => ({ ...row, track_id: track(row.track_id) })),
+    playlists: snapshot.playlists.map((row) => ({ ...row, playlist_id: id_of('playlists', row.playlist_id), track_id: track(row.track_id) }))
+  }
+}
+
+function copy_merge_journal(database: SqlDatabase): void {
+  const id_of = id_maps(database)
+  const album_exists = (id: string | null) => id !== null && first_row(database, 'SELECT 1 FROM albums WHERE id = ?', id) !== undefined
+  const insert = database.prepare('INSERT INTO merge_journal (id, batch_id, at, survivor_id, snapshot, undone) VALUES (?, ?, ?, ?, ?, ?)')
+  const entries = all_rows<{ id: number; batch_id: string; at: number; survivor_id: number; snapshot: string; undone: number }>(
+    database,
+    'SELECT id, batch_id, at, survivor_id, snapshot, undone FROM legacy_merge_journal ORDER BY id'
+  )
+  for (const entry of entries) {
+    const snapshot = rewrite_snapshot(JSON.parse(entry.snapshot) as OldSnapshot, id_of, album_exists)
+    insert.run(id_of('merge_journal', entry.id)!, entry.batch_id, entry.at, id_of('tracks', entry.survivor_id)!, JSON.stringify(snapshot), entry.undone)
+  }
+}
+
+// ── Converting ───────────────────────────────────────────────────────────────
+
+const count = (database: SqlDatabase, table: string): number => first_row<{ total: number }>(database, `SELECT COUNT(*) AS total FROM ${table}`)!.total
+
+function convert(database: SqlDatabase): void {
+  const tables = [...numbered, ...unnumbered]
+
+  // The old tables step aside under new names; their indexes go, since index names are shared across tables.
+  for (const table of tables) database.exec(`ALTER TABLE ${table} RENAME TO legacy_${table}`)
+  const indexes = all_rows<{ name: string }>(database, "SELECT name FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL AND tbl_name LIKE 'legacy\\_%' ESCAPE '\\'")
+  for (const { name } of indexes) database.exec(`DROP INDEX ${name}`)
+  // The old search table was never filled, so nothing is lost with it.
+  database.exec('DROP TABLE IF EXISTS tracks_fts')
+
+  for (const statement of migrations.slice(0, converted_migrations).flatMap((migration) => migration.statements)) database.exec(statement)
+  database.exec('CREATE TABLE IF NOT EXISTS schema_versions (owner TEXT PRIMARY KEY, version INTEGER NOT NULL)')
+  run(database, 'INSERT INTO schema_versions (owner, version) VALUES (?, ?)', 'library', converted_migrations)
+
+  database.exec('CREATE TEMP TABLE legacy_ids (kind TEXT NOT NULL, old INTEGER NOT NULL, new TEXT NOT NULL, PRIMARY KEY (kind, old))')
+  for (const kind of numbered) database.exec(`INSERT INTO legacy_ids (kind, old, new) SELECT '${kind}', id, ${uuid_sql} FROM legacy_${kind} ORDER BY id`)
+
+  for (const table of tables) {
+    if (table === 'merge_journal') copy_merge_journal(database)
+    else database.exec(copies[table])
+  }
+
+  // Nothing is left behind: a row that could not follow its references stops the whole conversion.
+  for (const table of tables) {
+    const before = count(database, `legacy_${table}`)
+    const after = count(database, table)
+    if (before !== after) throw new Error(`converting the library would lose ${before - after} of ${before} rows in ${table}`)
+  }
+
+  for (const table of tables) database.exec(`DROP TABLE legacy_${table}`)
+  database.exec('DROP TABLE legacy_ids')
+
+  const broken = all_rows(database, 'PRAGMA foreign_key_check')
+  if (broken.length > 0) throw new Error(`converting the library left ${broken.length} broken references`)
+
+  database.exec(`PRAGMA user_version = ${converted_version}`)
+}
+
+// Runs whatever old steps the library missed, then converts it; foreign keys must be off, as SQLite asks for a schema change.
+export function upgrade_legacy(database: SqlDatabase): void {
+  database.exec('PRAGMA foreign_keys = OFF')
+  migrate(database, legacy_steps)
+  in_transaction(database, () => convert(database))
+}

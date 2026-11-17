@@ -2,17 +2,10 @@
 // from the schema without any typecheck noticing. This test is what catches that.
 
 import { describe, expect, it } from 'vitest'
-import { compileFilter } from '@main/query/compile'
 import { and, leaf } from '@shared/filter'
-import { makeCorpus, FIXED_NOW } from '../helpers/corpus'
+import { group_tracks, query_tracks } from '@shared/library/store'
+import { makeCorpus } from '../helpers/corpus'
 import { freshDb, loadCorpus } from '../helpers/sqlite'
-
-// Kept identical to TRACK_COLUMNS in src/main/ipc.ts.
-const TRACK_COLUMNS = `
-  t.id, t.title, t.year, t.track_number, t.length_ms, t.rating, t.play_count,
-  (SELECT a.name FROM albums a WHERE a.id = t.album_id) AS album,
-  (SELECT vv.value FROM track_values tv JOIN values_ vv ON vv.id = tv.value_id
-    WHERE tv.track_id = t.id AND tv.field_id = 1 ORDER BY tv.ordinal LIMIT 1) AS artist`
 
 describe('song list row projection', () => {
   it('resolves every displayed column against the real schema', () => {
@@ -20,14 +13,11 @@ describe('song list row projection', () => {
     const db = freshDb()
     loadCorpus(db, corpus)
 
-    const { sql, params } = compileFilter(and(), {
-      now: FIXED_NOW,
-      select: TRACK_COLUMNS,
+    const rows = query_tracks(db, {
+      filter: and(),
       sort: [{ field: 'album' }, { field: 'track_number' }],
       limit: { count: 10 }
     })
-
-    const rows = db.prepare(sql).all(...(params as never[])) as Record<string, unknown>[]
     expect(rows.length).toBeGreaterThan(0)
 
     for (const key of ['id', 'title', 'album', 'artist', 'year', 'track_number',
@@ -46,11 +36,22 @@ describe('song list row projection', () => {
     const db = freshDb()
     loadCorpus(db, corpus)
 
-    const { sql, params } = compileFilter(
-      and(leaf('genre', 'any', ['Jazz', 'Rock']), leaf('codec', 'is', 'flac')),
-      { now: FIXED_NOW, select: TRACK_COLUMNS }
-    )
-    expect(() => db.prepare(sql).all(...(params as never[]))).not.toThrow()
+    expect(() => query_tracks(db, { filter: and(leaf('genre', 'any', ['Jazz', 'Rock']), leaf('codec', 'is', 'flac')) })).not.toThrow()
+    db.close()
+  })
+
+  it('pages with an offset and groups a set field by its values', () => {
+    const corpus = makeCorpus(50, 13)
+    const db = freshDb()
+    loadCorpus(db, corpus)
+
+    const all = query_tracks(db, { filter: and(), sort: [{ field: 'title' }] })
+    const page = query_tracks(db, { filter: and(), sort: [{ field: 'title' }], limit: { count: 5 }, offset: 5 })
+    const groups = group_tracks(db, { filter: and(), field: 'genre' })
+
+    expect(page.map((row) => row.id)).toEqual(all.slice(5, 10).map((row) => row.id))
+    expect(groups.map((group) => group.label)).toContain('Jazz')
+    expect(typeof groups[0]!.gid).toBe('string')
     db.close()
   })
 })

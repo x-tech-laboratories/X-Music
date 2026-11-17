@@ -1,11 +1,23 @@
 // The IPC contract. Both the main process and the renderer import this module, so the boundary is
-// type-checked end to end with no codegen step, and the X-Libs bridge builds both ends from it.
+// type-checked end to end with no codegen step, and the X-Libs bridge builds both ends from it. Types the
+// library store owns are declared there and only named here, so each has one declaration.
 
 import { backup_method_names, type BackupMethods } from '@x-tech-laboratories/x-libs/backup_protocol'
 import { define_bridge } from '@x-tech-laboratories/x-libs/electron/bridge'
 import { define_events } from '@x-tech-laboratories/x-libs/electron/events'
+import { history_method_names, type HistoryMethods } from '@x-tech-laboratories/x-libs/history'
 import type { FilterNode, SortKey, Limit } from './filter'
 import type { FieldDescriptor } from './fields'
+import type { TrackDetails } from './library/details'
+import type { DuplicateGroup, DuplicateReason } from './library/duplicates'
+import type { TrackSnapshot } from './library/history'
+import type { MergePreview, MergeResult, Resolution } from './library/merge'
+
+export type { DetailMedia, TrackDetails } from './library/details'
+export type { DuplicateGroup, DuplicateMember, DuplicateReason } from './library/duplicates'
+export type { TrackSnapshot, TrackState } from './library/history'
+export type { FieldOption, MergePreview, MergeResult, PreviewField, PreviewMedia, Resolution } from './library/merge'
+export type { Version, VersionKind } from '@x-tech-laboratories/x-libs/history'
 
 export interface LibraryStats {
   tracks: number
@@ -18,7 +30,7 @@ export interface LibraryStats {
 }
 
 export interface TrackRow {
-  id: number
+  id: string
   title: string | null
   artist: string | null
   album: string | null
@@ -59,6 +71,8 @@ export interface GmbPreview {
 export interface ImportReport {
   songsRead: number
   tracksCreated: number
+  tracksUpdated: number
+  mediaMatched: number
   mediaCreated: number
   missingFlagged: number
   playHistoryRows: number
@@ -69,7 +83,7 @@ export interface ImportReport {
 }
 
 export interface Root {
-  id: number
+  id: string
   path: string
   enabled: boolean
   slow: boolean
@@ -88,8 +102,9 @@ export type FileOutcome = 'new' | 'matched' | 'moved' | 'unchanged' | 'error' | 
 export interface FileResult {
   path: string
   outcome: FileOutcome
+  /** Why, for errors; the previous path, for moves. */
   detail?: string
-  trackId?: number
+  trackId?: string
 }
 
 export interface ScanReport {
@@ -104,157 +119,40 @@ export interface ScanReport {
   durationMs: number
 }
 
-export type Resolution = { kind: 'value'; from: number } | { kind: 'union' }
-
-export interface FieldOption { from: number; value: string | number | null | string[] }
-
-export interface PreviewField {
-  field: string
-  name: string
-  multi: boolean
-  conflict: boolean
-  value?: string | number | null | string[]
-  options?: FieldOption[]
-  union?: string[]
-}
-
-export interface PreviewMedia {
-  id: number
-  from: number
-  uri: string
-  codec: string | null
-  bitrate: number | null
-  present: boolean
-}
-
-export interface MergePreview {
-  ids: number[]
-  survivor: number
-  fields: PreviewField[]
-  media: PreviewMedia[]
-  statistics: {
-    playCount: number
-    skipCount: number
-    rating: number | null
-    firstPlayed: number | null
-    lastPlayed: number | null
-  }
-  pinnedSources: number[]
-}
-
-export interface MergeResult {
-  batchId: string
-  survivor: number
-  absorbed: number[]
-  mediaMoved: number
-  historyMoved: number
-  playlistEntriesRepointed: number
-}
-
-export type DuplicateReason = 'audio_hash' | 'mb_recording_id' | 'tags' | 'fuzzy'
-
-export interface DuplicateMember {
-  trackId: number
-  title: string | null
-  artist: string | null
-  album: string | null
-  year: number | null
-  lengthMs: number | null
-  rating: number | null
-  playCount: number
-  mediaCount: number
-  codecs: string
-}
-
-export interface DuplicateGroup {
-  key: string
-  reason: DuplicateReason
-  confidence: 'certain' | 'likely' | 'possible'
-  explanation: string
-  members: DuplicateMember[]
-}
-
 export type RepeatMode = 'off' | 'all' | 'one'
 
 export interface PlayerTrack {
-  id: number
+  id: string
   title: string | null
   artist: string | null
   album: string | null
   lengthMs: number | null
   rating: number | null
+}
+
+export interface PlayerMedia {
+  id: string
+  uri: string
+  startMs: number | null
+  endMs: number | null
+  gainDb: number | null
 }
 
 export interface PlayerStatus {
   state: 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error'
   track: PlayerTrack | null
-  media: { id: number; uri: string; startMs: number | null; endMs: number | null; gainDb: number | null } | null
+  media: PlayerMedia | null
   positionMs: number
   durationMs: number | null
   volume: number
   repeat: RepeatMode
   shuffle: boolean
-  queue: number[]
+  /** Tracks explicitly queued, which drain before the standing context. */
+  queue: string[]
+  /** The list the player walks when the queue is empty. */
   contextLength: number
   contextIndex: number
   error?: string
-}
-
-export interface DetailMedia {
-  id: number
-  kind: string
-  uri: string
-  provider: string | null
-  present: boolean
-  preferred: boolean
-  codec: string | null
-  container: string | null
-  bitrate: number | null
-  bitrateMode: string | null
-  samplerate: number | null
-  channels: number | null
-  bitsPerSample: number | null
-  filesize: number | null
-  mtime: number | null
-  lastSeen: number | null
-  qualityRank: number
-  audioHashHex: string | null
-  audioHashAlgo: string | null
-  subtrackIndex: number
-  startMs: number | null
-  endMs: number | null
-  tags: { field: string; value: string }[]
-}
-
-export interface TrackDetails {
-  id: number
-  title: string | null
-  album: string | null
-  albumId: number | null
-  identity: {
-    source: string
-    key: string | null
-    pinned: boolean
-    mbRecordingId: string | null
-    acoustid: string | null
-  }
-  fields: { field: string; name: string; value: string | null; multi: boolean }[]
-  media: DetailMedia[]
-  statistics: {
-    rating: number | null
-    playCount: number
-    skipCount: number
-    firstPlayed: number | null
-    lastPlayed: number | null
-    lastSkipped: number | null
-    added: number
-    modified: number
-    bookmarkMs: number | null
-  }
-  loudness: { rgTrackGain: number | null; rgAlbumGain: number | null }
-  history: { at: number; kind: 'play' | 'skip' }[]
-  historyTotal: number
-  merges: { batchId: string; at: number; absorbed: number }[]
 }
 
 export interface AppInfo {
@@ -281,16 +179,16 @@ export interface XMusicApi {
   'library:reset': () => { cleared: boolean }
   'library:roots': () => Root[]
   'library:addRoot': () => Root | null
-  'library:removeRoot': (id: number) => { removed: boolean }
+  'library:removeRoot': (id: string) => { removed: boolean }
   'library:scan': () => ScanReport
   'library:scanCancel': () => { cancelled: boolean }
-  'tracks:mergePreview': (ids: number[]) => MergePreview
+  'tracks:mergePreview': (ids: string[]) => MergePreview
   'tracks:merge': (req: {
-    ids: number[]
-    survivor: number
+    ids: string[]
+    survivor: string
     resolutions?: Record<string, Resolution>
   }) => MergeResult
-  'tracks:unmerge': (batchId: string) => { batchId: string; restored: number[]; survivor: number }
+  'tracks:unmerge': (batchId: string) => { batchId: string; restored: string[]; survivor: string }
   'app:log': (record: {
     level: 'critical' | 'error' | 'warn' | 'info' | 'debug'
     scope: string
@@ -298,21 +196,21 @@ export interface XMusicApi {
     data?: unknown
   }) => { logged: boolean }
   'app:logConfig': () => { spec: string | undefined }
-  'tracks:details': (trackId: number) => TrackDetails | null
+  'tracks:details': (trackId: string) => TrackDetails | null
   /** Resolves cover art lazily; returns an x-music-art:// url, or null when there is none. */
-  'art:forTrack': (req: { trackId: number; size?: number }) =>
+  'art:forTrack': (req: { trackId: string; size?: number }) =>
     { url: string | null; source: string }
   'art:rescan': () => { forgotten: number }
   'tracks:reveal': (uri: string) => { revealed: boolean }
   'player:status': () => PlayerStatus
-  'player:playTrack': (req: { trackId: number; context?: number[]; index?: number }) => PlayerStatus
+  'player:playTrack': (req: { trackId: string; context?: string[]; index?: number }) => PlayerStatus
   'player:toggle': () => PlayerStatus
   'player:next': () => PlayerStatus
   'player:previous': () => PlayerStatus
   'player:stop': () => PlayerStatus
   'player:seek': (positionMs: number) => PlayerStatus
   'player:volume': (volume: number) => PlayerStatus
-  'player:enqueue': (req: { trackIds: number[]; position?: 'end' | 'next' }) => PlayerStatus
+  'player:enqueue': (req: { trackIds: string[]; position?: 'end' | 'next' }) => PlayerStatus
   'player:dequeue': (index: number) => PlayerStatus
   'player:clearQueue': () => PlayerStatus
   'player:repeat': (mode: RepeatMode) => PlayerStatus
@@ -359,3 +257,14 @@ export const x_music_bridge = define_bridge<XMusicApi>('xMusic', CHANNELS)
 export const x_music_events = define_events<XMusicEvents>('xMusicEvents')
 // The library database's backups, for Settings, as window.xMusicBackups.
 export const x_music_backups_bridge = define_bridge<BackupMethods>('xMusicBackups', backup_method_names)
+
+// The track history: a track's versions, the latest changes to every track, restoring a version, and how long versions are kept.
+export type XMusicHistoryApi = HistoryMethods<TrackSnapshot> & {
+  get_history_keep_days: () => number
+  set_history_keep_days: (days: number) => void
+}
+
+export const history_channels = [...history_method_names, 'get_history_keep_days', 'set_history_keep_days'] as const
+
+// The page reaches these as window.xMusicHistory.
+export const x_music_history_bridge = define_bridge<XMusicHistoryApi>('xMusicHistory', history_channels)

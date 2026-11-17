@@ -2,21 +2,20 @@
 // tests pin the invariants that follow from that (DESIGN-SPEC §3).
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { freshDb, type TestDb } from '../helpers/sqlite'
+import { new_id } from '@shared/library/database'
+import { addTrack, freshDb, type TestDb } from '../helpers/sqlite'
 
 let db: TestDb
 
-const lastId = (): number =>
-  (db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id
-
-const addMedia = (trackId: number, uri: string, opts: Partial<{
+const addMedia = (trackId: string, uri: string, opts: Partial<{
   kind: string; codec: string; subtrack: number; start: number | null; end: number | null
-}> = {}): number => {
-  db.prepare(`INSERT INTO media (track_id, kind, uri, codec, subtrack_index, start_ms, end_ms, added)
-              VALUES (?, ?, ?, ?, ?, ?, ?, 0)`)
-    .run(trackId, opts.kind ?? 'file', uri, opts.codec ?? 'flac',
+}> = {}): string => {
+  const id = new_id()
+  db.prepare(`INSERT INTO media (id, track_id, kind, uri, codec, subtrack_index, start_ms, end_ms, added)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`)
+    .run(id, trackId, opts.kind ?? 'file', uri, opts.codec ?? 'flac',
          opts.subtrack ?? 0, opts.start ?? null, opts.end ?? null)
-  return lastId()
+  return id
 }
 
 beforeEach(() => { db = freshDb() })
@@ -24,28 +23,24 @@ afterEach(() => db.close())
 
 describe('track and media', () => {
   it('a track can exist with no media at all', () => {
-    db.prepare('INSERT INTO tracks (title, added, modified) VALUES (?, 0, 0)').run('Wishlist item')
-    const id = lastId()
+    const id = addTrack(db, { title: 'Wishlist item' })
     const media = db.prepare('SELECT COUNT(*) AS n FROM media WHERE track_id = ?').get(id) as { n: number }
     expect(media.n).toBe(0)
   })
 
   it('one track can have several media in different formats', () => {
-    db.prepare('INSERT INTO tracks (title, added, modified) VALUES (?, 0, 0)').run('Blue in Green')
-    const t = lastId()
+    const t = addTrack(db, { title: 'Blue in Green' })
     addMedia(t, '/music/blue.flac', { codec: 'flac' })
     addMedia(t, '/music/blue.mp3', { codec: 'mp3' })
     addMedia(t, 'subsonic://server/42', { kind: 'stream', codec: 'opus' })
 
-    const rows = db.prepare('SELECT kind, codec FROM media WHERE track_id = ? ORDER BY id').all(t)
+    const rows = db.prepare('SELECT kind, codec FROM media WHERE track_id = ? ORDER BY rowid').all(t)
     expect(rows).toHaveLength(3)
     expect(rows.map((r) => (r as { kind: string }).kind)).toEqual(['file', 'file', 'stream'])
   })
 
   it('deleting a media row leaves the track and its statistics intact', () => {
-    db.prepare('INSERT INTO tracks (title, rating, play_count, added, modified) VALUES (?, 80, 12, 0, 0)')
-      .run('So What')
-    const t = lastId()
+    const t = addTrack(db, { title: 'So What', rating: 80, play_count: 12 })
     const m = addMedia(t, '/music/sowhat.flac')
 
     db.prepare('DELETE FROM media WHERE id = ?').run(m)
@@ -57,8 +52,7 @@ describe('track and media', () => {
   })
 
   it('deleting a track cascades to its media', () => {
-    db.prepare('INSERT INTO tracks (title, added, modified) VALUES (?, 0, 0)').run('Flamenco Sketches')
-    const t = lastId()
+    const t = addTrack(db, { title: 'Flamenco Sketches' })
     addMedia(t, '/music/flamenco.flac')
 
     db.prepare('DELETE FROM tracks WHERE id = ?').run(t)
@@ -67,10 +61,8 @@ describe('track and media', () => {
   })
 
   it('CUE ranges are ordinary media rows addressing one container', () => {
-    db.prepare('INSERT INTO tracks (title, added, modified) VALUES (?, 0, 0)').run('Side A track 1')
-    const t1 = lastId()
-    db.prepare('INSERT INTO tracks (title, added, modified) VALUES (?, 0, 0)').run('Side A track 2')
-    const t2 = lastId()
+    const t1 = addTrack(db, { title: 'Side A track 1' })
+    const t2 = addTrack(db, { title: 'Side A track 2' })
 
     addMedia(t1, '/music/live.flac', { subtrack: 1, start: 0, end: 240_000 })
     addMedia(t2, '/music/live.flac', { subtrack: 2, start: 240_000, end: 511_000 })
@@ -81,15 +73,13 @@ describe('track and media', () => {
   })
 
   it('refuses two media rows for the same range of the same file', () => {
-    db.prepare('INSERT INTO tracks (title, added, modified) VALUES (?, 0, 0)').run('dupe')
-    const t = lastId()
+    const t = addTrack(db, { title: 'dupe' })
     addMedia(t, '/music/x.flac', { subtrack: 0 })
     expect(() => addMedia(t, '/music/x.flac', { subtrack: 0 })).toThrow()
   })
 
   it('a missing file is flagged, not deleted', () => {
-    db.prepare('INSERT INTO tracks (title, added, modified) VALUES (?, 0, 0)').run('On an external drive')
-    const t = lastId()
+    const t = addTrack(db, { title: 'On an external drive' })
     const m = addMedia(t, '/mnt/usb/track.flac')
 
     db.prepare('UPDATE media SET present = 0 WHERE id = ?').run(m)
@@ -101,10 +91,9 @@ describe('track and media', () => {
   })
 
   it('a pinned identity is recorded so automated passes can skip it', () => {
-    db.prepare(`INSERT INTO tracks (title, pinned, identity_source, added, modified)
-                VALUES (?, 1, 'manual', 0, 0)`).run('Manually merged')
+    const id = addTrack(db, { title: 'Manually merged', pinned: 1, identity_source: 'manual' })
     const row = db.prepare('SELECT pinned, identity_source FROM tracks WHERE id = ?')
-      .get(lastId()) as { pinned: number; identity_source: string }
+      .get(id) as { pinned: number; identity_source: string }
     expect(row.pinned).toBe(1)
     expect(row.identity_source).toBe('manual')
   })
@@ -112,34 +101,36 @@ describe('track and media', () => {
 
 describe('albums', () => {
   it('keeps a stable id while the derived match key changes', () => {
-    db.prepare("INSERT INTO albums (match_key, name, added) VALUES ('a\\x1fb\\x1f1959', 'Kind of Blue', 0)").run()
-    const id = lastId()
+    const id = new_id()
+    db.prepare("INSERT INTO albums (id, match_key, name, added) VALUES (?, 'a\\x1fb\\x1f1959', 'Kind of Blue', 0)").run(id)
 
     db.prepare('UPDATE albums SET match_key = ? WHERE id = ?').run('mbid:abc-123', id)
 
     const row = db.prepare('SELECT id, match_key FROM albums WHERE id = ?').get(id) as
-      { id: number; match_key: string }
+      { id: string; match_key: string }
     expect(row.id).toBe(id)
     expect(row.match_key).toBe('mbid:abc-123')
   })
 
   it('refuses two albums with the same match key', () => {
-    db.prepare("INSERT INTO albums (match_key, added) VALUES ('dup', 0)").run()
-    expect(() => db.prepare("INSERT INTO albums (match_key, added) VALUES ('dup', 0)").run()).toThrow()
+    db.prepare("INSERT INTO albums (id, match_key, added) VALUES (?, 'dup', 0)").run(new_id())
+    expect(() => db.prepare("INSERT INTO albums (id, match_key, added) VALUES (?, 'dup', 0)").run(new_id())).toThrow()
   })
 })
 
 describe('schema hygiene', () => {
   it('enforces foreign keys', () => {
     expect(() =>
-      db.prepare(`INSERT INTO media (track_id, kind, uri, added) VALUES (9999, 'file', '/x', 0)`).run()
+      db.prepare(`INSERT INTO media (id, track_id, kind, uri, added) VALUES (?, 'no-such-track', 'file', '/x', 0)`).run(new_id())
     ).toThrow()
   })
 
-  it('uses STRICT tables so a type error is caught at write time', () => {
-    expect(() =>
-      db.prepare('INSERT INTO tracks (title, year, added, modified) VALUES (?, ?, 0, 0)')
-        .run('x', 'not a number')
-    ).toThrow()
+  it('refuses a row without an id, which SQLite would otherwise allow for a text key', () => {
+    for (const table of ['tracks', 'albums', 'values_', 'media', 'play_history', 'playlists', 'roots', 'artwork']) {
+      const row = db.prepare(`SELECT sql FROM sqlite_master WHERE name = ?`).get(table) as { sql: string }
+      expect(row.sql, table).toContain('IS NOT NULL')
+    }
+    expect(() => db.prepare('INSERT INTO tracks (id, title, added, modified) VALUES (NULL, ?, 0, 0)').run('x')).toThrow(/CHECK/)
+    expect(() => db.prepare("INSERT INTO roots (id, path) VALUES (NULL, '/music')").run()).toThrow(/CHECK/)
   })
 })

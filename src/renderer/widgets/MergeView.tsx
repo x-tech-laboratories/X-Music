@@ -20,11 +20,11 @@ function show(v: unknown): string {
   return String(v)
 }
 
-export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: boolean) => void }) {
+export function MergeView({ ids, onclose }: { ids: string[]; onclose?: (merged: boolean) => void }) {
   const loaded = use_resource(() => ipc('tracks:mergePreview', ids), [])
   const preview = loaded.data
   // The source that survives, the preview's proposal until one is picked.
-  const [chosen_survivor, setSurvivor] = useState<number | null>(null)
+  const [chosen_survivor, setSurvivor] = useState<string | null>(null)
   const survivor = chosen_survivor ?? preview?.survivor ?? null
   const [choices, setChoices] = useState<Record<string, Resolution>>({})
   const [busy, setBusy] = useState(false)
@@ -33,9 +33,9 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
   const [undoing, setUndoing] = useState(false)
   const [onlyDifferences, setOnlyDifferences] = use_pref('x-music.pref.merge.onlyDifferences', false, is_boolean)
 
-  const sourceIndex = (id: number): number => (preview?.ids.indexOf(id) ?? -1) + 1
+  const sourceIndex = (id: string): number => (preview?.ids.indexOf(id) ?? -1) + 1
 
-  const valueFor = (fieldId: string, from: number): unknown => {
+  const valueFor = (fieldId: string, from: string): unknown => {
     const f = preview?.fields.find((x) => x.field === fieldId)
     if (!f) return null
     if (!f.conflict) return f.value
@@ -54,7 +54,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
     return valueFor(fieldId, survivor ?? preview!.ids[0]!)
   }
 
-  const isChosen = (fieldId: string, from: number): boolean => {
+  const isChosen = (fieldId: string, from: string): boolean => {
     const f = preview?.fields.find((x) => x.field === fieldId)
     if (!f?.conflict) return false
     const res = choices[fieldId]
@@ -69,7 +69,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
     return !res || res.kind === 'union'
   }
 
-  function pick(fieldId: string, from: number): void {
+  function pick(fieldId: string, from: string): void {
     setChoices({ ...choices, [fieldId]: { kind: 'value', from } })
   }
 
@@ -78,7 +78,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
   }
 
   /** Take every field from one source at once — the "this record is simply better" shortcut. */
-  function takeAll(from: number): void {
+  function takeAll(from: string): void {
     const next: Record<string, Resolution> = { ...choices }
     for (const f of preview?.fields ?? []) if (f.conflict) next[f.field] = { kind: 'value', from }
     setChoices(next)
@@ -89,7 +89,7 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
 
   const conflictCount = (preview?.fields ?? []).filter((f) => f.conflict).length
 
-  const mediaFor = (id: number): number =>
+  const mediaFor = (id: string): number =>
     preview?.media.filter((m) => m.from === id).length ?? 0
 
   const columns = preview

@@ -60,7 +60,7 @@ class PlayerStore {
     this.apply(await ipc('player:status'))
   }
 
-  async playTrack(trackId: number, context?: number[], index?: number): Promise<void> {
+  async playTrack(trackId: string, context?: string[], index?: number): Promise<void> {
     this.apply(await ipc('player:playTrack', { trackId, context, index }))
   }
 
@@ -71,7 +71,7 @@ class PlayerStore {
   async seek(ms: number): Promise<void> { this.positionMs = ms; this.apply(await ipc('player:seek', ms)) }
   async setVolume(v: number): Promise<void> { this.apply(await ipc('player:volume', v)) }
 
-  async enqueue(trackIds: number[], position: 'end' | 'next' = 'end'): Promise<void> {
+  async enqueue(trackIds: string[], position: 'end' | 'next' = 'end'): Promise<void> {
     this.apply(await ipc('player:enqueue', { trackIds, position }))
   }
 
@@ -86,7 +86,7 @@ class PlayerStore {
   set positionMs(ms: number) { this.positionValue = ms; this.position_changes.bump() }
 
   get playing(): boolean { return this.status?.state === 'playing' }
-  get currentId(): number | null { return this.status?.track?.id ?? null }
+  get currentId(): string | null { return this.status?.track?.id ?? null }
 }
 
 export const player = new PlayerStore()

@@ -55,8 +55,8 @@ export function SongList() {
   use_watch(library.selection_changes)
   use_watch(player.status_changes)
 
-  const [merging, set_merging] = useState<number[] | null>(null)
-  const [inspecting, set_inspecting] = useState<number | null>(null)
+  const [merging, set_merging] = useState<string[] | null>(null)
+  const [inspecting, set_inspecting] = useState<string | null>(null)
   // The keyboard cursor: which row arrow keys move from.
   const [cursor, set_cursor] = useState(0)
   const body = useRef<HTMLDivElement>(null)

@@ -13,7 +13,7 @@ export default defineConfig({
     benchmark: { include: ['bench/**/*.bench.ts'] },
     coverage: {
       provider: 'v8',
-      include: ['src/shared/**', 'src/main/query/**', 'src/main/library/**'],
+      include: ['src/shared/**', 'src/main/library/**'],
       thresholds: { lines: 70, functions: 70, branches: 60 }
     }
   }

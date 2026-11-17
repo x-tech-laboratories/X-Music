@@ -7,14 +7,12 @@ import { Player, countsAsPlay, shuffleOrder } from '@main/play/player'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { freshDb, type TestDb } from '../helpers/sqlite'
+import { new_id } from '@shared/library/database'
+import { addTrack, freshDb, type TestDb } from '../helpers/sqlite'
 
 let db: TestDb
 let engine: NullEngine
 let player: Player
-
-const lastId = (): number =>
-  (db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id
 
 /** Files must really exist now that the player checks, so the default one is created. */
 let scratch: string
@@ -22,23 +20,20 @@ let scratch: string
 function makeTrack(o: {
   title?: string; lengthMs?: number | null; files?: { uri: string; present?: boolean; rank?: number }[]
   trackGain?: number | null
-} = {}): number {
-  db.prepare(`INSERT INTO tracks (title, length_ms, rg_track_gain, added, modified)
-              VALUES (?, ?, ?, 0, 0)`)
-    .run(o.title ?? 'Song', o.lengthMs === undefined ? 200_000 : o.lengthMs, o.trackGain ?? null)
-  const id = lastId()
+} = {}): string {
+  const id = addTrack(db, { title: o.title ?? 'Song', length_ms: o.lengthMs === undefined ? 200_000 : o.lengthMs, rg_track_gain: o.trackGain ?? null })
 
   const files = o.files ?? [{ uri: join(scratch, `${id}.flac`) }]
   for (const f of files) {
     if (f.uri.startsWith(scratch)) writeFileSync(f.uri, Buffer.alloc(16))
-    db.prepare(`INSERT INTO media (track_id, kind, uri, present, quality_rank, added)
-                VALUES (?, 'file', ?, ?, ?, 0)`)
-      .run(id, f.uri, f.present === false ? 0 : 1, f.rank ?? 0)
+    db.prepare(`INSERT INTO media (id, track_id, kind, uri, present, quality_rank, added)
+                VALUES (?, ?, 'file', ?, ?, ?, 0)`)
+      .run(new_id(), id, f.uri, f.present === false ? 0 : 1, f.rank ?? 0)
   }
   return id
 }
 
-const stat = (id: number): { play_count: number; skip_count: number; last_played: number | null } =>
+const stat = (id: string): { play_count: number; skip_count: number; last_played: number | null } =>
   db.prepare('SELECT play_count, skip_count, last_played FROM tracks WHERE id = ?')
     .get(id) as never
 
@@ -46,7 +41,7 @@ beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), 'x-music-tracks-'))
   db = freshDb()
   engine = new NullEngine()
-  player = new Player(db as never, engine)
+  player = new Player(db, engine)
 })
 
 afterEach(async () => {
@@ -99,8 +94,7 @@ describe('playing a track', () => {
   })
 
   it('says a track has no file at all, rather than failing at load', async () => {
-    db.prepare("INSERT INTO tracks (title, added, modified) VALUES ('orphan', 0, 0)").run()
-    await player.playTrack(lastId())
+    await player.playTrack(addTrack(db, { title: 'orphan' }))
 
     const s = player.status()
     expect(s.state).toBe('error')
@@ -147,12 +141,12 @@ describe('playing a track', () => {
     const id = makeTrack({ trackGain: -6 })
 
     const off = new NullEngine()
-    const p1 = new Player(db as never, off)
+    const p1 = new Player(db, off)
     await p1.playTrack(id)
     expect(p1.status().media?.gainDb).toBeNull()
 
     const on = new NullEngine()
-    const p2 = new Player(db as never, on, { replayGain: 'track', preampDb: 2 })
+    const p2 = new Player(db, on, { replayGain: 'track', preampDb: 2 })
     await p2.playTrack(id)
     expect(p2.status().media?.gainDb).toBe(-4)
 
@@ -194,7 +188,7 @@ describe('statistics', () => {
 
     expect(stat(a).skip_count).toBe(1)
     expect(stat(a).play_count).toBe(0)
-    expect(b).toBeGreaterThan(0)
+    expect(stat(b).skip_count).toBe(0)
   })
 
   it('does not record a skip for a track that barely started', async () => {

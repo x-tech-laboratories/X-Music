@@ -4,12 +4,14 @@
 // index; a property test asserts the two always return identical id sets, which is the only thing
 // keeping the fast path honest.
 
-import { field, type FieldDescriptor } from '@shared/fields'
-import { isGroup, type FilterNode, type LeafNode, type RelativeDate, type SortKey, type Limit } from '@shared/filter'
+import type { SqlValue } from '@x-tech-laboratories/x-libs/sql'
+
+import { field, type FieldDescriptor } from '../fields.ts'
+import { isGroup, type FilterNode, type LeafNode, type RelativeDate, type SortKey, type Limit } from '../filter.ts'
 
 export interface CompiledQuery {
   sql: string
-  params: unknown[]
+  params: SqlValue[]
 }
 
 const MS: Record<RelativeDate['unit'], number> = {
@@ -21,7 +23,7 @@ const MS: Record<RelativeDate['unit'], number> = {
 }
 
 class Compiler {
-  readonly params: unknown[] = []
+  readonly params: SqlValue[] = []
 
   readonly now: number
 
@@ -29,8 +31,9 @@ class Compiler {
     this.now = now
   }
 
+  // A filter's values arrive as JSON, so each is passed to SQLite as the value it is.
   private p(v: unknown): string {
-    this.params.push(v)
+    this.params.push(v as SqlValue)
     return '?'
   }
 
@@ -57,9 +60,12 @@ class Compiler {
 
   private setPredicate(d: FieldDescriptor, node: LeafNode): string {
     const values = (Array.isArray(node.value) ? node.value : [node.value]) as string[]
+    // The value's id is found once, so the lookup index answers by field, value and track together.
     const member = (v: string): string =>
-      `EXISTS (SELECT 1 FROM track_values tv JOIN values_ vv ON vv.id = tv.value_id
-               WHERE tv.track_id = t.id AND tv.field_id = ${d.fieldId} AND vv.value = ${this.p(v)})`
+      `EXISTS (SELECT 1 FROM track_values tv
+               WHERE tv.field_id = ${d.fieldId}
+                 AND tv.value_id = (SELECT vv.id FROM values_ vv WHERE vv.field_id = ${d.fieldId} AND vv.value = ${this.p(v)})
+                 AND tv.track_id = t.id)`
 
     switch (node.op) {
       case 'any':
@@ -90,7 +96,7 @@ class Compiler {
     if (d.storage === 'multi') return this.setPredicate(d, node)
 
     if (node.op === 'matches') {
-      return `t.id IN (SELECT rowid FROM tracks_fts WHERE tracks_fts MATCH ${this.p(node.value)})`
+      return `t.id IN (SELECT track_id FROM tracks_fts WHERE tracks_fts MATCH ${this.p(node.value)})`
     }
 
     if (node.op === 'in_playlist') {
@@ -146,10 +152,10 @@ class Compiler {
       }
       case 'top':
         return `t.id IN (SELECT id FROM tracks WHERE ${e.replace(/\bt\./g, '')} IS NOT NULL
-                         ORDER BY ${e.replace(/\bt\./g, '')} DESC LIMIT ${this.p(Number(v))})`
+                         ORDER BY ${e.replace(/\bt\./g, '')} DESC, id LIMIT ${this.p(Number(v))})`
       case 'bottom':
         return `t.id IN (SELECT id FROM tracks WHERE ${e.replace(/\bt\./g, '')} IS NOT NULL
-                         ORDER BY ${e.replace(/\bt\./g, '')} ASC LIMIT ${this.p(Number(v))})`
+                         ORDER BY ${e.replace(/\bt\./g, '')} ASC, id LIMIT ${this.p(Number(v))})`
       default:
         throw new Error(`unhandled operator: ${node.op}`)
     }
@@ -240,5 +246,15 @@ export function compileGroupBy(node: FilterNode, groupField: string, now = Date.
           FROM tracks t WHERE ${where}
           GROUP BY ${expr} ORDER BY ${expr} IS NULL, ${expr}`,
     params: c.params
+  }
+}
+
+// The REGEXP a compiled `regex` filter calls, which SQLite leaves to the host to register: no match on a missing value or a bad pattern.
+export function regexp_matches(pattern: unknown, value: unknown): number {
+  if (value === null || value === undefined) return 0
+  try {
+    return new RegExp(String(pattern), 'u').test(String(value)) ? 1 : 0
+  } catch {
+    return 0
   }
 }

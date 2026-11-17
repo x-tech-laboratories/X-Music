@@ -2,8 +2,8 @@
 // initially to prove that it did not.
 
 import { describe, expect, it } from 'vitest'
-import { parseGmbrc } from '@main/import/gmbrc'
-import { importGmbrc } from '@main/import/gmb-import'
+import { parseGmbrc } from '@shared/import/gmbrc'
+import { importGmbrc } from '@shared/import/gmb-import'
 import { freshDb } from '../helpers/sqlite'
 
 const HEADER = [
@@ -44,10 +44,10 @@ describe('importing the same gmbrc twice', () => {
     const db = freshDb()
     const data = parseGmbrc(gmbrc([row(1), row(2), row(3)]))
 
-    importGmbrc(db as never, data)
+    importGmbrc(db, data)
     const first = counts(db)
 
-    importGmbrc(db as never, data)
+    importGmbrc(db, data)
     const second = counts(db)
 
     expect(second).toEqual(first)
@@ -57,8 +57,8 @@ describe('importing the same gmbrc twice', () => {
   it('leaves every track with exactly one media row', () => {
     const db = freshDb()
     const data = parseGmbrc(gmbrc([row(1), row(2)]))
-    importGmbrc(db as never, data)
-    importGmbrc(db as never, data)
+    importGmbrc(db, data)
+    importGmbrc(db, data)
 
     const orphans = (db.prepare(
       'SELECT COUNT(*) AS n FROM tracks t WHERE NOT EXISTS (SELECT 1 FROM media m WHERE m.track_id = t.id)'
@@ -69,8 +69,8 @@ describe('importing the same gmbrc twice', () => {
 
   it('updates statistics rather than stacking a second copy', () => {
     const db = freshDb()
-    importGmbrc(db as never, parseGmbrc(gmbrc([row(1)])))
-    importGmbrc(db as never, parseGmbrc(gmbrc([row(1, { playcount: '20', rating: '100' })])))
+    importGmbrc(db, parseGmbrc(gmbrc([row(1)])))
+    importGmbrc(db, parseGmbrc(gmbrc([row(1, { playcount: '20', rating: '100' })])))
 
     const t = db.prepare('SELECT rating, play_count FROM tracks').get() as
       { rating: number; play_count: number }
