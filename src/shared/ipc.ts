@@ -11,12 +11,12 @@ import type { FieldDescriptor } from './fields'
 import type { TrackDetails } from './library/details'
 import type { DuplicateGroup, DuplicateReason } from './library/duplicates'
 import type { TrackSnapshot } from './library/history'
-import type { MergePreview, MergeResult, Resolution } from './library/merge'
+import type { MergeEntry, MergePreview, MergeResult, Resolution } from './library/merge'
 
 export type { DetailMedia, TrackDetails } from './library/details'
 export type { DuplicateGroup, DuplicateMember, DuplicateReason } from './library/duplicates'
 export type { TrackSnapshot, TrackState } from './library/history'
-export type { FieldOption, MergePreview, MergeResult, PreviewField, PreviewMedia, Resolution } from './library/merge'
+export type { FieldOption, MergeEntry, MergePreview, MergeResult, PreviewField, PreviewMedia, Resolution } from './library/merge'
 export type { Version, VersionKind } from '@x-tech-laboratories/x-libs/history'
 
 export interface LibraryStats {
@@ -258,13 +258,15 @@ export const x_music_events = define_events<XMusicEvents>('xMusicEvents')
 // The library database's backups, for Settings, as window.xMusicBackups.
 export const x_music_backups_bridge = define_bridge<BackupMethods>('xMusicBackups', backup_method_names)
 
-// The track history: a track's versions, the latest changes to every track, restoring a version, and how long versions are kept.
+// The track history: a track's versions, the latest changes to every track, restoring a version, how long versions are
+// kept, and the latest merges.
 export type XMusicHistoryApi = HistoryMethods<TrackSnapshot> & {
   get_history_keep_days: () => number
   set_history_keep_days: (days: number) => void
+  list_recent_merges: (limit: number) => MergeEntry[]
 }
 
-export const history_channels = [...history_method_names, 'get_history_keep_days', 'set_history_keep_days'] as const
+export const history_channels = [...history_method_names, 'get_history_keep_days', 'set_history_keep_days', 'list_recent_merges'] as const
 
 // The page reaches these as window.xMusicHistory.
 export const x_music_history_bridge = define_bridge<XMusicHistoryApi>('xMusicHistory', history_channels)
