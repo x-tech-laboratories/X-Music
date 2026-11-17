@@ -1,5 +1,6 @@
 // A filter pane: the values of one field, chosen by the user, picked to narrow the library, on X-Libs' FacetPane.
 
+import { useEffect } from 'react'
 import { Select } from '@x-tech-laboratories/x-libs/web/react/controls'
 import { FacetPane, type FacetValue } from '@x-tech-laboratories/x-libs/web/react/facet_pane'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
@@ -40,14 +41,23 @@ export function FilterPane({ field: default_field = 'genre', id = 'pane' }: { fi
   const current = sanitizePaneField(remembered, default_field)
   const state = use_store(browse)
   const groups = use_resource(() => library.groups_for(current), [current], { watch: results.watch })
+  const values = facet_values(current, groups.data ?? [])
+  const selected = state.panes[current] ?? []
+
+  // A remembered pick the library no longer holds would hide every track with no row to undo it, so it is let go.
+  const offered = new Set(values.map((each) => each.value))
+  const gone = groups.status === 'loaded' && selected.some((value) => !offered.has(value))
+  useEffect(() => {
+    if (gone) void library.set_pane(current, selected.filter((value) => offered.has(value)))
+  }, [gone])
 
   return (
     <FacetPane
       label={field(current).name}
       heading={<Select bare label="Field to browse by" options={groupable} value={current} on_change={remember} />}
-      values={facet_values(current, groups.data ?? [])}
+      values={values}
       total={(groups.data ?? []).reduce((sum, group) => sum + group.n, 0)}
-      selected={state.panes[current] ?? []}
+      selected={selected}
       on_change={(values) => void library.set_pane(current, values)}
       loading={groups.loading}
       error={groups.error}

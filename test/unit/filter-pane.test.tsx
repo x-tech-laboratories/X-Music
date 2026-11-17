@@ -89,6 +89,13 @@ describe('filter pane', () => {
     expect(asked.album_artist).toEqual(expect.objectContaining({ field: 'genre', value: ['Jazz'] }))
   })
 
+  it('lets go of a remembered pick the library no longer holds', async () => {
+    browse.set({ sort: [], panes: { genre: ['Jazz', 'Polka'] }, search: '' })
+    render(<FilterPane field="genre" />)
+
+    await vi.waitFor(() => expect(browse.get().panes.genre).toEqual(['Jazz']))
+  })
+
   it('draws a rating as stars', async () => {
     render(<FilterPane field="rating" />)
     await screen.findByRole('listbox', { name: 'Rating' })
