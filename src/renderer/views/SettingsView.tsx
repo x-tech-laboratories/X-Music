@@ -31,10 +31,12 @@ function use_theme(): Theme {
 // Library database
 // ============================================================================
 
+const CLEAR_LIBRARY_EFFECT = 'Removes every track, album, playlist, rating and play from the library. Your music folders stay listed, and your music files are not touched.'
+
 function clear_library(): void {
   confirm_dialog({
     title: 'Clear the library database?',
-    message: 'Removes every track, playlist and statistic. Your music files are untouched.',
+    message: CLEAR_LIBRARY_EFFECT,
     confirm_label: 'Clear library',
     busy_label: 'Clearing…',
     danger: true,
@@ -62,7 +64,7 @@ function LibraryDatabase() {
         ['Location', stats ? <code className="path">{stats.path}</code> : null],
         ['Contents', contents]
       ]} />
-      <SettingRow label="Clear library" hint="Removes every track, playlist and statistic. Your music files are untouched.">
+      <SettingRow label="Clear library" hint={CLEAR_LIBRARY_EFFECT}>
         <button className="danger" onClick={clear_library}>Clear library…</button>
       </SettingRow>
     </>

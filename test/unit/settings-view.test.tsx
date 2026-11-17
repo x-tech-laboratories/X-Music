@@ -3,7 +3,8 @@
 
 import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { Dialogs } from '@x-tech-laboratories/x-libs/web/react/dialog'
 import { SettingsView } from '../../src/renderer/views/SettingsView'
 import { library } from '../../src/renderer/stores/library'
 import { install_bridge } from '../helpers/bridge'
@@ -46,5 +47,23 @@ describe('settings view', () => {
     expect(screen.getByText(/1,200 tracks/)).toBeTruthy()
     expect(screen.getByText('0.1.2')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Clear library…' })).toBeTruthy()
+  })
+
+  it('clears the library only once the dialog is confirmed', async () => {
+    let cleared = 0
+    install_bridge({ 'library:reset': () => { cleared += 1; return { cleared: true } } })
+    render(<><SettingsView info={info} density="normal" on_density={() => undefined} /><Dialogs /></>)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear library…' }))
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.textContent).toContain('Removes every track, album, playlist, rating and play')
+    expect(dialog.textContent).toContain('your music files are not touched')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(cleared).toBe(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear library…' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Clear library' }))
+
+    await waitFor(() => expect(cleared).toBe(1))
   })
 })
