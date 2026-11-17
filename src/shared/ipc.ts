@@ -102,7 +102,7 @@ export type FileOutcome = 'new' | 'matched' | 'moved' | 'unchanged' | 'error' | 
 export interface FileResult {
   path: string
   outcome: FileOutcome
-  /** Why, for errors; the previous path, for moves. */
+  // Why, for errors; the previous path, for moves.
   detail?: string
   trackId?: string
 }
@@ -147,9 +147,9 @@ export interface PlayerStatus {
   volume: number
   repeat: RepeatMode
   shuffle: boolean
-  /** Tracks explicitly queued, which drain before the standing context. */
+  // Tracks explicitly queued, which drain before the standing context.
   queue: string[]
-  /** The list the player walks when the queue is empty. */
+  // The list the player walks when the queue is empty.
   contextLength: number
   contextIndex: number
   error?: string
@@ -229,14 +229,14 @@ export const page_method_names = [
   'pick_folder', 'pick_gmbrc_file', 'show_in_folder', 'get_cover_url', 'write_log', 'get_log_config'
 ] as const satisfies readonly (keyof XMusicPageApi)[]
 
-/** Pushed from the main process; the renderer subscribes rather than polling. */
+// Pushed from the main process; the renderer subscribes rather than polling.
 export type XMusicEvents = {
   scan_progress: ScanProgress
-  /** Batched, because one message per file would flood the bridge on a large library. */
+  // Batched, because one message per file would flood the bridge on a large library.
   scan_files: FileResult[]
   scan_done: ScanReport
   player_status: PlayerStatus
-  /** Throttled; the UI interpolates between ticks rather than being fed every frame. */
+  // Throttled; the UI interpolates between ticks rather than being fed every frame.
   player_position: { positionMs: number; durationMs: number | null }
   // The library changed outside the window, through the MCP server.
   changed: null
@@ -256,8 +256,7 @@ export const x_music_backups_bridge = define_bridge<BackupMethods>('xMusicBackup
 // The local MCP server's settings, for Settings, as window.xMusicMcp.
 export const x_music_mcp_bridge = define_bridge<LocalMcpMethods>('xMusicMcp', local_mcp_method_names)
 
-// The track history: a track's versions, the latest changes to every track, restoring a version, how long versions are
-// kept, and the latest merges.
+// The track history: a track's versions, the latest changes to every track, restoring a version, how long versions are kept, and the latest merges.
 export type XMusicHistoryApi = HistoryMethods<TrackSnapshot> & {
   get_history_keep_days: () => number
   set_history_keep_days: (days: number) => void

@@ -25,7 +25,7 @@ export function fresh_db(): TestDb {
   return db
 }
 
-/** Loads a corpus into a real database so the SQL path can be compared to the native path. */
+// Loads a corpus into a real database so the SQL path can be compared to the native path.
 export function load_corpus(db: TestDb, corpus: Corpus): void {
   const insert_track = db.prepare(`
     INSERT INTO tracks (id, title, album_id, year, track_number, disc_number, length_ms,
@@ -96,5 +96,5 @@ export function add_track(db: TestDb, columns: Record<string, string | number | 
   return id
 }
 
-/** Column widths and field ids must stay stable; a reused field id silently corrupts a library. */
+// Column widths and field ids must stay stable; a reused field id silently corrupts a library.
 export const set_field_id = (id: string): number => field(id).field_id!

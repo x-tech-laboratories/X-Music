@@ -1,5 +1,4 @@
 // Finding tracks that are probably the same recording.
-//
 // This proposes; merge.ts disposes. Nothing here changes the library — the whole point of keeping
 // §3.5.0's identity rule narrow is that guessing happens in a reviewable place, with the evidence
 // shown, rather than silently at import time.
@@ -26,7 +25,7 @@ export interface DuplicateMember {
 export interface DuplicateGroup {
   key: string
   reason: DuplicateReason
-  /** How much to trust the grouping: 'certain' needs no thought, 'likely' wants a glance. */
+  // How much to trust the grouping: 'certain' needs no thought, 'likely' wants a glance.
   confidence: 'certain' | 'likely' | 'possible'
   explanation: string
   members: DuplicateMember[]
@@ -34,7 +33,7 @@ export interface DuplicateGroup {
 
 export interface FindOptions {
   reasons?: readonly DuplicateReason[]
-  /** How far two durations may differ and still be called the same recording. */
+  // How far two durations may differ and still be called the same recording.
   lengthToleranceMs?: number
   limit?: number
 }
@@ -52,18 +51,14 @@ function members(database: SqlDatabase, ids: readonly string[]): DuplicateMember
     .map((member) => ({ ...member }))
 }
 
-/** Groups of track ids sharing a key, only where the group has more than one member. */
+// Groups of track ids sharing a key, only where the group has more than one member.
 function groups_by_key(database: SqlDatabase, sql: string): { key: string; ids: string[] }[] {
   return all_rows<{ key: string; ids: string }>(database, sql)
     .map((r) => ({ key: r.key, ids: r.ids.split(',') }))
     .filter((g) => g.ids.length > 1)
 }
 
-/**
- * Bracketed noise worth ignoring when comparing titles. Deliberately a fixed list rather than
- * "strip anything in brackets": that broader rule collapses "[Act 1]" and "[Act 2]" into the same
- * title, which is a wrong merge rather than a missed one.
- */
+// Bracketed noise worth ignoring when comparing titles. Deliberately a fixed list rather than "strip anything in brackets": that broader rule collapses "[Act 1]" and "[Act 2]" into the same title, which is a wrong merge rather than a missed one.
 const NOISE = new RegExp(
   '[\\(\\[]\\s*(?:' + [
     'official\\s+(?:music\\s+)?video', 'official\\s+audio', 'official\\s+lyric[s]?\\s+video',
@@ -88,8 +83,7 @@ const norm = (s: string | null): string =>
     .trim()
 
 export function find_duplicates(database: SqlDatabase, opts: FindOptions = {}): DuplicateGroup[] {
-  // Fuzzy matching is left out by default: on a real library it proposes far more than a person
-  // can review, and most of it needs judgement. It is a deliberate deeper sweep, not a baseline.
+  // Fuzzy matching is left out by default: on a real library it proposes far more than a person can review, and most of it needs judgement. It is a deliberate deeper sweep, not a baseline.
   const reasons = new Set<DuplicateReason>(
     opts.reasons ?? ['audio_hash', 'mb_recording_id', 'tags'])
   const tolerance = opts.lengthToleranceMs ?? 3000

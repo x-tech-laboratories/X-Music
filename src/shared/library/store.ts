@@ -34,8 +34,7 @@ export function needs_upgrade(database: SqlDatabase): boolean {
 
 export type { UpgradeReport }
 
-// Brings an open connection up to date and starts the track history; run once each time the library opens. Gives back
-// what converting an older library did, when it was one.
+// Brings an open connection up to date and starts the track history; run once each time the library opens. Gives back what converting an older library did, when it was one.
 export function open_library(database: SqlDatabase): UpgradeReport | null {
   // SQLite changes a schema with foreign keys off and checks them after.
   database.exec('PRAGMA foreign_keys = OFF')
@@ -117,8 +116,7 @@ export function mark_roots_scanned(database: SqlDatabase, at: number): void {
 
 // ── Clearing ─────────────────────────────────────────────────────────────────
 
-// Empties the library of tracks and everything hanging off them, keeping the music folders and settings; the caller
-// backs up first. The track history and merge journal go too, since nothing is left for them to bring back.
+// Empties the library of tracks and everything hanging off them, keeping the music folders and settings; the caller backs up first. The track history and merge journal go too, since nothing is left for them to bring back.
 export function clear_library(database: SqlDatabase): void {
   in_transaction(database, () => {
     for (const table of ['playlist_tracks', 'playlists', 'play_history', 'track_values', 'track_extras', 'tag_writes', 'media_tags', 'media', 'artwork', 'tracks', 'albums', 'values_', 'merge_journal', 'tracks_fts']) {

@@ -1,6 +1,5 @@
 // The format-string language (DESIGN-SPEC §5.5). One engine serves labels, now-playing text,
 // tooltips, tray text, notifications, column formats and the file renamer.
-//
 // It lives in shared/ and touches no DOM, so it is unchanged by any UI-framework decision.
 
 export type FormatValue = string | number | null | undefined | readonly string[]
@@ -14,17 +13,7 @@ interface Token {
   children?: Token[]
 }
 
-/**
- * Grammar:
- *   {field}                  field value
- *   {a|b}                    first non-empty of a, b
- *   {year:%04d}              printf-style numeric format
- *   {length:m:ss}            duration format
- *   {rating:stars}           typed renderer
- *   {genre:join(", ")}       set join
- *   {path:basename}          transform
- *   [ ... ]                  group that vanishes if any field inside is empty
- */
+// Parses a format string by the grammar in DESIGN-SPEC §5.5: {field}, {a|b}, {field:spec}, {genre:join(", ")} and [ groups ] that vanish when a field inside is empty.
 export function parse_format(input: string): Token[] {
   let i = 0
 
@@ -154,11 +143,11 @@ export function format_string(template: string, get: FormatSource): string {
   return render_tokens(parse_format(template), get).text
 }
 
-/** Convenience for the common case of formatting a plain record. */
+// Convenience for the common case of formatting a plain record.
 export const format_record = (template: string, row: Record<string, FormatValue>): string =>
   format_string(template, (f) => row[f])
 
-/** Every field a template references, so a caller knows what to fetch. */
+// Every field a template references, so a caller knows what to fetch.
 export function template_fields(template: string): string[] {
   const out = new Set<string>()
   const walk = (tokens: readonly Token[]): void => {

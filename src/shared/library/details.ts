@@ -1,5 +1,4 @@
 // Everything X-Music knows about one track.
-//
 // This is where the entity model becomes visible to the user: not just tags, but how many sources
 // back the track, where each one is, which will actually play, and how the track came to be
 // identified the way it is (DESIGN-SPEC §6.5). Read-only.
@@ -32,7 +31,7 @@ export interface DetailMedia {
   subtrackIndex: number
   startMs: number | null
   endMs: number | null
-  /** Raw tags read from this source, so disagreements between sources stay visible. */
+  // Raw tags read from this source, so disagreements between sources stay visible.
   tags: { field: string; value: string }[]
 }
 
@@ -82,11 +81,11 @@ export interface TrackDetails {
     rgAlbumGain: number | null
   }
 
-  /** Most recent first, capped: the full list can run to hundreds of entries. */
+  // Most recent first, capped: the full list can run to hundreds of entries.
   history: HistoryEntry[]
   historyTotal: number
 
-  /** Present when this track absorbed others, so the merge can be found and undone. */
+  // Present when this track absorbed others, so the merge can be found and undone.
   merges: { batchId: string; at: number; absorbed: number }[]
 }
 

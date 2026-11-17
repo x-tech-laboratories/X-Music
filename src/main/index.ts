@@ -51,8 +51,7 @@ function show_existing_window(): void {
   if (window) bring_to_front(window)
 }
 
-// Cached covers cannot be served over file:// under the renderer's CSP, so they get their own
-// scheme. Registered before ready, as Electron requires.
+// Cached covers cannot be served over file:// under the renderer's CSP, so they get their own scheme. Registered before ready, as Electron requires.
 protocol.registerSchemesAsPrivileged([{
   scheme: 'x-music-art',
   privileges: { standard: true, secure: true, supportFetchAPI: true, bypassCSP: false }

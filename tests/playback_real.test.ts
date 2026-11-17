@@ -35,8 +35,7 @@ describe.runIf(has_live_library() && mpv)('playback against the real library', (
     await player.set_volume(0)
     await player.play_track(row.id)
 
-    // Poll rather than sleep a fixed amount: mpv start-up is slower when the whole suite is
-    // running in parallel, and a fixed wait turns that into a flake.
+    // Poll rather than sleep a fixed amount: mpv start-up is slower when the whole suite is running in parallel, and a fixed wait turns that into a flake.
     const deadline = Date.now() + 15_000
     while (Date.now() < deadline) {
       const s = player.status()
@@ -64,8 +63,7 @@ describe.runIf(has_live_library() && mpv)('playback against the real library', (
       if (e === 'state') seen.push((p as { state: string }).state)
     })
 
-    // Start-up used to hang here: the setup commands waited on the promise start-up itself
-    // resolves. A timeout rather than a hang is the point of this assertion.
+    // Start-up used to hang here: the setup commands waited on the promise start-up itself resolves. A timeout rather than a hang is the point of this assertion.
     await engine.set_volume(0)
 
     const db = open_live_copy('x-music-play-check.db')

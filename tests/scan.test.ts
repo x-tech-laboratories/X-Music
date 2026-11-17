@@ -13,7 +13,7 @@ import { add_track, fresh_db, type TestDb } from './sqlite.ts'
 let dir: string
 let db: TestDb
 
-/** A tiny but genuinely parseable FLAC: signature, STREAMINFO with an md5, then padding. */
+// A tiny but genuinely parseable FLAC: signature, STREAMINFO with an md5, then padding.
 function flac(md5: string, audio: Buffer): Buffer {
   const streaminfo = Buffer.alloc(34)
   streaminfo.writeUInt16BE(4096, 0)
@@ -159,8 +159,7 @@ describe('scanning', () => {
 
   it('reports an outcome for every file it touches', async () => {
     await writeFile(join(dir, 'a.flac'), flac('3'.repeat(32), Buffer.alloc(512, 20)))
-    // A file with no valid preamble is what actually fails to parse; a truncated-but-signed file
-    // is tolerated by music-metadata and indexed with empty tags.
+    // A file with no valid preamble is what actually fails to parse; a truncated-but-signed file is tolerated by music-metadata and indexed with empty tags.
     await writeFile(join(dir, 'bad.flac'), Buffer.from('this is definitely not audio at all'))
 
     const seen: { path: string; outcome: string }[] = []

@@ -1,5 +1,4 @@
 // mpv backend, driven over its JSON IPC socket.
-//
 // mpv is used for the same reason gmusicbrowser eventually added an mpv backend: gapless, format
 // coverage, precise seeking and output backend selection are unglamorous and enormous to re-solve,
 // and mpv has already solved them. X-Music talks to it as a subprocess rather than linking libmpv,
@@ -29,10 +28,10 @@ interface Pending {
   reject: (err: Error) => void
 }
 
-/** Unique per engine instance: two engines in one process must not share an IPC socket. */
+// Unique per engine instance: two engines in one process must not share an IPC socket.
 let instance_counter = 0
 
-/** A Unix socket path holds about a hundred bytes, so a long temporary folder falls back to /tmp. */
+// A Unix socket path holds about a hundred bytes, so a long temporary folder falls back to /tmp.
 const SOCKET_PATH_LIMIT = 100
 
 const PROP_POSITION = 1
@@ -42,11 +41,11 @@ const PROP_IDLE = 4
 
 export interface MpvOptions {
   binary?: string
-  /** Receives mpv's own diagnostics, which are otherwise discarded. */
+  // Receives mpv's own diagnostics, which are otherwise discarded.
   on_log?: (line: string) => void
-  /** How often mpv reports position, in seconds. The UI interpolates between ticks. */
+  // How often mpv reports position, in seconds. The UI interpolates between ticks.
   position_interval?: number
-  /** How long mpv has to open its socket before start-up counts as failed. */
+  // How long mpv has to open its socket before start-up counts as failed.
   start_timeout_ms?: number
   extra_args?: readonly string[]
 }
@@ -63,11 +62,11 @@ export class MpvEngine implements PlaybackEngine {
   private state: EngineState = 'idle'
   private position_ms = 0
   private duration_ms: number | null = null
-  /** Start-up under way or done; null before the first command and after mpv fails or exits. */
+  // Start-up under way or done; null before the first command and after mpv fails or exits.
   private ready: Promise<void> | null = null
-  /** mpv's last diagnostic line, which explains a failed start. */
+  // mpv's last diagnostic line, which explains a failed start.
   private last_log = ''
-  /** Set while a load is in flight, so mpv going idle mid-swap is not read as the track ending. */
+  // Set while a load is in flight, so mpv going idle mid-swap is not read as the track ending.
   private swapping = false
 
   private readonly opts: MpvOptions
@@ -89,7 +88,7 @@ export class MpvEngine implements PlaybackEngine {
     this.emit('state', error ? { state, error } : { state })
   }
 
-  /** Starts mpv on first use, and again after a failed start or an exit, so the next command is the retry. */
+  // Starts mpv on first use, and again after a failed start or an exit, so the next command is the retry.
   private started(): Promise<void> {
     if (!this.ready) {
       this.ready = this.start().catch((err: Error) => {
@@ -152,7 +151,7 @@ export class MpvEngine implements PlaybackEngine {
     await this.observe()
   }
 
-  /** mpv creates the socket a moment after starting, so connecting retries until mpv stops or time runs out. */
+  // mpv creates the socket a moment after starting, so connecting retries until mpv stops or time runs out.
   private connect(stopped: () => string | null): Promise<void> {
     const timeout_ms = this.opts.start_timeout_ms ?? 10_000
     const deadline = Date.now() + timeout_ms
@@ -198,7 +197,7 @@ export class MpvEngine implements PlaybackEngine {
     this.pending.clear()
   }
 
-  /** Stops the process and closes the socket, after a failed start or on dispose. */
+  // Stops the process and closes the socket, after a failed start or on dispose.
   private halt(): void {
     this.socket?.destroy()
     this.socket = null
@@ -268,10 +267,7 @@ export class MpvEngine implements PlaybackEngine {
     }
   }
 
-  /**
-   * Writes a command straight to the socket. Used during start-up, where waiting on `ready` would
-   * deadlock: `ready` is the promise that start-up itself resolves.
-   */
+  // Writes a command straight to the socket. Used during start-up, where waiting on `ready` would deadlock: `ready` is the promise that start-up itself resolves.
   private send(...args: unknown[]): Promise<unknown> {
     return new Promise((resolve, reject) => {
       if (!this.socket) {
@@ -284,7 +280,7 @@ export class MpvEngine implements PlaybackEngine {
     })
   }
 
-  /** Waits for start-up before sending, for everything after it. */
+  // Waits for start-up before sending, for everything after it.
   private command(...args: unknown[]): Promise<unknown> {
     return this.started().then(() => this.send(...args))
   }
@@ -299,12 +295,7 @@ export class MpvEngine implements PlaybackEngine {
     await this.send('set_property', 'options/audio-buffer', String(interval))
   }
 
-  /**
-   * mpv 0.38 added an insert-index parameter to loadfile, so the signature is
-   * `loadfile <url> <flags> <index> <options>`. Passing options in the index slot fails with
-   * "invalid parameter", and an empty options string is rejected outright — so the argument list
-   * is built rather than padded.
-   */
+  // mpv 0.38 added an insert-index parameter to loadfile, so the signature is `loadfile <url> <flags> <index> <options>`. Passing options in the index slot fails with "invalid parameter", and an empty options string is rejected outright — so the argument list is built rather than padded.
   private load_args(uri: string, mode: 'replace' | 'append', opts?: LoadOptions): unknown[] {
     const flags = this.apply_options(opts)
     return flags.length > 0

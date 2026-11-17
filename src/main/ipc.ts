@@ -60,8 +60,7 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
   // A scan runs at most once at a time; the flag is what cancel flips.
   let scanning: { aborted: boolean } | null = null
 
-  // Without mpv the app still runs and the library still works; only audio is unavailable, and the
-  // player reports that plainly rather than failing at the first click.
+  // Without mpv the app still runs and the library still works; only audio is unavailable, and the player reports that plainly rather than failing at the first click.
   const play_log = logger('play')
   const mpv_path = await find_mpv()
   if (!mpv_path) play_log.warn('mpv not found; playback is disabled', { hint: 'set X_MUSIC_MPV' })

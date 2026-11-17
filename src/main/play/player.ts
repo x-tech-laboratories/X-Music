@@ -1,5 +1,4 @@
 // What plays, and what plays next.
-//
 // This owns every decision X-Music makes about playback and none of the audio: which of a track's
 // media to use, when a play counts as a play rather than a skip, how the queue drains against the
 // standing playlist, and what repeat and shuffle mean. The engine underneath is injected, so all of
@@ -27,11 +26,7 @@ export type PlayerListener = <E extends keyof PlayerEvents>(
   payload: PlayerEvents[E]
 ) => void
 
-/**
- * A play counts once the listener has heard enough of it to mean it. Anything less that is skipped
- * forward counts as a skip. These are the conventional thresholds and they matter, because play
- * counts drive weighted shuffle and smart playlists.
- */
+// A play counts once the listener has heard enough of it to mean it. Anything less that is skipped forward counts as a skip. These are the conventional thresholds and they matter, because play counts drive weighted shuffle and smart playlists.
 export const PLAY_THRESHOLD_RATIO = 0.5
 export const PLAY_THRESHOLD_MS = 240_000
 
@@ -41,7 +36,7 @@ export function counts_as_play(position_ms: number, duration_ms: number | null):
   return position_ms / duration_ms >= PLAY_THRESHOLD_RATIO
 }
 
-/** Deterministic shuffle, so an order can be reproduced and tested. */
+// Deterministic shuffle, so an order can be reproduced and tested.
 export function shuffle_order(length: number, seed: number): number[] {
   const order = Array.from({ length }, (_, i) => i)
   let s = seed | 0 || 1
@@ -56,7 +51,7 @@ export function shuffle_order(length: number, seed: number): number[] {
 }
 
 export interface PlayerOptions {
-  /** How ReplayGain is applied; 'off' leaves the file alone. */
+  // How ReplayGain is applied; 'off' leaves the file alone.
   replay_gain?: 'off' | 'track' | 'album'
   preamp_db?: number
   // Runs after the player writes to the library, such as a counted play, so the track history sees it.
@@ -83,9 +78,9 @@ export class Player {
   repeat: RepeatMode = 'off'
   shuffle = false
 
-  /** Highest position reached in the current track, so a seek back cannot fake a play. */
+  // Highest position reached in the current track, so a seek back cannot fake a play.
   private furthest_ms = 0
-  /** A track resolves to exactly one outcome: played, skipped, or neither. Never both. */
+  // A track resolves to exactly one outcome: played, skipped, or neither. Never both.
   private settled = false
   private seed = 1
 
@@ -121,14 +116,7 @@ export class Player {
     return get_player_track(this.db, id)
   }
 
-  /**
-   * The best source that is actually there.
-   *
-   * Existence is checked rather than trusted: a library imported from elsewhere, or scanned before
-   * a drive was unplugged, is full of rows whose files have since gone. Handing one of those to the
-   * engine produces "loading failed", which tells the listener nothing. A row found to be absent is
-   * marked so, which also means the library corrects itself as it is used.
-   */
+  // The best source that is actually there. Existence is checked rather than trusted: a library imported from elsewhere, or scanned before a drive was unplugged, is full of rows whose files have since gone. Handing one of those to the engine produces "loading failed", which tells the listener nothing. A row found to be absent is marked so, which also means the library corrects itself as it is used.
   private load_media(track_id: string): PlayerMedia | null {
     const rows = list_playable_files(this.db, track_id)
 
@@ -156,7 +144,7 @@ export class Player {
     return null
   }
 
-  /** Whether a track has any file on disk, without loading it. */
+  // Whether a track has any file on disk, without loading it.
   private has_any_media(track_id: string): boolean {
     return has_any_file(this.db, track_id)
   }
@@ -171,7 +159,7 @@ export class Player {
     this.opts.after_write?.()
   }
 
-  /** Called when a track is abandoned before it counted as played. */
+  // Called when a track is abandoned before it counted as played.
   private record_skip(): void {
     if (this.settled || !this.current_track) return
     // Barely-started tracks are not skips; the listener changed their mind before it began.
@@ -187,7 +175,7 @@ export class Player {
     this.order = this.shuffle ? shuffle_order(this.context.length, this.seed) : null
   }
 
-  /** Position of `contextIndex` within the walk order. */
+  // Position of `contextIndex` within the walk order.
   private order_position(): number {
     if (!this.order) return this.context_index
     return this.order.indexOf(this.context_index)
@@ -286,7 +274,7 @@ export class Player {
     void this.preload_next().catch(() => undefined)
   }
 
-  /** Runs an engine call, turning its failure into the error state the listener sees rather than a rejection. */
+  // Runs an engine call, turning its failure into the error state the listener sees rather than a rejection.
   private async drive(work: () => Promise<void>): Promise<boolean> {
     try {
       await work()
@@ -299,7 +287,7 @@ export class Player {
     }
   }
 
-  /** Tells the engine what is coming, so it can make the transition gapless. */
+  // Tells the engine what is coming, so it can make the transition gapless.
   private async preload_next(): Promise<void> {
     if (!this.engine.preload) return
     const upcoming = this.peek_next()

@@ -14,7 +14,7 @@ let db: TestDb
 let engine: NullEngine
 let player: Player
 
-/** Files must really exist now that the player checks, so the default one is created. */
+// Files must really exist now that the player checks, so the default one is created.
 let scratch: string
 
 function make_track(o: {

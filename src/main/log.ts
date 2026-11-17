@@ -1,5 +1,4 @@
 // The main process's logger.
-//
 // Configured entirely by environment, so a user reporting a problem can turn on detail without a
 // rebuild: X_MUSIC_LOG=debug, or X_MUSIC_LOG=warn,play:debug to make one area noisy while the rest
 // stays quiet. X_MUSIC_LOG_FILE additionally appends to a file.
@@ -33,7 +32,7 @@ export const log = create_logger('app', spec, sink)
 
 export const logger = (scope: string): Logger => create_logger(scope, spec, sink)
 
-/** Records arriving from the renderer, already levelled and scoped there. */
+// Records arriving from the renderer, already levelled and scoped there.
 export function log_from_renderer(level: Level, scope: string, message: string, data?: unknown): void {
   create_logger(`ui:${scope}`, spec, sink)[level](message, data)
 }

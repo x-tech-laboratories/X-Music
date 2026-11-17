@@ -1,10 +1,8 @@
 // Merging several track records into one.
-//
 // §3.5.0 deliberately refuses to guess that two different files are the same recording, which
 // leaves the user to say so. The model follows Thunderbird CardBook: resolve conflicts per *field*
 // rather than picking a winning record, because the right answer is usually spread across sources —
 // one file has the better title, another has the year, a third has the genre.
-//
 // Every merge is journaled in full and can be undone. That is a prerequisite, not a nicety: a merge
 // deletes rows holding ratings and play history that cannot be reconstructed from the files. The
 // track history records each merge as well, but only this journal holds the plays and playlist
@@ -23,9 +21,9 @@ export type Resolution =
 export interface MergeRequest {
   ids: readonly string[]
   survivor: string
-  /** Field id → how to resolve it. Fields left out take the survivor's value. */
+  // Field id → how to resolve it. Fields left out take the survivor's value.
   resolutions?: Record<string, Resolution>
-  /** Field id → an explicit value, for a field the user typed rather than chose. */
+  // Field id → an explicit value, for a field the user typed rather than chose.
   overrides?: Record<string, string | number | null>
 }
 
@@ -39,10 +37,10 @@ export interface PreviewField {
   name: string
   multi: boolean
   conflict: boolean
-  /** Present when every source agrees. */
+  // Present when every source agrees.
   value?: string | number | null | string[]
   options?: FieldOption[]
-  /** For multi-value fields, the union of every source. */
+  // For multi-value fields, the union of every source.
   union?: string[]
 }
 
@@ -67,7 +65,7 @@ export interface MergePreview {
     firstPlayed: number | null
     lastPlayed: number | null
   }
-  /** True when at least one source is pinned; merging overrides a human decision. */
+  // True when at least one source is pinned; merging overrides a human decision.
   pinnedSources: string[]
 }
 
@@ -80,7 +78,7 @@ export interface MergeResult {
   playlistEntriesRepointed: number
 }
 
-/** Scalar fields offered for resolution, in the order a person reads them. */
+// Scalar fields offered for resolution, in the order a person reads them.
 const SCALAR_FIELDS = [
   'title', 'album', 'year', 'track_number', 'disc_number', 'length', 'bpm', 'compilation'
 ] as const
@@ -183,10 +181,7 @@ const same_scalar = (a: string | number | null, b: string | number | null): bool
 const same_set = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && a.every((v, i) => v === b[i])
 
-/**
- * Describes what a merge would do, without doing it. The dialog is a rendering of this structure,
- * which keeps the resolution rules testable without a DOM.
- */
+// Describes what a merge would do, without doing it. The dialog is a rendering of this structure, which keeps the resolution rules testable without a DOM.
 export function merge_preview(database: SqlDatabase, ids: readonly string[]): MergePreview {
   if (ids.length < 2) throw new Error('a merge needs at least two tracks')
 
@@ -446,7 +441,7 @@ const track_columns = [
   'skip_count', 'first_played', 'last_played', 'last_skipped', 'added', 'pinned', 'mb_recording_id'
 ] as const
 
-/** Puts the library back exactly as it was before a merge. */
+// Puts the library back exactly as it was before a merge.
 export function unmerge(database: SqlDatabase, batch_id: string): UnmergeResult {
   const entry = first_row<{ survivor_id: string; snapshot: string; undone: number }>(database,
     'SELECT survivor_id, snapshot, undone FROM merge_journal WHERE batch_id = ?', batch_id)

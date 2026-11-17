@@ -5,14 +5,13 @@ export type FieldType =
   | 'string' | 'text' | 'set' | 'artist' | 'integer' | 'float' | 'rating'
   | 'date' | 'datelist' | 'duration' | 'bool' | 'path' | 'enum'
 
-// 'media' fields describe a physical source rather than the music; they match when ANY of a
-// track's media satisfies the predicate.
+// 'media' fields describe a physical source rather than the music; they match when ANY of a track's media satisfies the predicate.
 export type FieldStorage = 'column' | 'multi' | 'extra' | 'media' | 'computed'
 
 export type FieldFlag =
   | 'filterable' | 'groupable' | 'sortable' | 'editable' | 'columnar' | 'searchable' | 'writable'
 
-/** Per-container tag mappings, keyed by tag format. */
+// Per-container tag mappings, keyed by tag format.
 export interface TagMapping {
   id3v2?: string
   vorbis?: string
@@ -26,24 +25,21 @@ export interface FieldDescriptor {
   type: FieldType
   storage: FieldStorage
   flags: readonly FieldFlag[]
-  /** Physical column name when storage is 'column'; defaults to id. */
+  // Physical column name when storage is 'column'; defaults to id.
   column?: string
-  /** Stable numeric id for multi-value and extra storage; must never be reused. */
+  // Stable numeric id for multi-value and extra storage; must never be reused.
   field_id?: number
   tags?: TagMapping
   range?: readonly [number, number]
   width?: number
   align?: 'left' | 'right'
-  /** Populated for computed fields: a SQL expression over the tracks table. */
+  // Populated for computed fields: a SQL expression over the tracks table.
   expr?: string
 }
 
 const f = (d: FieldDescriptor): FieldDescriptor => d
 
-/**
- * The v1 built-in catalogue. This is deliberately data, not code — user-defined fields are
- * appended to it at runtime and are indistinguishable from built-ins downstream.
- */
+// The v1 built-in catalogue. This is deliberately data, not code — user-defined fields are appended to it at runtime and are indistinguishable from built-ins downstream.
 export const BUILTIN_FIELDS: readonly FieldDescriptor[] = [
   // ── file / physical ────────────────────────────────────────────────────────
   f({ id: 'path', name: 'Path', type: 'path', storage: 'media', column: 'uri', width: 400,
@@ -155,7 +151,7 @@ export function fields_with(flag: FieldFlag): FieldDescriptor[] {
   return BUILTIN_FIELDS.filter((d) => d.flags.includes(flag))
 }
 
-/** Stars are the display unit; 0-100 is the storage unit. See DESIGN-SPEC §3.6. */
+// Stars are the display unit; 0-100 is the storage unit. See DESIGN-SPEC §3.6.
 export const stars_to_rating = (stars: number): number => Math.round(stars * 20)
 export const rating_to_stars = (rating: number | null): number | null =>
   rating === null ? null : rating / 20

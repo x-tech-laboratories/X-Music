@@ -16,7 +16,7 @@ const ARTISTS = ['Miles Davis', 'The Beatles', 'Aphex Twin', 'Nina Simone', 'Bil
 const ALBUMS = ['Kind of Blue', 'Revolver', 'Selected Ambient Works', 'Pastel Blues', 'Waltz for Debby']
 const CODECS = ['flac', 'mp3', 'opus', 'aac']
 
-/** xorshift32: small, fast, and identical across runs and platforms. */
+// xorshift32: small, fast, and identical across runs and platforms.
 export function rng(seed: number): () => number {
   let s = seed | 0 || 1
   return () => {
@@ -59,8 +59,7 @@ export function make_corpus(n: number, seed = 42): Corpus {
         bpm: maybe(60 + Math.floor(r() * 140), 0.3),
         compilation: r() < 0.1 ? 1 : 0
       },
-      // Most tracks have one file; some have a second copy in another format, and a few have none
-      // at all — which the entity model treats as ordinary, not as an error.
+      // Most tracks have one file; some have a second copy in another format, and a few have none at all — which the entity model treats as ordinary, not as an error.
       media: (() => {
         const n = r() < 0.05 ? 0 : r() < 0.2 ? 2 : 1
         return Array.from({ length: n }, (_, k) => ({

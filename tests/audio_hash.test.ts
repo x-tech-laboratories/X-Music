@@ -10,7 +10,7 @@ import { hash_audio } from '@main/library/audio_hash'
 
 let dir: string
 
-/** A minimal but structurally valid FLAC: 'fLaC' + STREAMINFO block with a known MD5. */
+// A minimal but structurally valid FLAC: 'fLaC' + STREAMINFO block with a known MD5.
 function flac_with(md5: Buffer, audio: Buffer): Buffer {
   const streaminfo = Buffer.alloc(34)
   streaminfo.writeUInt16BE(4096, 0)   // min block size
@@ -21,7 +21,7 @@ function flac_with(md5: Buffer, audio: Buffer): Buffer {
   return Buffer.concat([Buffer.from('fLaC'), header, streaminfo, last, Buffer.alloc(4), audio])
 }
 
-/** ID3v2.4 header with a syncsafe size, followed by frames and an optional ID3v1 trailer. */
+// ID3v2.4 header with a syncsafe size, followed by frames and an optional ID3v1 trailer.
 function mp3_with(tag_bytes: number, audio: Buffer, id3v1 = false): Buffer {
   const header = Buffer.alloc(10)
   header.write('ID3', 0, 'latin1')
@@ -48,7 +48,7 @@ function box(type: string, payload: Buffer): Buffer {
   return Buffer.concat([head, payload])
 }
 
-/** ftyp, then moov carrying a tag of the given size, then mdat; or mdat first when `mdatFirst`. */
+// ftyp, then moov carrying a tag of the given size, then mdat; or mdat first when `mdatFirst`.
 function m4a_with(tag_bytes: number, audio: Buffer, mdat_first = false): Buffer {
   const ftyp = box('ftyp', Buffer.from('M4A \0\0\0\0M4A isom', 'latin1'))
   const moov = box('moov', box('udta', box('meta', Buffer.alloc(tag_bytes, 0x61))))
@@ -56,7 +56,7 @@ function m4a_with(tag_bytes: number, audio: Buffer, mdat_first = false): Buffer 
   return Buffer.concat(mdat_first ? [ftyp, mdat, moov] : [ftyp, moov, mdat])
 }
 
-/** One Ogg page holding the given lacing values and body; CRC is left zero, which the hasher never checks. */
+// One Ogg page holding the given lacing values and body; CRC is left zero, which the hasher never checks.
 function ogg_page(serial: number, seq: number, flags: number, lacing: number[], body: Buffer): Buffer {
   const head = Buffer.alloc(27)
   head.write('OggS', 0, 'latin1')
@@ -67,13 +67,10 @@ function ogg_page(serial: number, seq: number, flags: number, lacing: number[], 
   return Buffer.concat([head, Buffer.from(lacing), body])
 }
 
-/** Lacing values for one whole packet of length `n`. */
+// Lacing values for one whole packet of length `n`.
 const lace = (n: number): number[] => [...Array<number>(Math.floor(n / 255)).fill(255), n % 255]
 
-/**
- * An Opus stream: OpusHead on its own page, OpusTags of the given size on the next (spilling over
- * pages when large, as real retags do), then audio packets paginated after it.
- */
+// An Opus stream: OpusHead on its own page, OpusTags of the given size on the next (spilling over pages when large, as real retags do), then audio packets paginated after it.
 function opus_with(tag_bytes: number, audio_packets: Buffer[], serial = 1): Buffer {
   const pages: Buffer[] = []
   let seq = 0

@@ -203,8 +203,7 @@ interface JournalEntry {
   undone: number
 }
 
-// The numbers in a merge still to undo that now belong to a row made after it: an absorbed track's number on any live
-// track, a file's on one added after the merge, a play's on one that is not the survivor's.
+// The numbers in a merge still to undo that now belong to a row made after it: an absorbed track's number on any live track, a file's on one added after the merge, a play's on one that is not the survivor's.
 function reused_numbers(database: SqlDatabase, entry: JournalEntry, snapshot: OldSnapshot): Map<Numbered, Set<number>> {
   const reused = new Map<Numbered, Set<number>>([['tracks', new Set()], ['media', new Set()], ['play_history', new Set()]])
   if (entry.undone) return reused

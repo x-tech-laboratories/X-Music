@@ -15,7 +15,7 @@ let dir: string
 let cache: string
 let db: TestDb
 
-/** A PNG header with the given dimensions; enough for the size reader and for hashing. */
+// A PNG header with the given dimensions; enough for the size reader and for hashing.
 function png(width: number, height: number, fill = 0): Buffer {
   const buf = Buffer.alloc(64, fill)
   buf.writeUInt32BE(0x89504e47, 0)

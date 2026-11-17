@@ -59,8 +59,7 @@ export function library_backups(database: () => SqlDatabase, path: string, resta
   }
 }
 
-// Opens the library, backing it up first when opening would upgrade its schema; gives back that backup, if one was
-// taken, and what converting an older library did.
+// Opens the library, backing it up first when opening would upgrade its schema; gives back that backup, if one was taken, and what converting an older library did.
 export async function open_library_backed_up(
   database: SqlDatabase, backups: Pick<LibraryBackups, 'create'>
 ): Promise<{ backup: Backup | null; report: UpgradeReport | null }> {

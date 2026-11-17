@@ -1,5 +1,4 @@
 // Imports a parsed gmbrc into X-Music's entity model.
-//
 // gmusicbrowser has one row per file; X-Music has a track plus its media. The import creates one
 // track and one file-media per gmusicbrowser song, which is correct but conservative: it does not
 // try to merge two files that are the same recording. Deduplication is a separate, reviewable
@@ -16,15 +15,15 @@ import type { GmbrcData } from './gmbrc.ts'
 export type { ImportReport }
 
 export interface ImportOptions {
-  /** Import ratings, play counts and history. */
+  // Import ratings, play counts and history.
   statistics?: boolean
-  /** Import genre, grouping and label as multi-value fields. */
+  // Import genre, grouping and label as multi-value fields.
   labels?: boolean
-  /** Import SavedLists as static playlists. */
+  // Import SavedLists as static playlists.
   playlists?: boolean
 }
 
-/** gmusicbrowser timestamps are unix seconds; X-Music stores milliseconds. */
+// gmusicbrowser timestamps are unix seconds; X-Music stores milliseconds.
 const to_ms = (secs: number | undefined): number | null =>
   secs === undefined || secs <= 0 ? null : secs * 1000
 
@@ -67,7 +66,7 @@ export function import_gmbrc(database: SqlDatabase, data: GmbrcData, opts: Impor
   const now = Date.now()
   const upsert = create_upserter(database)
 
-  /** gmusicbrowser song id to X-Music track id, so SavedLists can be resolved afterwards. */
+  // gmusicbrowser song id to X-Music track id, so SavedLists can be resolved afterwards.
   const track_by_gmb_id = new Map<number, string>()
 
   in_transaction(database, () => {

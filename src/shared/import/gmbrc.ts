@@ -1,10 +1,8 @@
 // Parser for gmusicbrowser's gmbrc file.
-//
 // The format is a sectioned text file. [Options] is YAML-ish key/value; [Songs] is a tab-separated
 // table whose first line names the columns; [album] and [artist] hold picture associations. Values
 // in filesystem-derived columns are percent-encoded, and multi-value fields use a literal "\x00"
 // separator — the four characters, not a NUL byte.
-//
 // Reading only. Nothing here opens a file for writing, and the importer never touches the music.
 
 export interface GmbSong {
@@ -18,7 +16,7 @@ export interface GmbSong {
   comment?: string
   compilation?: boolean
   disc?: number
-  /** Filename within `path`, already percent-decoded. */
+  // Filename within `path`, already percent-decoded.
   file?: string
   filetype?: string
   genre: string[]
@@ -29,7 +27,7 @@ export interface GmbSong {
   length?: number
   missing?: boolean
   modif?: number
-  /** Directory, already percent-decoded. */
+  // Directory, already percent-decoded.
   path?: string
   play_count?: number
   play_history: number[]
@@ -47,7 +45,7 @@ export interface GmbSong {
 
 export interface GmbSavedFilter {
   name: string
-  /** The raw gmusicbrowser filter string, e.g. "rating:h:50". */
+  // The raw gmusicbrowser filter string, e.g. "rating:h:50".
   expression: string
 }
 
@@ -62,13 +60,13 @@ export interface GmbrcData {
   songs: GmbSong[]
   saved_filters: GmbSavedFilter[]
   saved_lists: GmbSavedList[]
-  /** Column names present in [Songs] that this parser does not map. */
+  // Column names present in [Songs] that this parser does not map.
   unmapped_columns: string[]
 }
 
 const MULTI_SEP = '\\x00'
 
-/** gmusicbrowser percent-encodes filesystem names; a malformed escape must not lose the value. */
+// gmusicbrowser percent-encodes filesystem names; a malformed escape must not lose the value.
 function decode(v: string): string {
   if (!v.includes('%')) return v
   try {
@@ -150,7 +148,7 @@ function parse_song_row(columns: readonly string[], line: string): GmbSong | nul
   return song
 }
 
-/** Strips one layer of gmbrc quoting from an [Options] scalar. */
+// Strips one layer of gmbrc quoting from an [Options] scalar.
 function unquote(v: string): string {
   const t = v.trim()
   if (t.length >= 2 && ((t[0] === '"' && t.endsWith('"')) || (t[0] === "'" && t.endsWith("'")))) {
@@ -230,7 +228,7 @@ export function parse_gmbrc(text: string): GmbrcData {
   return data
 }
 
-/** Where gmusicbrowser keeps its configuration by default. */
+// Where gmusicbrowser keeps its configuration by default.
 export function default_gmbrc_path(home: string, platform: string): string {
   if (platform === 'win32') return `${home}/gmusicbrowser/gmbrc`
   if (platform === 'darwin') return `${home}/Library/Preferences/gmusicbrowser/gmbrc`

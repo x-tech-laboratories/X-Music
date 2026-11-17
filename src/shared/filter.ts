@@ -27,7 +27,7 @@ export interface LeafNode {
   field: string
   op: LeafOp
   value?: FilterValue
-  /** Case-sensitive comparison; defaults to false for string ops. */
+  // Case-sensitive comparison; defaults to false for string ops.
   cs?: boolean
 }
 
@@ -44,7 +44,7 @@ export const is_group = (n: FilterNode): n is GroupNode =>
 export interface SortKey {
   field: string
   dir?: 'asc' | 'desc'
-  /** Seed policy for the `random` pseudo-field. */
+  // Seed policy for the `random` pseudo-field.
   seed?: string
 }
 
@@ -68,14 +68,14 @@ export const not = (child: FilterNode): GroupNode => ({ op: 'not', children: [ch
 export const leaf = (field: string, op: LeafOp, value?: FilterValue): LeafNode =>
   value === undefined ? { field, op } : { field, op, value }
 
-/** Walks the tree, collecting every field the filter touches. */
+// Walks the tree, collecting every field the filter touches.
 export function referenced_fields(node: FilterNode, into = new Set<string>()): Set<string> {
   if (is_group(node)) node.children.forEach((c) => referenced_fields(c, into))
   else into.add(node.field)
   return into
 }
 
-/** Rejects cycles created by `in_filter` composition before a filter is saved. */
+// Rejects cycles created by `in_filter` composition before a filter is saved.
 export function find_cycle(
   id: string,
   node: FilterNode,

@@ -1,5 +1,4 @@
 // Identity of a FILE, deliberately distinct from identity of the music (DESIGN-SPEC §3.7).
-//
 // The hash covers the audio stream only, with every metadata region excluded, so that retagging a
 // file does not change its hash and a moved or renamed file is still recognisably the same file.
 // AcoustID answers a different question — "is this the same recording?" — and is a hint elsewhere.
@@ -18,7 +17,7 @@ export interface AudioHash {
 
 const HASH_CHUNK = 1 << 20
 
-/** Reads FLAC's STREAMINFO MD5 of the decoded audio — already in the file, free and exact. */
+// Reads FLAC's STREAMINFO MD5 of the decoded audio — already in the file, free and exact.
 async function flac_streaminfo_md5(fh: FileHandle): Promise<AudioHash | null> {
   const head = Buffer.alloc(4)
   await fh.read(head, 0, 4, 0)
@@ -50,10 +49,7 @@ async function flac_streaminfo_md5(fh: FileHandle): Promise<AudioHash | null> {
   }
 }
 
-/**
- * Hashes the payload of every top-level MP4 `mdat` box, which holds the audio samples; tags live
- * in `moov`, so rewriting them never touches what is hashed.
- */
+// Hashes the payload of every top-level MP4 `mdat` box, which holds the audio samples; tags live in `moov`, so rewriting them never touches what is hashed.
 async function mp4_mdat(fh: FileHandle, file_size: number): Promise<AudioHash | null> {
   const ranges: [number, number][] = []
   const header = Buffer.alloc(16)
@@ -88,17 +84,14 @@ async function mp4_mdat(fh: FileHandle, file_size: number): Promise<AudioHash | 
   return { hash: h.digest(), algo: 'sha256-mdat' }
 }
 
-/** The packet index holding the comment header, for each Ogg codec whose layout is known. */
+// The packet index holding the comment header, for each Ogg codec whose layout is known.
 const OGG_COMMENT_PACKET: readonly [magic: string, index: number][] = [
   ['\x01vorbis', 1],
   ['OpusHead', 1],
   ['Speex   ', 1]
 ]
 
-/**
- * Hashes the packets of an Ogg stream with the comment packet left out. Packets rather than pages,
- * because retagging repaginates everything after the comment and so changes every page header.
- */
+// Hashes the packets of an Ogg stream with the comment packet left out. Packets rather than pages, because retagging repaginates everything after the comment and so changes every page header.
 async function ogg_packets(fh: FileHandle, file_size: number, start: number): Promise<AudioHash | null> {
   const h = createHash('sha256')
   // Per logical stream: how many packets have completed, and which one is the comment.
@@ -150,7 +143,7 @@ async function ogg_packets(fh: FileHandle, file_size: number, start: number): Pr
   return hashed ? { hash: h.digest(), algo: 'sha256-ogg-packets' } : null
 }
 
-/** Serves small reads from one large buffered read, so walking thousands of Ogg pages stays cheap. */
+// Serves small reads from one large buffered read, so walking thousands of Ogg pages stays cheap.
 class ChunkReader {
   private buf = Buffer.alloc(0)
   private buf_start = 0
@@ -163,7 +156,7 @@ class ChunkReader {
     this.file_size = file_size
   }
 
-  /** The `n` bytes at `pos`, valid until the next call, or null if the file ends first. */
+  // The `n` bytes at `pos`, valid until the next call, or null if the file ends first.
   async at(pos: number, n: number): Promise<Buffer | null> {
     if (pos + n > this.file_size) return null
     if (pos < this.buf_start || pos + n > this.buf_start + this.buf.length) {
@@ -177,7 +170,7 @@ class ChunkReader {
   }
 }
 
-/** Size of a leading ID3v2 tag, or 0 if there is none. */
+// Size of a leading ID3v2 tag, or 0 if there is none.
 async function id3v2_length(fh: FileHandle): Promise<number> {
   const b = Buffer.alloc(10)
   const { bytesRead: bytes_read } = await fh.read(b, 0, 10, 0)
@@ -189,7 +182,7 @@ async function id3v2_length(fh: FileHandle): Promise<number> {
   return 10 + size + footer
 }
 
-/** Combined size of trailing APEv2 and ID3v1 tags, or 0 if there are none. */
+// Combined size of trailing APEv2 and ID3v1 tags, or 0 if there are none.
 async function trailer_length(fh: FileHandle, file_size: number): Promise<number> {
   let trailer = 0
 
@@ -232,12 +225,7 @@ async function hash_range(fh: FileHandle, start: number, end: number): Promise<B
   return h.digest()
 }
 
-/**
- * Hashes a media file's audio content. FLAC gets its embedded decoded-audio MD5; MP4 and Ogg get
- * their audio payload hashed with the tag structures left out; ID3/APE-tagged formats get their
- * frame region hashed; anything else falls back to a whole-file hash, which is still stable under
- * moves but not under retagging.
- */
+// Hashes a media file's audio content. FLAC gets its embedded decoded-audio MD5; MP4 and Ogg get their audio payload hashed with the tag structures left out; ID3/APE-tagged formats get their frame region hashed; anything else falls back to a whole-file hash, which is still stable under moves but not under retagging.
 export async function hash_audio(path: string): Promise<AudioHash> {
   const fh = await open(path, 'r')
   try {
@@ -271,7 +259,7 @@ export async function hash_audio(path: string): Promise<AudioHash> {
 
 const CONTAINER_EXTENSIONS = new Set(['.m4a', '.m4b', '.mp4', '.aac', '.ogg', '.oga', '.opus', '.spx'])
 
-/** Whether a stored hash should be recomputed: never hashed, or hashed whole before its container was understood. */
+// Whether a stored hash should be recomputed: never hashed, or hashed whole before its container was understood.
 export function needs_rehash(path: string, algo: string | null): boolean {
   if (algo === null) return true
   return algo === 'sha256-file' && CONTAINER_EXTENSIONS.has(extname(path).toLowerCase())

@@ -1,5 +1,4 @@
 // Cover art: finding it, caching it, and remembering that there is none.
-//
 // Art belongs to an album where there is one and to the track otherwise, so a loose single still
 // gets a cover. Resolution is lazy — nothing is extracted until something wants to display it —
 // and the answer is recorded either way, including "nothing found", so a coverless track is not
@@ -18,17 +17,14 @@ import {
 
 export { forget_misses, lookup_artwork, type ArtSource, type Artwork } from '@shared/library/covers'
 
-/**
- * Filenames worth trying, most specific first. Matching is case-insensitive and extension-agnostic,
- * because these conventions are followed loosely in the wild.
- */
+// Filenames worth trying, most specific first. Matching is case-insensitive and extension-agnostic, because these conventions are followed loosely in the wild.
 const FOLDER_NAMES = [
   'cover', 'folder', 'front', 'album', 'albumart', 'albumartsmall', 'thumb', 'artwork'
 ]
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'])
 
-/** Reads image dimensions from the header, so a decoder is not needed just to know the size. */
+// Reads image dimensions from the header, so a decoder is not needed just to know the size.
 export function image_size(buf: Buffer): { width: number; height: number } | null {
   // PNG: IHDR width/height at a fixed offset.
   if (buf.length > 24 && buf.readUInt32BE(0) === 0x89504e47) {
@@ -70,7 +66,7 @@ const extension_for = (mime: string | undefined, fallback = '.jpg'): string => {
   return '.jpg'
 }
 
-/** Looks beside the file for a conventional cover image. */
+// Looks beside the file for a conventional cover image.
 export function find_folder_image(media_path: string): string | null {
   const dir = dirname(media_path)
 
@@ -96,7 +92,7 @@ export function find_folder_image(media_path: string): string | null {
   return images.length === 1 ? join(dir, images[0]!) : null
 }
 
-/** Pulls the front cover out of a file's tags, preferring an explicitly-typed front image. */
+// Pulls the front cover out of a file's tags, preferring an explicitly-typed front image.
 export async function read_embedded(media_path: string): Promise<{ data: Buffer; mime: string } | null> {
   try {
     const meta = await parseFile(media_path, { skipCovers: false })
@@ -110,11 +106,11 @@ export async function read_embedded(media_path: string): Promise<{ data: Buffer;
   }
 }
 
-/** Sizes generated on demand. A request is served by the smallest one that is large enough. */
+// Sizes generated on demand. A request is served by the smallest one that is large enough.
 export const THUMBNAIL_SIZES = [64, 128, 256, 512] as const
 export type ThumbnailSize = (typeof THUMBNAIL_SIZES)[number]
 
-/** Resizes an encoded image, returning encoded bytes. Injected so this module stays testable. */
+// Resizes an encoded image, returning encoded bytes. Injected so this module stays testable.
 export type Resizer = (data: Buffer, size: number) => Buffer | null
 
 export interface ArtworkOptions {
@@ -145,12 +141,7 @@ function store(cache_dir: string, data: Buffer, mime: string | undefined): {
 const thumb_path = (cache_dir: string, hash: string, size: number): string =>
   join(cache_dir, 'thumbs', hash.slice(0, 2), `${hash}-${size}.png`)
 
-/**
- * A cached thumbnail at the given size, generated on first request.
- *
- * Returns the original when the source is already no larger than what was asked for, because
- * upscaling a small cover wastes space and looks worse than letting the layout scale it.
- */
+// A cached thumbnail at the given size, generated on first request. Returns the original when the source is already no larger than what was asked for, because upscaling a small cover wastes space and looks worse than letting the layout scale it.
 export function thumbnail(
   opts: ArtworkOptions,
   art: Artwork,
@@ -179,10 +170,7 @@ export function thumbnail(
   }
 }
 
-/**
- * Finds art for a track and records the outcome. Embedded images win over a folder image, because a
- * file that carries its own cover is more specific than a picture shared by a directory.
- */
+// Finds art for a track and records the outcome. Embedded images win over a folder image, because a file that carries its own cover is more specific than a picture shared by a directory.
 export async function resolve_artwork(
   database: SqlDatabase,
   track_id: string,

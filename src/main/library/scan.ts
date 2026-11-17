@@ -1,5 +1,4 @@
 // Filesystem scanner.
-//
 // Reads only: files are opened 'r' for tag parsing and hashing, and nothing here ever writes to the
 // music tree. Identity resolution is delegated to identity.ts, so scanning a library that was
 // already imported from gmusicbrowser attaches to the existing tracks instead of duplicating them.
@@ -24,9 +23,9 @@ export const AUDIO_EXTENSIONS = new Set([
 ])
 
 export interface ScanOptions {
-  /** Directory names skipped wholesale. */
+  // Directory names skipped wholesale.
   exclude_dirs?: readonly string[]
-  /** Skip hashing; much faster, but move detection stops working. For slow network mounts. */
+  // Skip hashing; much faster, but move detection stops working. For slow network mounts.
   slow?: boolean
   on_progress?: (p: ScanProgress) => void
   on_file?: (r: FileResult) => void
@@ -35,7 +34,7 @@ export interface ScanOptions {
 
 const DEFAULT_EXCLUDES = ['.git', 'node_modules', '@eaDir', '.Trash-1000', 'lost+found']
 
-/** Yields every audio file beneath `root`, depth first, skipping excluded directories. */
+// Yields every audio file beneath `root`, depth first, skipping excluded directories.
 async function* walk(
   root: string,
   excludes: ReadonlySet<string>,
@@ -155,8 +154,7 @@ export async function scan_roots(
       const info = await stat(path)
       const mtime = Math.floor(info.mtimeMs)
 
-      // Unchanged files are the common case on a rescan; skip the expensive part entirely, unless the
-      // stored hash is missing or weaker than what hashing now produces.
+      // Unchanged files are the common case on a rescan; skip the expensive part entirely, unless the stored hash is missing or weaker than what hashing now produces.
       const hit = first_row<{ id: string; algo: string | null }>(db,
         'SELECT id, audio_hash_algo AS algo FROM media WHERE uri = ? AND subtrack_index = 0 AND mtime = ? AND filesize = ?',
         path, mtime, info.size)
@@ -229,8 +227,7 @@ export async function scan_roots(
 
   write()
 
-  // Anything under a scanned root that was not seen is gone from disk. The media is flagged, never
-  // deleted, so its track keeps its rating and history (DESIGN-SPEC §3.4).
+  // Anything under a scanned root that was not seen is gone from disk. The media is flagged, never deleted, so its track keeps its rating and history (DESIGN-SPEC §3.4).
   opts.on_progress?.({ phase: 'finishing', found: files.length, processed: files.length })
 
   if (!opts.signal?.aborted && roots.length > 0) {

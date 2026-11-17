@@ -1,5 +1,4 @@
 // Album identity (DESIGN-SPEC §17.1).
-//
 // An album row's id is what persists; its match_key is derived here from tags and may be
 // recomputed. The importer and the scanner both key albums through this file, so the same file
 // read by either lands on the same album.
@@ -11,10 +10,10 @@ import { all_rows, first_row, new_id, run } from './database.ts'
 
 const KEY_SEP = '\x1f'
 
-/** How many different artists an album without an album artist needs before it counts as a compilation. */
+// How many different artists an album without an album artist needs before it counts as a compilation.
 export const COMPILATION_ARTISTS = 3
 
-/** Splits a tag that holds several values, which containers do inconsistently. */
+// Splits a tag that holds several values, which containers do inconsistently.
 export function split_values(value: string | string[] | null | undefined): string[] {
   if (value === undefined || value === null) return []
   const raw = Array.isArray(value) ? value : [value]
@@ -24,7 +23,7 @@ export function split_values(value: string | string[] | null | undefined): strin
     .filter((v) => v !== '')
 }
 
-/** Casefolds, strips diacritics and collapses whitespace. */
+// Casefolds, strips diacritics and collapses whitespace.
 export function normalize(s: string | null | undefined): string {
   return (s ?? '')
     .normalize('NFKD')
@@ -34,14 +33,14 @@ export function normalize(s: string | null | undefined): string {
     .trim()
 }
 
-/** A trailing bracketed edition note such as "(Remastered)" or "[2011 Deluxe Edition]". */
+// A trailing bracketed edition note such as "(Remastered)" or "[2011 Deluxe Edition]".
 const EDITION_SUFFIX =
   /\s*[([][^)\]]*\b(?:remaster(?:ed)?|deluxe|expanded|anniversary|edition|bonus tracks?|special|collector'?s)\b[^)\]]*[)\]]\s*$/i
 
-/** Names that say nothing about which album a file belongs to. */
+// Names that say nothing about which album a file belongs to.
 const GENERIC_ALBUM = /^(?:unknown(?: album)?|untitled|various(?: artists)?|(?:cd|disc|disk)\s*\d+)$/
 
-/** The album name as keyed: normalized, with edition notes removed so editions share an album. */
+// The album name as keyed: normalized, with edition notes removed so editions share an album.
 export function album_key_name(album: string): string {
   let name = album
   for (let prev = ''; prev !== name;) {
@@ -51,10 +50,7 @@ export function album_key_name(album: string): string {
   return normalize(name) || normalize(album)
 }
 
-/**
- * The first artist in a tag, normalized and without featured guests, so "A; B" from one reader and
- * "A feat. C" from another both count as A.
- */
+// The first artist in a tag, normalized and without featured guests, so "A; B" from one reader and "A feat. C" from another both count as A.
 const primary_artist = (raw: string | null | undefined): string =>
   normalize((split_values(raw)[0] ?? '').split(/\s+(?:feat\.?|ft\.|featuring)\s+/i)[0])
 
@@ -67,7 +63,7 @@ export interface AlbumInput {
   mb_release_id?: string | null
 }
 
-/** The folder, only when the album name is too generic to tell albums apart on its own. */
+// The folder, only when the album name is too generic to tell albums apart on its own.
 function folder_tie_break(album: string, uri: string | null | undefined): string {
   return uri && GENERIC_ALBUM.test(normalize(album)) ? folder_of(uri) : ''
 }
@@ -90,16 +86,13 @@ export function folder_of(path: string): string {
   return path.slice(0, end)
 }
 
-/** The key an album of many artists is filed under: no artist component. */
+// The key an album of many artists is filed under: no artist component.
 export function compilation_key(t: AlbumInput, uri?: string | null): string | null {
   if (!t.album?.trim()) return null
   return ['c', album_key_name(t.album), t.year ?? '', folder_tie_break(t.album, uri)].join(KEY_SEP)
 }
 
-/**
- * The album a track belongs to: its MusicBrainz release when tagged, otherwise album artist (or
- * track artist), name and year, with tagged compilations dropping the artist.
- */
+// The album a track belongs to: its MusicBrainz release when tagged, otherwise album artist (or track artist), name and year, with tagged compilations dropping the artist.
 export function album_match_key(t: AlbumInput, uri?: string | null): string | null {
   if (!t.album?.trim()) return null
   if (t.mb_release_id) return ['mb', t.mb_release_id].join(KEY_SEP)
@@ -117,10 +110,7 @@ export interface RegroupReport {
   albums_removed: number
 }
 
-/**
- * Moves albums with no album artist and at least three track artists onto one compilation album,
- * then deletes album rows nothing points at. Pinned albums and pinned tracks are left alone.
- */
+// Moves albums with no album artist and at least three track artists onto one compilation album, then deletes album rows nothing points at. Pinned albums and pinned tracks are left alone.
 export function regroup_albums(database: SqlDatabase): RegroupReport {
   const report: RegroupReport = { compilations_found: 0, tracks_moved: 0, albums_removed: 0 }
   const artist_field = field('artist').field_id!

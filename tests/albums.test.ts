@@ -15,7 +15,7 @@ const albums = (): number => (db.prepare('SELECT COUNT(*) AS n FROM albums').get
 const album_of = (track_id: string): string =>
   (db.prepare('SELECT album_id AS a FROM tracks WHERE id = ?').get(track_id) as { a: string }).a
 
-/** Imports one track at `uri`, returning its track id. */
+// Imports one track at `uri`, returning its track id.
 function add(t: TrackCandidate, uri: string): string {
   const sets = { artist: t.artist ? [t.artist] : [], album_artist: t.album_artist ? [t.album_artist] : [] }
   return upsert({ sets, ...t }, { uri }, { metadata: true }).track_id

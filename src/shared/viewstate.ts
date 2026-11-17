@@ -1,5 +1,4 @@
 // Validating remembered browse state.
-//
 // Sorts and filters are remembered across launches, which means they can outlive the fields they
 // name: a user field gets deleted, a built-in gets renamed, an older version wrote a different
 // shape. Restoring blindly would either crash the view or silently filter the library down to
@@ -47,7 +46,7 @@ export function sanitize_pane_values(value: unknown): Record<string, string[]> {
   return out
 }
 
-/** A pane remembers which field it is showing; an unknown field falls back to the default. */
+// A pane remembers which field it is showing; an unknown field falls back to the default.
 export function sanitize_pane_field(value: unknown, fallback: string): string {
   return known(value) ? value : fallback
 }

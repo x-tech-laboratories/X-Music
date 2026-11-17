@@ -1,5 +1,4 @@
 // The native predicate: the second compilation target for the filter AST (DESIGN-SPEC §4.2).
-//
 // This is the path the UI hits on every keystroke. It must agree with the SQL compiler exactly —
 // including SQLite's quirks, which is why the string helpers below fold only ASCII case and why
 // every comparison against a NULL yields false rather than throwing.
@@ -7,21 +6,21 @@
 import { field, type FieldDescriptor } from '../fields.ts'
 import { is_group, type FilterNode, type LeafNode, type RelativeDate } from '../filter.ts'
 
-/** One track as held by the in-memory index. */
+// One track as held by the in-memory index.
 export interface IndexedTrack {
   id: string
   scalars: Record<string, string | number | null>
-  /** field_id → interned values, mirroring track_values. */
+  // field_id → interned values, mirroring track_values.
   sets: Record<number, readonly string[]>
-  /** field_id → value, mirroring track_extras. */
+  // field_id → value, mirroring track_extras.
   extras: Record<number, string | null>
-  /** Physical sources, mirroring the media table. A track may legitimately have none. */
+  // Physical sources, mirroring the media table. A track may legitimately have none.
   media: readonly Record<string, string | number | null>[]
 }
 
 export interface EvalContext {
   now: number
-  /** Precomputed id sets for `top` / `bottom`, keyed `${field}:${op}:${n}`. */
+  // Precomputed id sets for `top` / `bottom`, keyed `${field}:${op}:${n}`.
   ranked?: Map<string, ReadonlySet<string>>
 }
 
@@ -33,7 +32,7 @@ const MS: Record<RelativeDate['unit'], number> = {
   year: 31_536_000_000
 }
 
-/** SQLite's LIKE folds ASCII case only; Unicode case is left alone. Match that exactly. */
+// SQLite's LIKE folds ASCII case only; Unicode case is left alone. Match that exactly.
 function ascii_lower(s: string): string {
   let out = ''
   for (let i = 0; i < s.length; i++) {
@@ -48,7 +47,7 @@ function scalar_of(t: IndexedTrack, d: FieldDescriptor): string | number | null 
   return t.scalars[d.id] ?? null
 }
 
-/** Mirrors the SQL side's preferred-source ordering for sorting and grouping. */
+// Mirrors the SQL side's preferred-source ordering for sorting and grouping.
 export function preferred_media(t: IndexedTrack): Record<string, string | number | null> | null {
   if (!t.media.length) return null
   return [...t.media].sort(
@@ -174,7 +173,7 @@ export function select_ids(node: FilterNode, tracks: readonly IndexedTrack[], ct
   return tracks.filter((t) => evaluate(node, t, ctx)).map((t) => t.id)
 }
 
-/** Precomputes the id sets that `top` / `bottom` need, matching the SQL subquery's ordering. */
+// Precomputes the id sets that `top` / `bottom` need, matching the SQL subquery's ordering.
 export function rank_for(
   tracks: readonly IndexedTrack[],
   field_id: string,

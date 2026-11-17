@@ -1,5 +1,4 @@
 // Resolving what a file is, and which track it belongs to.
-//
 // Both the gmbrc importer and the filesystem scanner funnel through here, so that running either
 // one twice is idempotent and running both does not produce two tracks for one song. The rule is
 // deliberately narrow: a file is matched to an existing track only when we can prove it is the same
@@ -54,19 +53,15 @@ export interface TrackCandidate {
   rg_album_gain?: number | null
   added?: number | null
 
-  /** Multi-value fields, keyed by field id. Replaces what is stored, rather than appending. */
+  // Multi-value fields, keyed by field id. Replaces what is stored, rather than appending.
   sets?: Record<string, readonly string[]>
   comment?: string | null
 }
 
 export interface UpsertOptions {
-  /**
-   * Whether the source is authoritative for ratings, play counts and history. True for the
-   * gmusicbrowser import; false for a filesystem scan, which must never clobber X-Music's own
-   * statistics with whatever happens to be in a tag.
-   */
+  // Whether the source is authoritative for ratings, play counts and history. True for the gmusicbrowser import; false for a filesystem scan, which must never clobber X-Music's own statistics with whatever happens to be in a tag.
   statistics?: boolean
-  /** Whether to replace multi-value fields and the comment. */
+  // Whether to replace multi-value fields and the comment.
   metadata?: boolean
 }
 
@@ -85,11 +80,7 @@ const KEY_SEP = ''
 const norm = (s: string | null | undefined): string =>
   (s ?? '').trim().toLocaleLowerCase().replace(/\s+/g, ' ')
 
-/**
- * A stable descriptor of what this track *is*, stored for a later deduplication pass. It is not
- * used to merge automatically — two files that agree on artist, title and album are usually the
- * same recording, but "usually" is not good enough to silently collapse someone's library.
- */
+// A stable descriptor of what this track *is*, stored for a later deduplication pass. It is not used to merge automatically — two files that agree on artist, title and album are usually the same recording, but "usually" is not good enough to silently collapse someone's library.
 export function identity_key(t: TrackCandidate): string {
   if (t.mb_recording_id) return `mbid${KEY_SEP}${t.mb_recording_id}`
 
@@ -100,7 +91,7 @@ export function identity_key(t: TrackCandidate): string {
   return ['t', artist, title, norm(t.album)].join(KEY_SEP)
 }
 
-/** Higher is preferred when several sources back one track. */
+// Higher is preferred when several sources back one track.
 export function quality_rank(m: MediaCandidate): number {
   const lossless = new Set(['flac', 'alac', 'wav', 'aiff', 'wavpack', 'ape'])
   const codec = (m.codec ?? '').toLocaleLowerCase()

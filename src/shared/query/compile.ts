@@ -1,5 +1,4 @@
 // Compiles a filter AST to parameterized SQL (DESIGN-SPEC §4.2).
-//
 // This is one of the two compilation targets. The other is a native predicate over the in-memory
 // index; a property test asserts the two always return identical id sets, which is the only thing
 // keeping the fast path honest.
@@ -37,7 +36,7 @@ class Compiler {
     return '?'
   }
 
-  /** SQL expression yielding the field's scalar value for the current track row `t`. */
+  // SQL expression yielding the field's scalar value for the current track row `t`.
   private scalar(d: FieldDescriptor): string {
     if (d.storage === 'column') return `t.${d.column ?? d.id}`
     if (d.storage === 'computed') return d.expr!
@@ -48,8 +47,7 @@ class Compiler {
   }
 
   private like(expr: string, pattern: string, cs: boolean): string {
-    // LIKE is case-insensitive for ASCII by default; the case-sensitive path needs GLOB-free
-    // exactness, so compare with a binary collation instead.
+    // LIKE is case-insensitive for ASCII by default; the case-sensitive path needs GLOB-free exactness, so compare with a binary collation instead.
     if (!cs) return `${expr} LIKE ${this.p(pattern)} ESCAPE '\\'`
     return `${expr} LIKE ${this.p(pattern)} ESCAPE '\\' COLLATE BINARY`
   }
@@ -107,8 +105,7 @@ class Compiler {
     const e = this.scalar(d)
     const predicate = this.apply_op(e, node)
 
-    // A physical property belongs to a source, not to the music. The track matches when any of its
-    // media does, which is also what makes "I have this in FLAC and MP3" behave sensibly.
+    // A physical property belongs to a source, not to the music. The track matches when any of its media does, which is also what makes "I have this in FLAC and MP3" behave sensibly.
     if (d.storage === 'media')
       return `EXISTS (SELECT 1 FROM media m WHERE m.track_id = t.id AND ${predicate})`
 
@@ -166,9 +163,7 @@ class Compiler {
 
     if (n.op === 'not') {
       if (n.children.length !== 1) throw new Error('not takes exactly one child')
-      // X-Music uses two-valued logic: a predicate is true or false for a track, never unknown.
-      // Without the COALESCE, SQL's NULL propagation would silently drop tracks with a missing
-      // value from a negated filter — so "not rated 5 stars" would exclude unrated tracks.
+      // X-Music uses two-valued logic: a predicate is true or false for a track, never unknown. Without the COALESCE, SQL's NULL propagation would silently drop tracks with a missing value from a negated filter — so "not rated 5 stars" would exclude unrated tracks.
       return `NOT COALESCE((${this.node(n.children[0]!)}), 0)`
     }
     if (n.children.length === 0) return n.op === 'and' ? '1' : '0'
@@ -216,7 +211,7 @@ export function compile_filter(
   return { sql, params: c.params }
 }
 
-/** Counts per distinct value of a field — what the browser panes render. */
+// Counts per distinct value of a field — what the browser panes render.
 export function compile_group_by(node: FilterNode, group_field: string, now = Date.now()): CompiledQuery {
   const c = new Compiler(now)
   const where = c.node(node)
