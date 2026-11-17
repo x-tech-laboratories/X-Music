@@ -2,8 +2,8 @@
 // local MCP server.
 
 import type { ApiSpec, JsonSchema } from '@x-tech-laboratories/x-libs/api_spec'
-import { BUILTIN_FIELDS } from './fields'
-import type { XMusicApi, XMusicHistoryApi } from './ipc'
+import { BUILTIN_FIELDS } from './fields.ts'
+import type { XMusicApi, XMusicHistoryApi } from './ipc.ts'
 
 // ============================================================================
 // Shapes

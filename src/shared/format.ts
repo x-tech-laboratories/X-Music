@@ -1,10 +1,9 @@
 // The format-string language (DESIGN-SPEC §5.5). One engine serves labels, now-playing text,
 // tooltips, tray text, notifications, column formats and the file renamer.
-//
 // It lives in shared/ and touches no DOM, so it is unchanged by any UI-framework decision.
 
 export type FormatValue = string | number | null | undefined | readonly string[]
-export type FormatSource = (fieldId: string) => FormatValue
+export type FormatSource = (field_id: string) => FormatValue
 
 interface Token {
   kind: 'literal' | 'field' | 'group'
@@ -14,21 +13,11 @@ interface Token {
   children?: Token[]
 }
 
-/**
- * Grammar:
- *   {field}                  field value
- *   {a|b}                    first non-empty of a, b
- *   {year:%04d}              printf-style numeric format
- *   {length:m:ss}            duration format
- *   {rating:stars}           typed renderer
- *   {genre:join(", ")}       set join
- *   {path:basename}          transform
- *   [ ... ]                  group that vanishes if any field inside is empty
- */
-export function parseFormat(input: string): Token[] {
+// Parses a format string by the grammar in DESIGN-SPEC §5.5: {field}, {a|b}, {field:spec}, {genre:join(", ")} and [ groups ] that vanish when a field inside is empty.
+export function parse_format(input: string): Token[] {
   let i = 0
 
-  function parseTokens(stopAt?: string): Token[] {
+  function parse_tokens(stop_at?: string): Token[] {
     const out: Token[] = []
     let literal = ''
 
@@ -39,11 +28,11 @@ export function parseFormat(input: string): Token[] {
     while (i < input.length) {
       const c = input[i]!
 
-      if (stopAt && c === stopAt) { i++; flush(); return out }
+      if (stop_at && c === stop_at) { i++; flush(); return out }
 
       if (c === '\\' && i + 1 < input.length) { literal += input[i + 1]; i += 2; continue }
 
-      if (c === '[') { i++; flush(); out.push({ kind: 'group', children: parseTokens(']') }); continue }
+      if (c === '[') { i++; flush(); out.push({ kind: 'group', children: parse_tokens(']') }); continue }
 
       if (c === '{') {
         i++
@@ -53,9 +42,9 @@ export function parseFormat(input: string): Token[] {
         flush()
 
         const colon = body.indexOf(':')
-        const namePart = colon === -1 ? body : body.slice(0, colon)
+        const name_part = colon === -1 ? body : body.slice(0, colon)
         const spec = colon === -1 ? undefined : body.slice(colon + 1)
-        out.push({ kind: 'field', fields: namePart.split('|').map((s) => s.trim()), spec })
+        out.push({ kind: 'field', fields: name_part.split('|').map((s) => s.trim()), spec })
         continue
       }
 
@@ -67,13 +56,13 @@ export function parseFormat(input: string): Token[] {
     return out
   }
 
-  return parseTokens()
+  return parse_tokens()
 }
 
-const isEmpty = (v: FormatValue): boolean =>
+const is_empty = (v: FormatValue): boolean =>
   v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)
 
-function formatDuration(ms: number, spec: string): string {
+function format_duration(ms: number, spec: string): string {
   const total = Math.round(ms / 1000)
   const h = Math.floor(total / 3600)
   const m = Math.floor((total % 3600) / 60)
@@ -85,8 +74,8 @@ function formatDuration(ms: number, spec: string): string {
   return `${m}:${pad(s)}`
 }
 
-function applySpec(value: FormatValue, spec: string | undefined): string {
-  if (isEmpty(value)) return ''
+function apply_spec(value: FormatValue, spec: string | undefined): string {
+  if (is_empty(value)) return ''
 
   if (spec === undefined) return Array.isArray(value) ? value.join(', ') : String(value)
 
@@ -109,7 +98,7 @@ function applySpec(value: FormatValue, spec: string | undefined): string {
     return '★'.repeat(Math.floor(stars)) + '☆'.repeat(5 - Math.floor(stars))
   }
 
-  if (spec === 'm:ss' || spec === 'h:mm:ss') return formatDuration(n, spec)
+  if (spec === 'm:ss' || spec === 'h:mm:ss') return format_duration(n, spec)
 
   const printf = /^%0?(\d+)d$/.exec(spec)
   if (printf && Number.isFinite(n)) return String(Math.trunc(n)).padStart(Number(printf[1]), '0')
@@ -126,40 +115,40 @@ function applySpec(value: FormatValue, spec: string | undefined): string {
   }
 }
 
-interface RenderResult { text: string; sawEmptyField: boolean }
+interface RenderResult { text: string; saw_empty_field: boolean }
 
-function renderTokens(tokens: readonly Token[], get: FormatSource): RenderResult {
+function render_tokens(tokens: readonly Token[], get: FormatSource): RenderResult {
   let text = ''
-  let sawEmptyField = false
+  let saw_empty_field = false
 
   for (const t of tokens) {
     if (t.kind === 'literal') { text += t.text; continue }
 
     if (t.kind === 'group') {
-      const inner = renderTokens(t.children!, get)
+      const inner = render_tokens(t.children!, get)
       // A bracketed group vanishes entirely if any field inside it is empty.
-      if (!inner.sawEmptyField) text += inner.text
+      if (!inner.saw_empty_field) text += inner.text
       continue
     }
 
-    const found = t.fields!.map(get).find((v) => !isEmpty(v))
-    if (found === undefined) { sawEmptyField = true; continue }
-    text += applySpec(found, t.spec)
+    const found = t.fields!.map(get).find((v) => !is_empty(v))
+    if (found === undefined) { saw_empty_field = true; continue }
+    text += apply_spec(found, t.spec)
   }
 
-  return { text, sawEmptyField }
+  return { text, saw_empty_field }
 }
 
-export function formatString(template: string, get: FormatSource): string {
-  return renderTokens(parseFormat(template), get).text
+export function format_string(template: string, get: FormatSource): string {
+  return render_tokens(parse_format(template), get).text
 }
 
-/** Convenience for the common case of formatting a plain record. */
-export const formatRecord = (template: string, row: Record<string, FormatValue>): string =>
-  formatString(template, (f) => row[f])
+// Convenience for the common case of formatting a plain record.
+export const format_record = (template: string, row: Record<string, FormatValue>): string =>
+  format_string(template, (f) => row[f])
 
-/** Every field a template references, so a caller knows what to fetch. */
-export function templateFields(template: string): string[] {
+// Every field a template references, so a caller knows what to fetch.
+export function template_fields(template: string): string[] {
   const out = new Set<string>()
   const walk = (tokens: readonly Token[]): void => {
     for (const t of tokens) {
@@ -167,6 +156,6 @@ export function templateFields(template: string): string[] {
       else if (t.kind === 'group') walk(t.children!)
     }
   }
-  walk(parseFormat(template))
+  walk(parse_format(template))
   return [...out]
 }

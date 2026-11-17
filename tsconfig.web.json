@@ -1,12 +1,12 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["src/renderer/**/*", "src/preload/*.d.ts", "src/shared/**/*"],
+  "include": ["src/web/**/*", "src/preload/*.d.ts", "src/shared/**/*"],
   "compilerOptions": {
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.web.tsbuildinfo",
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
     "jsx": "react-jsx",
-    "paths": { "@renderer/*": ["./src/renderer/*"], "@shared/*": ["./src/shared/*"] }
+    "paths": { "@web/*": ["./src/web/*"], "@shared/*": ["./src/shared/*"] }
   }
 }

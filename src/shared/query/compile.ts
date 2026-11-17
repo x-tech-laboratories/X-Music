@@ -1,5 +1,4 @@
 // Compiles a filter AST to parameterized SQL (DESIGN-SPEC §4.2).
-//
 // This is one of the two compilation targets. The other is a native predicate over the in-memory
 // index; a property test asserts the two always return identical id sets, which is the only thing
 // keeping the fast path honest.
@@ -7,7 +6,7 @@
 import type { SqlValue } from '@x-tech-laboratories/x-libs/sql'
 
 import { field, type FieldDescriptor } from '../fields.ts'
-import { isGroup, type FilterNode, type LeafNode, type RelativeDate, type SortKey, type Limit } from '../filter.ts'
+import { is_group, type FilterNode, type LeafNode, type RelativeDate, type SortKey, type Limit } from '../filter.ts'
 
 export interface CompiledQuery {
   sql: string
@@ -37,19 +36,18 @@ class Compiler {
     return '?'
   }
 
-  /** SQL expression yielding the field's scalar value for the current track row `t`. */
+  // SQL expression yielding the field's scalar value for the current track row `t`.
   private scalar(d: FieldDescriptor): string {
     if (d.storage === 'column') return `t.${d.column ?? d.id}`
     if (d.storage === 'computed') return d.expr!
     if (d.storage === 'extra')
-      return `(SELECT value FROM track_extras WHERE track_id = t.id AND field_id = ${d.fieldId})`
+      return `(SELECT value FROM track_extras WHERE track_id = t.id AND field_id = ${d.field_id})`
     if (d.storage === 'media') return `m.${d.column ?? d.id}`
     throw new Error(`field ${d.id} is not scalar`)
   }
 
   private like(expr: string, pattern: string, cs: boolean): string {
-    // LIKE is case-insensitive for ASCII by default; the case-sensitive path needs GLOB-free
-    // exactness, so compare with a binary collation instead.
+    // LIKE is case-insensitive for ASCII by default; the case-sensitive path needs GLOB-free exactness, so compare with a binary collation instead.
     if (!cs) return `${expr} LIKE ${this.p(pattern)} ESCAPE '\\'`
     return `${expr} LIKE ${this.p(pattern)} ESCAPE '\\' COLLATE BINARY`
   }
@@ -58,13 +56,13 @@ class Compiler {
     return s.replace(/[\\%_]/g, (m) => `\\${m}`)
   }
 
-  private setPredicate(d: FieldDescriptor, node: LeafNode): string {
+  private set_predicate(d: FieldDescriptor, node: LeafNode): string {
     const values = (Array.isArray(node.value) ? node.value : [node.value]) as string[]
     // The value's id is found once, so the lookup index answers by field, value and track together.
     const member = (v: string): string =>
       `EXISTS (SELECT 1 FROM track_values tv
-               WHERE tv.field_id = ${d.fieldId}
-                 AND tv.value_id = (SELECT vv.id FROM values_ vv WHERE vv.field_id = ${d.fieldId} AND vv.value = ${this.p(v)})
+               WHERE tv.field_id = ${d.field_id}
+                 AND tv.value_id = (SELECT vv.id FROM values_ vv WHERE vv.field_id = ${d.field_id} AND vv.value = ${this.p(v)})
                  AND tv.track_id = t.id)`
 
     switch (node.op) {
@@ -77,14 +75,14 @@ class Compiler {
       case 'count': {
         const n = Number(node.value)
         return `(SELECT COUNT(*) FROM track_values tv
-                 WHERE tv.track_id = t.id AND tv.field_id = ${d.fieldId}) = ${this.p(n)}`
+                 WHERE tv.track_id = t.id AND tv.field_id = ${d.field_id}) = ${this.p(n)}`
       }
       case 'empty':
         return `NOT EXISTS (SELECT 1 FROM track_values tv
-                            WHERE tv.track_id = t.id AND tv.field_id = ${d.fieldId})`
+                            WHERE tv.track_id = t.id AND tv.field_id = ${d.field_id})`
       case 'defined':
         return `EXISTS (SELECT 1 FROM track_values tv
-                        WHERE tv.track_id = t.id AND tv.field_id = ${d.fieldId})`
+                        WHERE tv.track_id = t.id AND tv.field_id = ${d.field_id})`
       default:
         throw new Error(`operator ${node.op} is not valid on set field ${d.id}`)
     }
@@ -93,7 +91,7 @@ class Compiler {
   leaf(node: LeafNode): string {
     const d = field(node.field)
 
-    if (d.storage === 'multi') return this.setPredicate(d, node)
+    if (d.storage === 'multi') return this.set_predicate(d, node)
 
     if (node.op === 'matches') {
       return `t.id IN (SELECT track_id FROM tracks_fts WHERE tracks_fts MATCH ${this.p(node.value)})`
@@ -105,17 +103,16 @@ class Compiler {
     }
 
     const e = this.scalar(d)
-    const predicate = this.applyOp(e, node)
+    const predicate = this.apply_op(e, node)
 
-    // A physical property belongs to a source, not to the music. The track matches when any of its
-    // media does, which is also what makes "I have this in FLAC and MP3" behave sensibly.
+    // A physical property belongs to a source, not to the music. The track matches when any of its media does, which is also what makes "I have this in FLAC and MP3" behave sensibly.
     if (d.storage === 'media')
       return `EXISTS (SELECT 1 FROM media m WHERE m.track_id = t.id AND ${predicate})`
 
     return predicate
   }
 
-  private applyOp(e: string, node: LeafNode): string {
+  private apply_op(e: string, node: LeafNode): string {
     const v = node.value
     const cs = node.cs ?? false
 
@@ -162,13 +159,11 @@ class Compiler {
   }
 
   node(n: FilterNode): string {
-    if (!isGroup(n)) return this.leaf(n)
+    if (!is_group(n)) return this.leaf(n)
 
     if (n.op === 'not') {
       if (n.children.length !== 1) throw new Error('not takes exactly one child')
-      // X-Music uses two-valued logic: a predicate is true or false for a track, never unknown.
-      // Without the COALESCE, SQL's NULL propagation would silently drop tracks with a missing
-      // value from a negated filter — so "not rated 5 stars" would exclude unrated tracks.
+      // X-Music uses two-valued logic: a predicate is true or false for a track, never unknown. Without the COALESCE, SQL's NULL propagation would silently drop tracks with a missing value from a negated filter — so "not rated 5 stars" would exclude unrated tracks.
       return `NOT COALESCE((${this.node(n.children[0]!)}), 0)`
     }
     if (n.children.length === 0) return n.op === 'and' ? '1' : '0'
@@ -178,7 +173,7 @@ class Compiler {
   }
 }
 
-function orderBy(sort: readonly SortKey[] | undefined): string {
+function order_by(sort: readonly SortKey[] | undefined): string {
   if (!sort?.length) return ''
   const keys = sort.map((k) => {
     if (k.field === 'random') return 'RANDOM()'
@@ -190,7 +185,7 @@ function orderBy(sort: readonly SortKey[] | undefined): string {
       : d.storage === 'media'
         ? `(SELECT mm.${d.column ?? d.id} FROM media mm WHERE mm.track_id = t.id
              ORDER BY mm.quality_rank DESC, mm.id LIMIT 1)`
-      : `(SELECT value FROM track_extras WHERE track_id = t.id AND field_id = ${d.fieldId})`
+      : `(SELECT value FROM track_extras WHERE track_id = t.id AND field_id = ${d.field_id})`
     // NULLs sort last in both directions, which is what a listener expects.
     return `${expr} IS NULL, ${expr} ${dir}`
   })
@@ -198,7 +193,7 @@ function orderBy(sort: readonly SortKey[] | undefined): string {
   return ` ORDER BY ${keys.join(', ')}, t.id`
 }
 
-export function compileFilter(
+export function compile_filter(
   node: FilterNode,
   opts: { sort?: readonly SortKey[]; limit?: Limit; select?: string; now?: number } = {}
 ): CompiledQuery {
@@ -207,7 +202,7 @@ export function compileFilter(
   const select = opts.select ?? 't.id'
 
   let sql = `SELECT ${select} FROM tracks t WHERE ${where}`
-  sql += orderBy(opts.sort)
+  sql += order_by(opts.sort)
 
   if (opts.limit && (opts.limit.by ?? 'tracks') === 'tracks') {
     sql += ` LIMIT ${c.params.push(opts.limit.count) && '?'}`
@@ -216,18 +211,18 @@ export function compileFilter(
   return { sql, params: c.params }
 }
 
-/** Counts per distinct value of a field — what the browser panes render. */
-export function compileGroupBy(node: FilterNode, groupField: string, now = Date.now()): CompiledQuery {
+// Counts per distinct value of a field — what the browser panes render.
+export function compile_group_by(node: FilterNode, group_field: string, now = Date.now()): CompiledQuery {
   const c = new Compiler(now)
   const where = c.node(node)
-  const d = field(groupField)
+  const d = field(group_field)
 
   if (d.storage === 'multi') {
     return {
       sql: `SELECT vv.id AS gid, vv.value AS label, COUNT(*) AS n,
                    SUM(COALESCE(t.length_ms, 0)) AS total_ms
             FROM tracks t
-            JOIN track_values tv ON tv.track_id = t.id AND tv.field_id = ${d.fieldId}
+            JOIN track_values tv ON tv.track_id = t.id AND tv.field_id = ${d.field_id}
             JOIN values_ vv ON vv.id = tv.value_id
             WHERE ${where}
             GROUP BY vv.id ORDER BY COALESCE(vv.sort_key, vv.value)`,

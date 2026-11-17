@@ -129,7 +129,7 @@ module, the boundary is typechecked end to end with no codegen step.
 arguments as they cross from the page's world into the preload's isolated world — a clone that
 happens *before* any preload code runs. So an argument that structured clone rejects, such as a
 Proxy, fails with "An object could not be cloned" no matter what the preload does; the flattening
-has to happen in the renderer. Every call therefore goes through `src/renderer/lib/ipc.ts`
+has to happen in the renderer. Every call therefore goes through `src/web/lib/ipc.ts`
 rather than touching `window.xMusic` directly.
 
 The symptom is easy to misread: the handler never runs, so nothing appears in the main process log,
@@ -261,13 +261,13 @@ is generic over it:
 | Consumer | How it stays generic |
 |---|---|
 | Filter compilers | Dispatch on `storage` (§3.5.2) and `type` (§3.3); no field is named in either compiler |
-| Column picker | Lists `fieldsWith('columnar')`; a new field appears without touching the widget |
-| Filter panes | Any `groupable` field is selectable in a pane — the dropdown is built from `fieldsWith('groupable')`, so a new field appears without touching the widget |
+| Column picker | Lists `fields_with('columnar')`; a new field appears without touching the widget |
+| Filter panes | Any `groupable` field is selectable in a pane — the dropdown is built from `fields_with('groupable')`, so a new field appears without touching the widget |
 | Sort | Any `sortable` field is a sort key, in any position of a multi-key sort (§4.3.1) |
 | Format strings | `{any_field}` resolves through the same descriptor lookup (§5.5) |
 | Tag round-trip | A user field with a `tags` mapping writes to files; without one it lives only in the database |
 
-`test/unit/fields.test.ts` already asserts the invariants this depends on — unique ids, a stable
+`tests/fields.test.ts` already asserts the invariants this depends on — unique ids, a stable
 numeric id for every multi-value and extra field, and an expression for every computed field.
 
 **What is still missing to make the promise true end to end:**
@@ -278,7 +278,7 @@ numeric id for every multi-value and extra field, and an expression for every co
 2. **Persisting user fields.** The catalogue is currently a TypeScript constant. User fields need a
    `fields` table, merged with the built-ins at startup, with numeric ids allocated from a range
    that can never collide with built-in ids.
-3. **A column picker** in the song-list header context menu, driven by `fieldsWith('columnar')`.
+3. **A column picker** in the song-list header context menu, driven by `fields_with('columnar')`.
 4. **Derived-field expressions.** `storage: 'computed'` exists and is used for `album`, but the
    expression is authored in TypeScript. Letting a user write one means a small safe expression
    language over other fields — deliberately not raw SQL, which would be an injection surface.
@@ -401,13 +401,13 @@ overwrite it.
 Two policies fall out of the sources being different:
 
 - **The importer is authoritative for statistics**; the scanner is not. A tag must never overwrite
-  X-Music's own rating or play count, so `scanRoots` passes `statistics: false`.
+  X-Music's own rating or play count, so `scan_roots` passes `statistics: false`.
 - **Multi-value fields are replaced, not appended**, or a second import doubles every genre.
 
 Play history needed a uniqueness constraint (`UNIQUE(track_id, at, kind)`), without which
 re-importing appended a second copy of every play event.
 
-`test/unit/idempotency.test.ts` and `test/unit/scan.test.ts` pin all of this. The first version of
+`tests/idempotency.test.ts` and `tests/scan.test.ts` pin all of this. The first version of
 the importer failed these: it created 6 tracks from 3 on a second run, 3 of them orphans with no
 media at all, because the track INSERT had no conflict clause while the media INSERT did.
 
@@ -625,7 +625,7 @@ A smart playlist = filter AST + sort spec + optional limit + refresh policy.
 
 **The mechanism exists today.** The library store holds an ordered list of sort keys; the X-Libs
 table's headers append one on shift-click rather than replacing it, flip it on a second click and
-drop it on a third, and show each key's position in the order. `compileFilter` emits every key into the `ORDER BY`, with NULLs last in both
+drop it on a third, and show each key's position in the order. `compile_filter` emits every key into the `ORDER BY`, with NULLs last in both
 directions. Sorting by album, then disc, then track is the default view.
 
 What follows is the part still to build.
@@ -679,7 +679,7 @@ expressible without a second concept, and a grouped view saves to a playlist ide
 
 #### 4.3.1.4 What is needed
 
-1. Per-key `nulls: 'first' | 'last'` in `SortKey`, honoured by `compileFilter` and `evaluate`.
+1. Per-key `nulls: 'first' | 'last'` in `SortKey`, honoured by `compile_filter` and `evaluate`.
 2. A sort editor component driven by `SortState`, with drag reordering.
 3. `saveAsSmartPlaylist(filter, sort, limit, name)` plus its IPC channel and dialog.
 4. Tests: multi-key ordering against real data, NULL placement in both directions, and a round-trip
@@ -841,7 +841,7 @@ in a component stylesheet.
 
 Themes ship as a directory: `theme.json` (tokens) + optional `theme.css` (overrides) + optional
 assets. Halon's light and dark come from the package, and the player layer above is derived from
-them in `src/renderer/app.css`.
+them in `src/web/app.css`.
 
 Metric tokens (spacing scale, radii, control heights, density modes) follow Halon's
 `THEME-DESIGN-GUIDE.md` §4 rather than being reinvented — including its three density levels, which
@@ -1029,7 +1029,7 @@ gains its strongest signal (§3.5.0). The scanner already reads the tag; nothing
 
 1. A `picard` setting: binary path, plus whether to rescan the affected paths on return.
 2. A "Tag with Picard" action on a track selection and on an album.
-3. A targeted rescan — `scanRoots` already takes a root list, so scanning specific paths is a small
+3. A targeted rescan — `scan_roots` already takes a root list, so scanning specific paths is a small
    generalization.
 4. A clear warning in the hand-off dialog that Picard writes to files.
 
@@ -1109,7 +1109,7 @@ Decisions worth recording:
   abandoned after at least three seconds counts as a skip; less than three seconds counts as
   neither, because changing your mind before it starts is not a skip.
 - **A track settles exactly once.** The first version double-counted skips, because both `next()`
-  and `playTrack()` recorded one. Play, skip, or neither — never two.
+  and `play_track()` recorded one. Play, skip, or neither — never two.
 - **Seeking backwards cannot fake a second play**: the threshold is measured against the furthest
   point reached, not the current position.
 - **The best source that is actually there wins.** Existence is checked rather than trusted: a
@@ -1213,7 +1213,7 @@ Still to do:
 
 - **Filesystem watching** (`chokidar` or `fs.watch`) for live updates; today a rescan is manual.
 - **Include/exclude globs** per root; only a default directory exclusion list exists.
-- **The `slow` flag** for network mounts is in the schema and honoured by `scanRoots`, but is not
+- **The `slow` flag** for network mounts is in the schema and honoured by `scan_roots`, but is not
   yet settable in the UI.
 - Running the scan in a **worker thread**. It currently runs on the main thread with batched
   transactions, which is acceptable at the §12 target but will block the UI on a very large first
@@ -1276,7 +1276,7 @@ the same way the scan does (§9.1) rather than a single summary.
 gap the user has to be able to close: **select several tracks and merge them into one, choosing
 which value to keep wherever they disagree.**
 
-`src/shared/library/merge.ts`, with `mergePreview`, `mergeTracks` and `unmerge`. Multi-select in the
+`src/shared/library/merge.ts`, with `merge_preview`, `merge_tracks` and `unmerge`. Multi-select in the
 song list, a merge dialog rendering the preview, and 20 tests including a full round-trip assertion
 that unmerge restores tracks, media, statistics, history, sets, extras and playlist positions
 exactly.
@@ -1322,7 +1322,7 @@ Escape, so no caller can forget.
 
 #### 9.4.2 The preview is the contract
 
-`mergePreview(ids)` returns, for every field, the distinct values across the sources and which
+`merge_preview(ids)` returns, for every field, the distinct values across the sources and which
 track each came from — so the UI is a rendering of that structure rather than its own logic, and the
 same preview can be unit-tested without a DOM.
 
@@ -1347,7 +1347,7 @@ same preview can be unit-tested without a DOM.
 A merge deletes rows, which makes it the most destructive operation in the app that does not touch a
 file. It must be reversible: the whole pre-merge state of every participating track, its plays
 and playlist places included, is written to `merge_journal` under one batch id, and
-`unmerge(batchId)` restores it. **This is a prerequisite, not a follow-up** — shipping merge without
+`unmerge(batch_id)` restores it. **This is a prerequisite, not a follow-up** — shipping merge without
 undo would be shipping a way to quietly lose ratings and history.
 
 #### 9.4.4 Decisions taken while building it
@@ -1481,7 +1481,7 @@ with no in-memory index at all** (§3.5.3).
 | Install size | — | ~150 MB | — |
 
 Measured figures are means from `bench/query.bench.ts` on the development machine, over the
-synthetic corpus in `test/helpers/corpus.ts`. Every query path has roughly 3× headroom against its
+synthetic corpus in `tests/corpus.ts`. Every query path has roughly 3× headroom against its
 budget.
 
 ### 12.1 Above 50k: degradation, not a wall
@@ -1501,7 +1501,7 @@ Vitest, with `fast-check` for property tests. Tests reach SQLite through Node's 
 
 ### 13.1 The load-bearing test
 
-`test/property/ast-agreement.test.ts`: for any generated filter over any generated library, the SQL
+`tests/ast_agreement.test.ts`: for any generated filter over any generated library, the SQL
 compiler and the native predicate must return **identical id sets**. Two implementations of one
 semantics are only safe because this test holds them together — a live smart playlist that
 disagreed with the list it was derived from would be a maddening bug to chase (§4.2).
@@ -1520,12 +1520,12 @@ The SQL compiler wraps every negation in `COALESCE(..., 0)` to enforce it.
 
 | Suite | Asserts |
 |---|---|
-| `unit/filter-compile.test.ts` | Operator semantics, parameterization (no interpolation), set algebra, NULL ordering, rejection of type-invalid operators |
-| `unit/entity-model.test.ts` | The §3.4 invariants: tracks with zero media, one track with many media, stats surviving media deletion, cascade on track deletion, CUE ranges as ordinary rows, missing files flagged not deleted, album ids stable across match-key changes, FK enforcement and ids that cannot be null |
-| `unit/audio-hash.test.ts` | Hash unchanged by ID3v2 growth, ID3v1 addition and rename; FLAC STREAMINFO used when valid and ignored when zero; different audio distinguished |
-| `unit/fields.test.ts` | Field id uniqueness and **numeric id stability** — a reused id silently corrupts every library on disk, so the pins are a compatibility lock |
-| `unit/format.test.ts` | The format-string grammar, including bracketed-group elision and the renamer pattern end to end |
-| `unit/view.test.ts` | Virtualization arithmetic, anchored range selection, filter-stack collapse to an AST, multi-key sort priority |
+| `tests/filter_compile.test.ts` | Operator semantics, parameterization (no interpolation), set algebra, NULL ordering, rejection of type-invalid operators |
+| `tests/entity_model.test.ts` | The §3.4 invariants: tracks with zero media, one track with many media, stats surviving media deletion, cascade on track deletion, CUE ranges as ordinary rows, missing files flagged not deleted, album ids stable across match-key changes, FK enforcement and ids that cannot be null |
+| `tests/audio_hash.test.ts` | Hash unchanged by ID3v2 growth, ID3v1 addition and rename; FLAC STREAMINFO used when valid and ignored when zero; different audio distinguished |
+| `tests/fields.test.ts` | Field id uniqueness and **numeric id stability** — a reused id silently corrupts every library on disk, so the pins are a compatibility lock |
+| `tests/format.test.ts` | The format-string grammar, including bracketed-group elision and the renamer pattern end to end |
+| `tests/view.test.ts` | Virtualization arithmetic, anchored range selection, filter-stack collapse to an AST, multi-key sort priority |
 | `bench/query.bench.ts` | The §12 budgets |
 
 ### 13.3 Planned, not yet written
@@ -1545,14 +1545,14 @@ x-music/
 ├── src/
 │   ├── main/                 # Electron main process
 │   │   ├── db/               # opens the database file through node:sqlite
-│   │   ├── library/          # audio-hash, scanner, artwork files, (planned) watcher
+│   │   ├── library/          # audio_hash, scanner, artwork files, (planned) watcher
 │   │   ├── tags/             # (planned) TagIO interface + implementation + write journal
 │   │   ├── play/             # (planned) PlaybackEngine interface + mpv backend
 │   │   ├── services/         # (planned) MPRIS, scrobble, hotkeys, HTTP API
 │   │   ├── ipc.ts            # channel handlers, typed by the shared contract
 │   │   └── index.ts          # app lifecycle and window
 │   ├── preload/              # contextBridge, exposing only declared channels
-│   ├── renderer/             # UI — deliberately thin (§2.4)
+│   ├── web/                  # UI — deliberately thin (§2.4)
 │   │   ├── widgets/          # Sidebar, SongList, FilterPane, Stars, PlayerBar
 │   │   ├── stores/           # thin reactive wrappers over shared/
 │   │   ├── layout/           # (planned) layout engine and inspector
@@ -1567,10 +1567,7 @@ x-music/
 │   │   ├── import/           # gmusicbrowser's gmbrc
 │   │   └── ipc.ts            # the IPC contract
 │   └── workers/              # (planned) scan, hash, replaygain
-├── test/
-│   ├── helpers/              # corpus generator, node:sqlite harness, fast-check arbitraries
-│   ├── property/             # the AST-agreement test
-│   └── unit/
+├── tests/                    # one *.test.ts per behaviour, and the helpers they share
 ├── bench/                    # performance budget benchmarks
 ├── layouts/  fields/  docs/  cli/
 ├── flake.nix                 # pins node, electron and mpv
@@ -1737,7 +1734,7 @@ it later would be invasive across five subsystems at once.
 
 Under the track/media model, a CUE range is simply a `media` row that addresses part of a container:
 `uri` plus `subtrack_index`, `start_ms`, `end_ms`, with `UNIQUE(uri, subtrack_index)`. Whole-file
-media leave those at their defaults, so the common case pays nothing. `test/unit/entity-model.test.ts`
+media leave those at their defaults, so the common case pays nothing. `tests/entity_model.test.ts`
 pins the behaviour today, before any CUE parser exists.
 
 What remains is ordinary feature work, scheduled rather than architectural: a `.cue` parser, reading

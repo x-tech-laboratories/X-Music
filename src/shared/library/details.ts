@@ -1,5 +1,4 @@
 // Everything X-Music knows about one track.
-//
 // This is where the entity model becomes visible to the user: not just tags, but how many sources
 // back the track, where each one is, which will actually play, and how the track came to be
 // identified the way it is (DESIGN-SPEC §6.5). Read-only.
@@ -32,7 +31,7 @@ export interface DetailMedia {
   subtrackIndex: number
   startMs: number | null
   endMs: number | null
-  /** Raw tags read from this source, so disagreements between sources stay visible. */
+  // Raw tags read from this source, so disagreements between sources stay visible.
   tags: { field: string; value: string }[]
 }
 
@@ -82,25 +81,25 @@ export interface TrackDetails {
     rgAlbumGain: number | null
   }
 
-  /** Most recent first, capped: the full list can run to hundreds of entries. */
+  // Most recent first, capped: the full list can run to hundreds of entries.
   history: HistoryEntry[]
   historyTotal: number
 
-  /** Present when this track absorbed others, so the merge can be found and undone. */
+  // Present when this track absorbed others, so the merge can be found and undone.
   merges: { batchId: string; at: number; absorbed: number }[]
 }
 
 const HISTORY_LIMIT = 200
 
-const fieldNameById = (): Map<number, { id: string; name: string }> => {
+const field_name_by_id = (): Map<number, { id: string; name: string }> => {
   const map = new Map<number, { id: string; name: string }>()
   for (const d of BUILTIN_FIELDS) {
-    if (d.fieldId !== undefined) map.set(d.fieldId, { id: d.id, name: d.name })
+    if (d.field_id !== undefined) map.set(d.field_id, { id: d.id, name: d.name })
   }
   return map
 }
 
-export function trackDetails(database: SqlDatabase, trackId: string): TrackDetails | null {
+export function track_details(database: SqlDatabase, track_id: string): TrackDetails | null {
   const t = first_row<Record<string, unknown>>(database, `
     SELECT t.id, t.title, t.album_id AS albumId, t.year, t.track_number AS trackNumber,
            t.disc_number AS discNumber, t.length_ms AS lengthMs, t.compilation, t.bpm,
@@ -111,23 +110,23 @@ export function trackDetails(database: SqlDatabase, trackId: string): TrackDetai
            t.last_skipped AS lastSkipped, t.added, t.modified, t.bookmark_ms AS bookmarkMs,
            t.rg_track_gain AS rgTrackGain, t.rg_album_gain AS rgAlbumGain,
            (SELECT a.name FROM albums a WHERE a.id = t.album_id) AS album
-    FROM tracks t WHERE t.id = ?`, trackId)
+    FROM tracks t WHERE t.id = ?`, track_id)
 
   if (!t) return null
 
-  const names = fieldNameById()
+  const names = field_name_by_id()
 
   // Multi-value fields, collapsed for display but marked so the UI can say they are sets.
-  const setRows = all_rows<{ fieldId: number; value: string }>(database, `
+  const set_rows = all_rows<{ fieldId: number; value: string }>(database, `
     SELECT tv.field_id AS fieldId, vv.value FROM track_values tv
     JOIN values_ vv ON vv.id = tv.value_id
-    WHERE tv.track_id = ? ORDER BY tv.field_id, tv.ordinal`, trackId)
+    WHERE tv.track_id = ? ORDER BY tv.field_id, tv.ordinal`, track_id)
 
   const sets = new Map<number, string[]>()
-  for (const r of setRows) sets.set(r.fieldId, [...(sets.get(r.fieldId) ?? []), r.value])
+  for (const r of set_rows) sets.set(r.fieldId, [...(sets.get(r.fieldId) ?? []), r.value])
 
-  const extraRows = all_rows<{ fieldId: number; value: string }>(database,
-    'SELECT field_id AS fieldId, value FROM track_extras WHERE track_id = ?', trackId)
+  const extra_rows = all_rows<{ fieldId: number; value: string }>(database,
+    'SELECT field_id AS fieldId, value FROM track_extras WHERE track_id = ?', track_id)
 
   const fields: DetailField[] = []
 
@@ -147,34 +146,34 @@ export function trackDetails(database: SqlDatabase, trackId: string): TrackDetai
   scalar('bpm', 'BPM', t.bpm)
   scalar('compilation', 'Compilation', t.compilation ? 'Yes' : null)
 
-  for (const [fieldId, values] of sets) {
-    const meta = names.get(fieldId)
+  for (const [field_id, values] of sets) {
+    const meta = names.get(field_id)
     if (!meta) continue
     fields.push({ field: meta.id, name: meta.name, value: values.join(', '), multi: true })
   }
 
-  for (const r of extraRows) {
+  for (const r of extra_rows) {
     const meta = names.get(r.fieldId)
     if (!meta) continue
     fields.push({ field: meta.id, name: meta.name, value: r.value, multi: false })
   }
 
   // ── sources ──────────────────────────────────────────────────────────────
-  const mediaRows = all_rows<Record<string, unknown>>(database, `
+  const media_rows = all_rows<Record<string, unknown>>(database, `
     SELECT id, kind, uri, provider, present, codec, container, bitrate,
            bitrate_mode AS bitrateMode, samplerate, channels, bits_per_sample AS bitsPerSample,
            filesize, mtime, last_seen AS lastSeen, quality_rank AS qualityRank,
            audio_hash AS audioHash, audio_hash_algo AS audioHashAlgo,
            subtrack_index AS subtrackIndex, start_ms AS startMs, end_ms AS endMs
     FROM media WHERE track_id = ?
-    ORDER BY present DESC, quality_rank DESC, added, id`, trackId)
+    ORDER BY present DESC, quality_rank DESC, added, id`, track_id)
 
-  const tagRows = all_rows<{ mediaId: string; fieldId: number; value: string | null }>(database, `
+  const tag_rows = all_rows<{ mediaId: string; fieldId: number; value: string | null }>(database, `
     SELECT media_id AS mediaId, field_id AS fieldId, value FROM media_tags
     WHERE media_id IN (SELECT id FROM media WHERE track_id = ?)
-    ORDER BY media_id, field_id, ordinal`, trackId)
+    ORDER BY media_id, field_id, ordinal`, track_id)
 
-  const media: DetailMedia[] = mediaRows.map((m, index) => {
+  const media: DetailMedia[] = media_rows.map((m, index) => {
     const hash = m.audioHash as Uint8Array | null
     return {
       id: m.id as string,
@@ -200,22 +199,22 @@ export function trackDetails(database: SqlDatabase, trackId: string): TrackDetai
       subtrackIndex: (m.subtrackIndex ?? 0) as number,
       startMs: (m.startMs ?? null) as number | null,
       endMs: (m.endMs ?? null) as number | null,
-      tags: tagRows
+      tags: tag_rows
         .filter((r) => r.mediaId === m.id && r.value !== null)
         .map((r) => ({ field: names.get(r.fieldId)?.name ?? `field ${r.fieldId}`, value: r.value! }))
     }
   })
 
   // ── history ──────────────────────────────────────────────────────────────
-  const historyTotal = first_row<{ n: number }>(database, 'SELECT COUNT(*) AS n FROM play_history WHERE track_id = ?', trackId)!.n
+  const history_total = first_row<{ n: number }>(database, 'SELECT COUNT(*) AS n FROM play_history WHERE track_id = ?', track_id)!.n
 
   const history = all_rows<{ at: number; kind: number }>(database,
-    'SELECT at, kind FROM play_history WHERE track_id = ? ORDER BY at DESC LIMIT ?', trackId, HISTORY_LIMIT)
+    'SELECT at, kind FROM play_history WHERE track_id = ? ORDER BY at DESC LIMIT ?', track_id, HISTORY_LIMIT)
     .map((r) => ({ at: r.at, kind: r.kind === 1 ? 'skip' as const : 'play' as const }))
 
   const merges = all_rows<{ batchId: string; at: number; snapshot: string }>(database, `
     SELECT batch_id AS batchId, at, snapshot FROM merge_journal
-    WHERE survivor_id = ? AND undone = 0 ORDER BY at DESC`, trackId)
+    WHERE survivor_id = ? AND undone = 0 ORDER BY at DESC`, track_id)
     .map((m) => {
       let absorbed = 0
       try {
@@ -256,7 +255,7 @@ export function trackDetails(database: SqlDatabase, trackId: string): TrackDetai
       rgAlbumGain: (t.rgAlbumGain ?? null) as number | null
     },
     history,
-    historyTotal,
+    historyTotal: history_total,
     merges
   }
 }

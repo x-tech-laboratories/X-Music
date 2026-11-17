@@ -7,7 +7,7 @@ in `docs/DESIGN-SPEC.md`, and every feature should match it.
 
 - `nix develop` gives the pinned toolchain; then `npm install`.
 - `npm run typecheck` and `npm test` must pass before you propose a change.
-- Run only the tests for what you changed while working (`npx vitest run test/unit/<file>`); CI runs the full suite.
+- Run only the tests for what you changed while working (`npx vitest run tests/<file>`); CI runs the full suite.
 - To run or screenshot the real app, use the `run-x-music` skill in `.claude/skills/`.
 
 ## Rules
@@ -19,7 +19,7 @@ in `docs/DESIGN-SPEC.md`, and every feature should match it.
   `new_id()`, never an auto-incrementing number.
 - Never open the real library (`~/.config/x-music/library.db` or wherever `X_MUSIC_DB` points) from a test or a
   check; use a scratch database.
-- Keep the SQL compiler and the native filter predicate in agreement; `test/property/ast-agreement.test.ts` must pass.
+- Keep the SQL compiler and the native filter predicate in agreement; `tests/ast_agreement.test.ts` must pass.
 - Add a test for every behaviour you change, and a failing test first for every bug fix.
 - Prefer settings and extension points over changing behaviour for everyone.
 - Commit messages follow Conventional Commits and end with an `Assisted-by:` trailer naming the tool.

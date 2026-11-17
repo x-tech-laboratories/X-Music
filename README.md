@@ -90,7 +90,7 @@ otherwise makes Electron run as bare node and die on the ESM entry point.
 | `npm test` | Full suite |
 | `npm run test:watch` | Watch mode |
 | `npm run bench` | Performance budget benchmarks |
-| `npm run typecheck` | `tsc -b` for main/preload and for the renderer |
+| `npm run typecheck` | `tsc -b` for main/preload, for the page and for the tests |
 | `npm run lint` | `oxlint` |
 | `npm run icons` | Generate `resources/icon.png` from `resources/icon.svg` |
 | `npm run app` | Build if needed and launch |
@@ -206,13 +206,13 @@ offered.
 
 The suite is described in DESIGN-SPEC §13. The load-bearing one:
 
-**`test/property/ast-agreement.test.ts`** asserts that for any generated filter over any generated
+**`tests/ast_agreement.test.ts`** asserts that for any generated filter over any generated
 library, the SQL compiler and the native predicate return identical id sets. The fast path exists
 only because this test keeps it honest — it has already caught a three-valued-logic divergence where
 SQL silently dropped tracks with a NULL value from negated filters.
 
 Tests reach SQLite through Node's built-in `node:sqlite`, as the app does, and open the library
-through the same store code. `test/unit/library-upgrade.test.ts` builds a library at the old schema
+through the same store code. `tests/library_upgrade.test.ts` builds a library at the old schema
 with a row of every kind and checks that the upgrade keeps all of it.
 
 ## Layout
@@ -221,7 +221,7 @@ with a row of every kind and checks that the upgrade keeps all of it.
 src/
 ├── main/        Electron main: opens the database, scanner, artwork, playback, backups, IPC
 ├── preload/     The typed IPC bridge, exposing only the declared contract
-├── renderer/    UI. Deliberately thin — see below.
+├── web/         UI. Deliberately thin — see below.
 └── shared/      Imported by BOTH sides: field descriptors, filter AST, format strings, view state,
                  and the library store (Drizzle schema, migrations, query compiler, history) in library/
 ```
@@ -229,7 +229,7 @@ src/
 `shared/` is where the leverage is. The filter AST, field descriptors, format-string engine and the
 filter stack are plain TypeScript with no framework primitives and no DOM access; the selection,
 sorting, table, panes, prefs and logging come from X-Libs. Replacing the UI framework touches
-`renderer/` only. The library store in `shared/library/` runs on X-Libs' `SqlDatabase`
+`web/` only. The library store in `shared/library/` runs on X-Libs' `SqlDatabase`
 and imports nothing from Node, so the main process only opens the file and hands it over.
 
 ## Contributing

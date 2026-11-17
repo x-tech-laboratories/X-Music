@@ -3,17 +3,17 @@
 
 import { test } from 'vitest'
 
-import { compileFilter, compileGroupBy } from '@shared/query/compile'
-import { selectIds } from '@shared/query/evaluate'
+import { compile_filter, compile_group_by } from '@shared/query/compile'
+import { select_ids } from '@shared/query/evaluate'
 import { and, or, leaf, not } from '@shared/filter'
-import { makeCorpus, FIXED_NOW } from '../test/helpers/corpus'
-import { freshDb, loadCorpus } from '../test/helpers/sqlite'
+import { make_corpus, FIXED_NOW } from '../tests/corpus.ts'
+import { fresh_db, load_corpus } from '../tests/sqlite.ts'
 
 const SIZE = Number(process.env.X_MUSIC_BENCH_SIZE ?? 50_000)
 
-const corpus = makeCorpus(SIZE, 2024)
-const db = freshDb()
-loadCorpus(db, corpus)
+const corpus = make_corpus(SIZE, 2024)
+const db = fresh_db()
+load_corpus(db, corpus)
 
 const SIMPLE = leaf('rating', '>=', 80)
 const COMPOUND = and(
@@ -24,8 +24,8 @@ const COMPOUND = and(
   not(leaf('codec', 'is', 'mp3'))
 )
 
-const run = (node: Parameters<typeof compileFilter>[0]): void => {
-  const { sql, params } = compileFilter(node, { now: FIXED_NOW })
+const run = (node: Parameters<typeof compile_filter>[0]): void => {
+  const { sql, params } = compile_filter(node, { now: FIXED_NOW })
   db.prepare(sql).all(...params)
 }
 
@@ -41,10 +41,10 @@ test(`SQL filter over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, async ({
 test(`native predicate over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, async ({ bench }) => {
   await bench.compare(
     bench('simple scalar predicate', () => {
-      selectIds(SIMPLE, corpus.tracks, { now: FIXED_NOW })
+      select_ids(SIMPLE, corpus.tracks, { now: FIXED_NOW })
     }),
     bench('compound predicate with sets, dates and negation', () => {
-      selectIds(COMPOUND, corpus.tracks, { now: FIXED_NOW })
+      select_ids(COMPOUND, corpus.tracks, { now: FIXED_NOW })
     })
   )
 })
@@ -52,11 +52,11 @@ test(`native predicate over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, as
 test(`group-by over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, async ({ bench }) => {
   await bench.compare(
     bench('group by genre (multi-value)', () => {
-      const { sql, params } = compileGroupBy(and(), 'genre', FIXED_NOW)
+      const { sql, params } = compile_group_by(and(), 'genre', FIXED_NOW)
       db.prepare(sql).all(...params)
     }),
     bench('group by year (scalar)', () => {
-      const { sql, params } = compileGroupBy(and(), 'year', FIXED_NOW)
+      const { sql, params } = compile_group_by(and(), 'year', FIXED_NOW)
       db.prepare(sql).all(...params)
     })
   )
@@ -64,7 +64,7 @@ test(`group-by over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, async ({ b
 
 test(`sort over ${SIZE.toLocaleString()} tracks (budget: 150ms)`, async ({ bench }) => {
   await bench('sort by album then track number', () => {
-    const { sql, params } = compileFilter(and(), {
+    const { sql, params } = compile_filter(and(), {
       now: FIXED_NOW,
       sort: [{ field: 'album' }, { field: 'track_number' }]
     })

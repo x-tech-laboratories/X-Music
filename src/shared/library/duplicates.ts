@@ -1,5 +1,4 @@
 // Finding tracks that are probably the same recording.
-//
 // This proposes; merge.ts disposes. Nothing here changes the library — the whole point of keeping
 // §3.5.0's identity rule narrow is that guessing happens in a reviewable place, with the evidence
 // shown, rather than silently at import time.
@@ -26,7 +25,7 @@ export interface DuplicateMember {
 export interface DuplicateGroup {
   key: string
   reason: DuplicateReason
-  /** How much to trust the grouping: 'certain' needs no thought, 'likely' wants a glance. */
+  // How much to trust the grouping: 'certain' needs no thought, 'likely' wants a glance.
   confidence: 'certain' | 'likely' | 'possible'
   explanation: string
   members: DuplicateMember[]
@@ -34,7 +33,7 @@ export interface DuplicateGroup {
 
 export interface FindOptions {
   reasons?: readonly DuplicateReason[]
-  /** How far two durations may differ and still be called the same recording. */
+  // How far two durations may differ and still be called the same recording.
   lengthToleranceMs?: number
   limit?: number
 }
@@ -52,18 +51,14 @@ function members(database: SqlDatabase, ids: readonly string[]): DuplicateMember
     .map((member) => ({ ...member }))
 }
 
-/** Groups of track ids sharing a key, only where the group has more than one member. */
-function groupsByKey(database: SqlDatabase, sql: string): { key: string; ids: string[] }[] {
+// Groups of track ids sharing a key, only where the group has more than one member.
+function groups_by_key(database: SqlDatabase, sql: string): { key: string; ids: string[] }[] {
   return all_rows<{ key: string; ids: string }>(database, sql)
     .map((r) => ({ key: r.key, ids: r.ids.split(',') }))
     .filter((g) => g.ids.length > 1)
 }
 
-/**
- * Bracketed noise worth ignoring when comparing titles. Deliberately a fixed list rather than
- * "strip anything in brackets": that broader rule collapses "[Act 1]" and "[Act 2]" into the same
- * title, which is a wrong merge rather than a missed one.
- */
+// Bracketed noise worth ignoring when comparing titles. Deliberately a fixed list rather than "strip anything in brackets": that broader rule collapses "[Act 1]" and "[Act 2]" into the same title, which is a wrong merge rather than a missed one.
 const NOISE = new RegExp(
   '[\\(\\[]\\s*(?:' + [
     'official\\s+(?:music\\s+)?video', 'official\\s+audio', 'official\\s+lyric[s]?\\s+video',
@@ -87,9 +82,8 @@ const norm = (s: string | null): string =>
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
 
-export function findDuplicates(database: SqlDatabase, opts: FindOptions = {}): DuplicateGroup[] {
-  // Fuzzy matching is left out by default: on a real library it proposes far more than a person
-  // can review, and most of it needs judgement. It is a deliberate deeper sweep, not a baseline.
+export function find_duplicates(database: SqlDatabase, opts: FindOptions = {}): DuplicateGroup[] {
+  // Fuzzy matching is left out by default: on a real library it proposes far more than a person can review, and most of it needs judgement. It is a deliberate deeper sweep, not a baseline.
   const reasons = new Set<DuplicateReason>(
     opts.reasons ?? ['audio_hash', 'mb_recording_id', 'tags'])
   const tolerance = opts.lengthToleranceMs ?? 3000
@@ -106,7 +100,7 @@ export function findDuplicates(database: SqlDatabase, opts: FindOptions = {}): D
 
   // ── identical audio, in different track records ──────────────────────────
   if (reasons.has('audio_hash')) {
-    for (const g of groupsByKey(database, `
+    for (const g of groups_by_key(database, `
       SELECT hex(m.audio_hash) AS key, GROUP_CONCAT(DISTINCT m.track_id) AS ids
       FROM media m WHERE m.audio_hash IS NOT NULL
       GROUP BY m.audio_hash HAVING COUNT(DISTINCT m.track_id) > 1`)) {
@@ -120,7 +114,7 @@ export function findDuplicates(database: SqlDatabase, opts: FindOptions = {}): D
 
   // ── the same MusicBrainz recording ───────────────────────────────────────
   if (reasons.has('mb_recording_id')) {
-    for (const g of groupsByKey(database, `
+    for (const g of groups_by_key(database, `
       SELECT mb_recording_id AS key, GROUP_CONCAT(id) AS ids FROM tracks
       WHERE mb_recording_id IS NOT NULL AND mb_recording_id != ''
       GROUP BY mb_recording_id HAVING COUNT(*) > 1`)) {
@@ -134,7 +128,7 @@ export function findDuplicates(database: SqlDatabase, opts: FindOptions = {}): D
 
   // ── same artist, title and album by tag ──────────────────────────────────
   if (reasons.has('tags')) {
-    for (const g of groupsByKey(database, `
+    for (const g of groups_by_key(database, `
       SELECT identity_key AS key, GROUP_CONCAT(id) AS ids FROM tracks
       WHERE identity_key IS NOT NULL AND identity_key != ''
       GROUP BY identity_key HAVING COUNT(*) > 1`)) {
@@ -162,18 +156,18 @@ export function findDuplicates(database: SqlDatabase, opts: FindOptions = {}): D
       if (group.length < 2) continue
 
       // Split a bucket by duration, so a cover and the original do not merge on title alone.
-      const byLength: DuplicateMember[][] = []
+      const by_length: DuplicateMember[][] = []
       for (const m of group.sort((a, b) => (a.lengthMs ?? 0) - (b.lengthMs ?? 0))) {
-        const bucket = byLength.find((b) => {
+        const bucket = by_length.find((b) => {
           const ref = b[0]!.lengthMs
           if (ref === null || m.lengthMs === null) return false
           return Math.abs(ref - m.lengthMs) <= tolerance
         })
         if (bucket) bucket.push(m)
-        else byLength.push([m])
+        else by_length.push([m])
       }
 
-      for (const bucket of byLength) {
+      for (const bucket of by_length) {
         if (bucket.length < 2) continue
         const albums = new Set(bucket.map((m) => norm(m.album)))
         take({

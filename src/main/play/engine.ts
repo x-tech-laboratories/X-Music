@@ -1,5 +1,4 @@
 // The playback engine boundary.
-//
 // X-Music's own logic — what plays next, when a play counts, which file of a track to use — lives in
 // player.ts and knows nothing about mpv. This interface is the seam, so a second backend (Web Audio,
 // or a native decoder) is a swap rather than a rewrite, and so the player can be tested against a
@@ -8,18 +7,18 @@
 export type EngineState = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error'
 
 export interface LoadOptions {
-  /** For CUE ranges and chapters: play only part of the container. */
-  startMs?: number | null
-  endMs?: number | null
-  /** ReplayGain adjustment in dB, already resolved to track or album preference. */
-  gainDb?: number | null
+  // For CUE ranges and chapters: play only part of the container.
+  start_ms?: number | null
+  end_ms?: number | null
+  // ReplayGain adjustment in dB, already resolved to track or album preference.
+  gain_db?: number | null
 }
 
 export interface EngineEvents {
-  /** Throttled by the engine; the UI interpolates between ticks. */
-  position: { positionMs: number; durationMs: number | null }
+  // Throttled by the engine; the UI interpolates between ticks.
+  position: { position_ms: number; duration_ms: number | null }
   state: { state: EngineState; error?: string }
-  /** The current item finished on its own, as opposed to being replaced. */
+  // The current item finished on its own, as opposed to being replaced.
   ended: Record<string, never>
 }
 
@@ -33,20 +32,20 @@ export interface PlaybackEngine {
   play(): Promise<void>
   pause(): Promise<void>
   stop(): Promise<void>
-  seek(positionMs: number): Promise<void>
-  setVolume(volume: number): Promise<void>
-  /** Hint the next file so the backend can prepare a gapless transition. */
+  seek(position_ms: number): Promise<void>
+  set_volume(volume: number): Promise<void>
+  // Hint the next file so the backend can prepare a gapless transition.
   preload?(uri: string, opts?: LoadOptions): Promise<void>
   subscribe(listener: EngineListener): () => void
   dispose(): Promise<void>
 }
 
-/** An engine that does nothing, for tests and for running with no audio backend available. */
+// An engine that does nothing, for tests and for running with no audio backend available.
 export class NullEngine implements PlaybackEngine {
   private listeners = new Set<EngineListener>()
   state: EngineState = 'idle'
   uri: string | null = null
-  positionMs = 0
+  position_ms = 0
   volume = 100
   readonly loaded: string[] = []
   readonly preloaded: string[] = []
@@ -58,7 +57,7 @@ export class NullEngine implements PlaybackEngine {
   async load(uri: string): Promise<void> {
     this.uri = uri
     this.loaded.push(uri)
-    this.positionMs = 0
+    this.position_ms = 0
     this.state = 'loading'
     this.emit('state', { state: 'loading' })
   }
@@ -79,12 +78,12 @@ export class NullEngine implements PlaybackEngine {
     this.emit('state', { state: 'idle' })
   }
 
-  async seek(positionMs: number): Promise<void> {
-    this.positionMs = positionMs
-    this.emit('position', { positionMs, durationMs: null })
+  async seek(position_ms: number): Promise<void> {
+    this.position_ms = position_ms
+    this.emit('position', { position_ms, duration_ms: null })
   }
 
-  async setVolume(volume: number): Promise<void> {
+  async set_volume(volume: number): Promise<void> {
     this.volume = volume
   }
 
@@ -102,9 +101,9 @@ export class NullEngine implements PlaybackEngine {
   }
 
   // ── test helpers ────────────────────────────────────────────────────────
-  tick(positionMs: number, durationMs: number | null = 200_000): void {
-    this.positionMs = positionMs
-    this.emit('position', { positionMs, durationMs })
+  tick(position_ms: number, duration_ms: number | null = 200_000): void {
+    this.position_ms = position_ms
+    this.emit('position', { position_ms, duration_ms })
   }
 
   finish(): void {

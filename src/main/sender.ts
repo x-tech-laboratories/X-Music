@@ -8,6 +8,6 @@ export interface AppPage {
   file: string
 }
 
-export function trustedSender(page: AppPage): (event: IpcMainEventLike) => boolean {
+export function trusted_sender(page: AppPage): (event: IpcMainEventLike) => boolean {
   return (event) => is_app_page(event.senderFrame?.url ?? '', page)
 }

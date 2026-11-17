@@ -27,7 +27,7 @@ export interface LeafNode {
   field: string
   op: LeafOp
   value?: FilterValue
-  /** Case-sensitive comparison; defaults to false for string ops. */
+  // Case-sensitive comparison; defaults to false for string ops.
   cs?: boolean
 }
 
@@ -38,13 +38,13 @@ export interface GroupNode {
 
 export type FilterNode = LeafNode | GroupNode
 
-export const isGroup = (n: FilterNode): n is GroupNode =>
+export const is_group = (n: FilterNode): n is GroupNode =>
   (n as GroupNode).children !== undefined
 
 export interface SortKey {
   field: string
   dir?: 'asc' | 'desc'
-  /** Seed policy for the `random` pseudo-field. */
+  // Seed policy for the `random` pseudo-field.
   seed?: string
 }
 
@@ -68,23 +68,23 @@ export const not = (child: FilterNode): GroupNode => ({ op: 'not', children: [ch
 export const leaf = (field: string, op: LeafOp, value?: FilterValue): LeafNode =>
   value === undefined ? { field, op } : { field, op, value }
 
-/** Walks the tree, collecting every field the filter touches. */
-export function referencedFields(node: FilterNode, into = new Set<string>()): Set<string> {
-  if (isGroup(node)) node.children.forEach((c) => referencedFields(c, into))
+// Walks the tree, collecting every field the filter touches.
+export function referenced_fields(node: FilterNode, into = new Set<string>()): Set<string> {
+  if (is_group(node)) node.children.forEach((c) => referenced_fields(c, into))
   else into.add(node.field)
   return into
 }
 
-/** Rejects cycles created by `in_filter` composition before a filter is saved. */
-export function findCycle(
+// Rejects cycles created by `in_filter` composition before a filter is saved.
+export function find_cycle(
   id: string,
   node: FilterNode,
   resolve: (ref: string) => FilterNode | undefined,
   seen: readonly string[] = []
 ): string[] | null {
-  if (isGroup(node)) {
+  if (is_group(node)) {
     for (const c of node.children) {
-      const cycle = findCycle(id, c, resolve, seen)
+      const cycle = find_cycle(id, c, resolve, seen)
       if (cycle) return cycle
     }
     return null
@@ -95,5 +95,5 @@ export function findCycle(
   if (ref === id || seen.includes(ref)) return [...seen, ref]
 
   const target = resolve(ref)
-  return target ? findCycle(id, target, resolve, [...seen, ref]) : null
+  return target ? find_cycle(id, target, resolve, [...seen, ref]) : null
 }

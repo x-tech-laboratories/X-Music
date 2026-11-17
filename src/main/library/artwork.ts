@@ -1,5 +1,4 @@
 // Cover art: finding it, caching it, and remembering that there is none.
-//
 // Art belongs to an album where there is one and to the track otherwise, so a loose single still
 // gets a cover. Resolution is lazy — nothing is extracted until something wants to display it —
 // and the answer is recorded either way, including "nothing found", so a coverless track is not
@@ -16,20 +15,17 @@ import {
   album_of, lookup_artwork, no_artwork, present_file_paths, record_artwork, type Artwork
 } from '@shared/library/covers'
 
-export { forget_misses as forgetMisses, lookup_artwork as lookupArtwork, type ArtSource, type Artwork } from '@shared/library/covers'
+export { forget_misses, lookup_artwork, type ArtSource, type Artwork } from '@shared/library/covers'
 
-/**
- * Filenames worth trying, most specific first. Matching is case-insensitive and extension-agnostic,
- * because these conventions are followed loosely in the wild.
- */
+// Filenames worth trying, most specific first. Matching is case-insensitive and extension-agnostic, because these conventions are followed loosely in the wild.
 const FOLDER_NAMES = [
   'cover', 'folder', 'front', 'album', 'albumart', 'albumartsmall', 'thumb', 'artwork'
 ]
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'])
 
-/** Reads image dimensions from the header, so a decoder is not needed just to know the size. */
-export function imageSize(buf: Buffer): { width: number; height: number } | null {
+// Reads image dimensions from the header, so a decoder is not needed just to know the size.
+export function image_size(buf: Buffer): { width: number; height: number } | null {
   // PNG: IHDR width/height at a fixed offset.
   if (buf.length > 24 && buf.readUInt32BE(0) === 0x89504e47) {
     return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) }
@@ -61,7 +57,7 @@ export function imageSize(buf: Buffer): { width: number; height: number } | null
   return null
 }
 
-const extensionFor = (mime: string | undefined, fallback = '.jpg'): string => {
+const extension_for = (mime: string | undefined, fallback = '.jpg'): string => {
   if (!mime) return fallback
   if (mime.includes('png')) return '.png'
   if (mime.includes('webp')) return '.webp'
@@ -70,9 +66,9 @@ const extensionFor = (mime: string | undefined, fallback = '.jpg'): string => {
   return '.jpg'
 }
 
-/** Looks beside the file for a conventional cover image. */
-export function findFolderImage(mediaPath: string): string | null {
-  const dir = dirname(mediaPath)
+// Looks beside the file for a conventional cover image.
+export function find_folder_image(media_path: string): string | null {
+  const dir = dirname(media_path)
 
   let entries: string[]
   try {
@@ -96,10 +92,10 @@ export function findFolderImage(mediaPath: string): string | null {
   return images.length === 1 ? join(dir, images[0]!) : null
 }
 
-/** Pulls the front cover out of a file's tags, preferring an explicitly-typed front image. */
-export async function readEmbedded(mediaPath: string): Promise<{ data: Buffer; mime: string } | null> {
+// Pulls the front cover out of a file's tags, preferring an explicitly-typed front image.
+export async function read_embedded(media_path: string): Promise<{ data: Buffer; mime: string } | null> {
   try {
-    const meta = await parseFile(mediaPath, { skipCovers: false })
+    const meta = await parseFile(media_path, { skipCovers: false })
     const pictures = meta.common.picture
     if (!pictures || pictures.length === 0) return null
 
@@ -110,47 +106,42 @@ export async function readEmbedded(mediaPath: string): Promise<{ data: Buffer; m
   }
 }
 
-/** Sizes generated on demand. A request is served by the smallest one that is large enough. */
+// Sizes generated on demand. A request is served by the smallest one that is large enough.
 export const THUMBNAIL_SIZES = [64, 128, 256, 512] as const
 export type ThumbnailSize = (typeof THUMBNAIL_SIZES)[number]
 
-/** Resizes an encoded image, returning encoded bytes. Injected so this module stays testable. */
+// Resizes an encoded image, returning encoded bytes. Injected so this module stays testable.
 export type Resizer = (data: Buffer, size: number) => Buffer | null
 
 export interface ArtworkOptions {
-  cacheDir: string
+  cache_dir: string
   resize?: Resizer
 }
 
-export const sizeFor = (requested: number): ThumbnailSize =>
+export const size_for = (requested: number): ThumbnailSize =>
   THUMBNAIL_SIZES.find((s) => s >= requested) ?? THUMBNAIL_SIZES[THUMBNAIL_SIZES.length - 1]!
 
-const cacheFile = (cacheDir: string, hash: string, ext: string): string =>
-  join(cacheDir, hash.slice(0, 2), `${hash}${ext}`)
+const cache_file = (cache_dir: string, hash: string, ext: string): string =>
+  join(cache_dir, hash.slice(0, 2), `${hash}${ext}`)
 
-function store(cacheDir: string, data: Buffer, mime: string | undefined): {
+function store(cache_dir: string, data: Buffer, mime: string | undefined): {
   path: string; hash: string; size: { width: number; height: number } | null
 } {
   const hash = createHash('sha256').update(data).digest('hex')
-  const path = cacheFile(cacheDir, hash, extensionFor(mime, extname(mime ?? '') || '.jpg'))
+  const path = cache_file(cache_dir, hash, extension_for(mime, extname(mime ?? '') || '.jpg'))
 
   if (!existsSync(path)) {
     mkdirSync(dirname(path), { recursive: true })
     writeFileSync(path, data)
   }
 
-  return { path, hash, size: imageSize(data) }
+  return { path, hash, size: image_size(data) }
 }
 
-const thumbPath = (cacheDir: string, hash: string, size: number): string =>
-  join(cacheDir, 'thumbs', hash.slice(0, 2), `${hash}-${size}.png`)
+const thumb_path = (cache_dir: string, hash: string, size: number): string =>
+  join(cache_dir, 'thumbs', hash.slice(0, 2), `${hash}-${size}.png`)
 
-/**
- * A cached thumbnail at the given size, generated on first request.
- *
- * Returns the original when the source is already no larger than what was asked for, because
- * upscaling a small cover wastes space and looks worse than letting the layout scale it.
- */
+// A cached thumbnail at the given size, generated on first request. Returns the original when the source is already no larger than what was asked for, because upscaling a small cover wastes space and looks worse than letting the layout scale it.
 export function thumbnail(
   opts: ArtworkOptions,
   art: Artwork,
@@ -158,11 +149,11 @@ export function thumbnail(
 ): string | null {
   if (!art.path || !art.hash) return null
 
-  const size = sizeFor(requested)
+  const size = size_for(requested)
   const longest = Math.max(art.width ?? 0, art.height ?? 0)
   if (longest > 0 && longest <= size) return art.path
 
-  const target = thumbPath(opts.cacheDir, art.hash, size)
+  const target = thumb_path(opts.cache_dir, art.hash, size)
   if (existsSync(target)) return target
   if (!opts.resize) return art.path
 
@@ -179,29 +170,26 @@ export function thumbnail(
   }
 }
 
-/**
- * Finds art for a track and records the outcome. Embedded images win over a folder image, because a
- * file that carries its own cover is more specific than a picture shared by a directory.
- */
-export async function resolveArtwork(
+// Finds art for a track and records the outcome. Embedded images win over a folder image, because a file that carries its own cover is more specific than a picture shared by a directory.
+export async function resolve_artwork(
   database: SqlDatabase,
-  trackId: string,
+  track_id: string,
   opts: ArtworkOptions
 ): Promise<Artwork> {
-  const existing = lookup_artwork(database, trackId)
+  const existing = lookup_artwork(database, track_id)
   // A recorded miss stands until something changes; re-searching every play would be wasteful.
   if (existing) return existing
 
-  const track = album_of(database, trackId)
+  const track = album_of(database, track_id)
   if (!track) return no_artwork
 
-  const paths = present_file_paths(database, trackId)
+  const paths = present_file_paths(database, track_id)
   let found: Artwork = no_artwork
 
   for (const path of paths) {
-    const embedded = await readEmbedded(path)
+    const embedded = await read_embedded(path)
     if (embedded) {
-      const stored = store(opts.cacheDir, embedded.data, embedded.mime)
+      const stored = store(opts.cache_dir, embedded.data, embedded.mime)
       found = {
         source: 'embedded', path: stored.path, origin: path,
         width: stored.size?.width ?? null, height: stored.size?.height ?? null, hash: stored.hash
@@ -212,11 +200,11 @@ export async function resolveArtwork(
 
   if (found.source === 'none') {
     for (const path of paths) {
-      const image = findFolderImage(path)
+      const image = find_folder_image(path)
       if (!image) continue
       try {
         const data = readFileSync(image)
-        const stored = store(opts.cacheDir, data, extname(image).slice(1))
+        const stored = store(opts.cache_dir, data, extname(image).slice(1))
         found = {
           source: 'folder', path: stored.path, origin: image,
           width: stored.size?.width ?? null, height: stored.size?.height ?? null, hash: stored.hash
@@ -228,12 +216,12 @@ export async function resolveArtwork(
     }
   }
 
-  record_artwork(database, trackId, track.album_id, found, found.path ? readFileSize(found.path) : null, Date.now())
+  record_artwork(database, track_id, track.album_id, found, found.path ? read_file_size(found.path) : null, Date.now())
 
   return found
 }
 
-function readFileSize(path: string): number | null {
+function read_file_size(path: string): number | null {
   try {
     return readFileSync(path).byteLength
   } catch {
