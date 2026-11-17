@@ -81,7 +81,7 @@ function refresh(): Promise<void> {
 export const player = {
   init,
   refresh,
-  playTrack: (trackId: string, context?: string[], index?: number) => act(() => ipc('play_track', trackId, context, index)),
+  play_track: (track_id: string, context?: string[], index?: number) => act(() => ipc('play_track', track_id, context, index)),
   toggle: () => act(() => ipc('toggle_playback')),
   next: () => act(() => ipc('play_next')),
   previous: () => act(() => ipc('play_previous')),
@@ -90,18 +90,18 @@ export const player = {
     player_position.set(milliseconds)
     return act(() => ipc('seek', milliseconds))
   },
-  setVolume: (volume: number) => act(() => ipc('set_volume', volume)),
-  enqueue: (trackIds: string[], position: 'end' | 'next' = 'end') => act(() => ipc('queue_tracks', trackIds, position)),
+  set_volume: (volume: number) => act(() => ipc('set_volume', volume)),
+  enqueue: (track_ids: string[], position: 'end' | 'next' = 'end') => act(() => ipc('queue_tracks', track_ids, position)),
   dequeue: (index: number) => act(() => ipc('remove_from_queue', index)),
-  clearQueue: () => act(() => ipc('clear_queue')),
-  setRepeat: (mode: RepeatMode) => act(() => ipc('set_repeat', mode)),
-  setShuffle: (on: boolean) => act(() => ipc('set_shuffle', on)),
+  clear_queue: () => act(() => ipc('clear_queue')),
+  set_repeat: (mode: RepeatMode) => act(() => ipc('set_repeat', mode)),
+  set_shuffle: (on: boolean) => act(() => ipc('set_shuffle', on)),
 
   // Read-only views of the stores, for the widgets that read them in place.
   status_changes: player_status.watch,
   position_changes: player_position.watch,
   get status(): PlayerStatus | null { return player_status.get() },
-  get positionMs(): number { return player_position.get() },
+  get position_ms(): number { return player_position.get() },
   get playing(): boolean { return player_status.get()?.state === 'playing' },
-  get currentId(): string | null { return player_status.get()?.track?.id ?? null }
+  get current_id(): string | null { return player_status.get()?.track?.id ?? null }
 }

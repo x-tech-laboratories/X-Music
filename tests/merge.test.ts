@@ -2,10 +2,10 @@
 // the round-trip through unmerge is the test that matters most here.
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { list_recent_merges, mergePreview, mergeTracks, unmerge } from '@shared/library/merge'
+import { list_recent_merges, merge_preview, merge_tracks, unmerge } from '@shared/library/merge'
 import { field } from '@shared/fields'
 import { new_id } from '@shared/library/database'
-import { freshDb, type TestDb } from './sqlite.ts'
+import { fresh_db, type TestDb } from './sqlite.ts'
 
 let db: TestDb
 
@@ -13,32 +13,32 @@ interface Spec {
   title?: string | null
   year?: number | null
   rating?: number | null
-  playCount?: number
-  skipCount?: number
-  lastPlayed?: number | null
+  play_count?: number
+  skip_count?: number
+  last_played?: number | null
   album?: string | null
   genres?: string[]
   artist?: string
   comment?: string
 }
 
-function makeTrack(s: Spec = {}): string {
-  let albumId: string | null = null
+function make_track(s: Spec = {}): string {
+  let album_id: string | null = null
   if (s.album) {
     db.prepare('INSERT OR IGNORE INTO albums (id, match_key, name, added) VALUES (?, ?, ?, 0)')
       .run(new_id(), s.album, s.album)
-    albumId = (db.prepare('SELECT id FROM albums WHERE match_key = ?').get(s.album) as { id: string }).id
+    album_id = (db.prepare('SELECT id FROM albums WHERE match_key = ?').get(s.album) as { id: string }).id
   }
 
   const id = new_id()
   db.prepare(`INSERT INTO tracks (id, title, album_id, year, rating, play_count, skip_count,
                                   last_played, added, modified)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1000, 0)`)
-    .run(id, s.title ?? 'Song', albumId, s.year ?? null, s.rating ?? null,
-         s.playCount ?? 0, s.skipCount ?? 0, s.lastPlayed ?? null)
+    .run(id, s.title ?? 'Song', album_id, s.year ?? null, s.rating ?? null,
+         s.play_count ?? 0, s.skip_count ?? 0, s.last_played ?? null)
 
-  const addValue = (fieldId: string, value: string, ordinal: number): void => {
-    const fid = field(fieldId).fieldId!
+  const add_value = (field_id: string, value: string, ordinal: number): void => {
+    const fid = field(field_id).field_id!
     db.prepare('INSERT OR IGNORE INTO values_ (id, field_id, value) VALUES (?, ?, ?)').run(new_id(), fid, value)
     const vid = (db.prepare('SELECT id FROM values_ WHERE field_id = ? AND value = ?')
       .get(fid, value) as { id: string }).id
@@ -46,30 +46,30 @@ function makeTrack(s: Spec = {}): string {
       .run(id, fid, vid, ordinal)
   }
 
-  if (s.artist) addValue('artist', s.artist, 0)
-  ;(s.genres ?? []).forEach((g, i) => addValue('genre', g, i))
+  if (s.artist) add_value('artist', s.artist, 0)
+  ;(s.genres ?? []).forEach((g, i) => add_value('genre', g, i))
 
   if (s.comment) {
     db.prepare('INSERT INTO track_extras (track_id, field_id, value) VALUES (?, ?, ?)')
-      .run(id, field('comment').fieldId!, s.comment)
+      .run(id, field('comment').field_id!, s.comment)
   }
 
   return id
 }
 
-const addMedia = (trackId: string, uri: string, codec = 'flac'): string => {
+const add_media = (track_id: string, uri: string, codec = 'flac'): string => {
   const id = new_id()
   db.prepare(`INSERT INTO media (id, track_id, kind, uri, codec, present, added)
-              VALUES (?, ?, 'file', ?, ?, 1, 0)`).run(id, trackId, uri, codec)
+              VALUES (?, ?, 'file', ?, ?, 1, 0)`).run(id, track_id, uri, codec)
   return id
 }
 
-const addHistory = (trackId: string, at: number): void => {
+const add_history = (track_id: string, at: number): void => {
   db.prepare('INSERT OR IGNORE INTO play_history (id, track_id, at, kind) VALUES (?, ?, ?, 0)')
-    .run(new_id(), trackId, at)
+    .run(new_id(), track_id, at)
 }
 
-const addPlaylist = (): string => {
+const add_playlist = (): string => {
   const id = new_id()
   db.prepare("INSERT INTO playlists (id, name, kind, created, modified) VALUES (?, 'p', 'static', 0, 0)").run(id)
   return id
@@ -81,15 +81,15 @@ const one = <T>(sql: string, ...args: (string | number)[]): T =>
 const count = (sql: string, ...args: (string | number)[]): number =>
   (one<{ n: number }>(sql, ...args)).n
 
-beforeEach(() => { db = freshDb() })
+beforeEach(() => { db = fresh_db() })
 afterEach(() => db.close())
 
 describe('merge preview', () => {
   it('marks agreeing fields as settled and disagreeing ones as conflicts', () => {
-    const a = makeTrack({ title: 'So What', year: 1959, artist: 'Miles Davis' })
-    const b = makeTrack({ title: 'So What', year: 1997, artist: 'Miles Davis' })
+    const a = make_track({ title: 'So What', year: 1959, artist: 'Miles Davis' })
+    const b = make_track({ title: 'So What', year: 1997, artist: 'Miles Davis' })
 
-    const p = mergePreview(db, [a, b])
+    const p = merge_preview(db, [a, b])
     const title = p.fields.find((f) => f.field === 'title')!
     const year = p.fields.find((f) => f.field === 'year')!
 
@@ -100,52 +100,52 @@ describe('merge preview', () => {
   })
 
   it('offers the union of multi-value fields', () => {
-    const a = makeTrack({ genres: ['Jazz'] })
-    const b = makeTrack({ genres: ['Jazz', 'Modal'] })
+    const a = make_track({ genres: ['Jazz'] })
+    const b = make_track({ genres: ['Jazz', 'Modal'] })
 
-    const genre = mergePreview(db, [a, b]).fields.find((f) => f.field === 'genre')!
+    const genre = merge_preview(db, [a, b]).fields.find((f) => f.field === 'genre')!
     expect(genre.multi).toBe(true)
     expect(genre.union!.sort()).toEqual(['Jazz', 'Modal'])
   })
 
   it('proposes the richest source as the survivor', () => {
-    const thin = makeTrack({ playCount: 1 })
-    const rich = makeTrack({ playCount: 50 })
-    addMedia(rich, '/a.flac')
-    addMedia(rich, '/a.mp3', 'mp3')
-    addMedia(thin, '/b.flac')
+    const thin = make_track({ play_count: 1 })
+    const rich = make_track({ play_count: 50 })
+    add_media(rich, '/a.flac')
+    add_media(rich, '/a.mp3', 'mp3')
+    add_media(thin, '/b.flac')
 
-    expect(mergePreview(db, [thin, rich]).survivor).toBe(rich)
+    expect(merge_preview(db, [thin, rich]).survivor).toBe(rich)
   })
 
   it('sums counts and takes the highest rating', () => {
-    const a = makeTrack({ rating: 80, playCount: 10, skipCount: 1 })
-    const b = makeTrack({ rating: null, playCount: 5, skipCount: 2 })
+    const a = make_track({ rating: 80, play_count: 10, skip_count: 1 })
+    const b = make_track({ rating: null, play_count: 5, skip_count: 2 })
 
-    const stats = mergePreview(db, [a, b]).statistics
+    const stats = merge_preview(db, [a, b]).statistics
     expect(stats).toMatchObject({ playCount: 15, skipCount: 3, rating: 80 })
   })
 
   it('flags pinned sources, since merging overrides a human decision', () => {
-    const a = makeTrack()
-    const b = makeTrack()
+    const a = make_track()
+    const b = make_track()
     db.prepare('UPDATE tracks SET pinned = 1 WHERE id = ?').run(b)
-    expect(mergePreview(db, [a, b]).pinnedSources).toEqual([b])
+    expect(merge_preview(db, [a, b]).pinnedSources).toEqual([b])
   })
 
   it('refuses fewer than two tracks', () => {
-    expect(() => mergePreview(db, [makeTrack()])).toThrow(/at least two/)
+    expect(() => merge_preview(db, [make_track()])).toThrow(/at least two/)
   })
 })
 
 describe('merging', () => {
   it('moves every media source onto the survivor', () => {
-    const a = makeTrack()
-    const b = makeTrack()
-    addMedia(a, '/a.flac')
-    addMedia(b, '/b.mp3', 'mp3')
+    const a = make_track()
+    const b = make_track()
+    add_media(a, '/a.flac')
+    add_media(b, '/b.mp3', 'mp3')
 
-    const r = mergeTracks(db, { ids: [a, b], survivor: a })
+    const r = merge_tracks(db, { ids: [a, b], survivor: a })
 
     expect(r.mediaMoved).toBe(1)
     expect(count('SELECT COUNT(*) AS n FROM media WHERE track_id = ?', a)).toBe(2)
@@ -153,10 +153,10 @@ describe('merging', () => {
   })
 
   it('applies per-field resolutions', () => {
-    const a = makeTrack({ title: 'so what', year: 1997 })
-    const b = makeTrack({ title: 'So What', year: 1959 })
+    const a = make_track({ title: 'so what', year: 1997 })
+    const b = make_track({ title: 'So What', year: 1959 })
 
-    mergeTracks(db, {
+    merge_tracks(db, {
       ids: [a, b], survivor: a,
       resolutions: { title: { kind: 'value', from: b }, year: { kind: 'value', from: b } }
     })
@@ -166,38 +166,38 @@ describe('merging', () => {
   })
 
   it('unions multi-value fields by default', () => {
-    const a = makeTrack({ genres: ['Jazz'] })
-    const b = makeTrack({ genres: ['Modal', 'Cool'] })
+    const a = make_track({ genres: ['Jazz'] })
+    const b = make_track({ genres: ['Modal', 'Cool'] })
 
-    mergeTracks(db, { ids: [a, b], survivor: a })
+    merge_tracks(db, { ids: [a, b], survivor: a })
 
     const genres = db.prepare(
       `SELECT vv.value FROM track_values tv JOIN values_ vv ON vv.id = tv.value_id
        WHERE tv.track_id = ? AND tv.field_id = ? ORDER BY vv.value`
-    ).all(a, field('genre').fieldId!) as { value: string }[]
+    ).all(a, field('genre').field_id!) as { value: string }[]
     expect(genres.map((g) => g.value)).toEqual(['Cool', 'Jazz', 'Modal'])
   })
 
   it('can take one source\'s set instead of the union', () => {
-    const a = makeTrack({ genres: ['Jazz'] })
-    const b = makeTrack({ genres: ['Modal'] })
+    const a = make_track({ genres: ['Jazz'] })
+    const b = make_track({ genres: ['Modal'] })
 
-    mergeTracks(db, {
+    merge_tracks(db, {
       ids: [a, b], survivor: a, resolutions: { genre: { kind: 'value', from: b } }
     })
 
     const genres = db.prepare(
       `SELECT vv.value FROM track_values tv JOIN values_ vv ON vv.id = tv.value_id
        WHERE tv.track_id = ? AND tv.field_id = ?`
-    ).all(a, field('genre').fieldId!) as { value: string }[]
+    ).all(a, field('genre').field_id!) as { value: string }[]
     expect(genres.map((g) => g.value)).toEqual(['Modal'])
   })
 
   it('sums play counts and keeps the highest rating', () => {
-    const a = makeTrack({ rating: 40, playCount: 3 })
-    const b = makeTrack({ rating: 100, playCount: 9 })
+    const a = make_track({ rating: 40, play_count: 3 })
+    const b = make_track({ rating: 100, play_count: 9 })
 
-    mergeTracks(db, { ids: [a, b], survivor: a })
+    merge_tracks(db, { ids: [a, b], survivor: a })
 
     expect(one<{ rating: number; play_count: number }>(
       'SELECT rating, play_count FROM tracks WHERE id = ?', a))
@@ -205,12 +205,12 @@ describe('merging', () => {
   })
 
   it('unions play history and drops exact duplicates', () => {
-    const a = makeTrack()
-    const b = makeTrack()
-    addHistory(a, 1000); addHistory(a, 2000)
-    addHistory(b, 2000); addHistory(b, 3000)
+    const a = make_track()
+    const b = make_track()
+    add_history(a, 1000); add_history(a, 2000)
+    add_history(b, 2000); add_history(b, 3000)
 
-    mergeTracks(db, { ids: [a, b], survivor: a })
+    merge_tracks(db, { ids: [a, b], survivor: a })
 
     const at = db.prepare('SELECT at FROM play_history WHERE track_id = ? ORDER BY at')
       .all(a) as { at: number }[]
@@ -218,21 +218,21 @@ describe('merging', () => {
   })
 
   it('repoints playlist entries without listing the survivor twice', () => {
-    const a = makeTrack()
-    const b = makeTrack()
-    const pl = addPlaylist()
+    const a = make_track()
+    const b = make_track()
+    const pl = add_playlist()
     db.prepare('INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, 0)').run(pl, a)
     db.prepare('INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, 1)').run(pl, b)
 
-    mergeTracks(db, { ids: [a, b], survivor: a })
+    merge_tracks(db, { ids: [a, b], survivor: a })
 
     expect(count('SELECT COUNT(*) AS n FROM playlist_tracks WHERE playlist_id = ?', pl)).toBe(1)
   })
 
   it('pins the survivor so an automated pass cannot re-split it', () => {
-    const a = makeTrack()
-    const b = makeTrack()
-    mergeTracks(db, { ids: [a, b], survivor: a })
+    const a = make_track()
+    const b = make_track()
+    merge_tracks(db, { ids: [a, b], survivor: a })
 
     const t = one<{ pinned: number; identity_source: string }>(
       'SELECT pinned, identity_source FROM tracks WHERE id = ?', a)
@@ -240,20 +240,20 @@ describe('merging', () => {
   })
 
   it('refuses a survivor that is not part of the merge', () => {
-    const a = makeTrack()
-    const b = makeTrack()
-    expect(() => mergeTracks(db, { ids: [a, b], survivor: 'no-such-track' })).toThrow(/survivor/)
+    const a = make_track()
+    const b = make_track()
+    expect(() => merge_tracks(db, { ids: [a, b], survivor: 'no-such-track' })).toThrow(/survivor/)
   })
 })
 
 describe('unmerge', () => {
   it('restores tracks, media, statistics and history exactly', () => {
-    const a = makeTrack({ title: 'A', rating: 40, playCount: 3, genres: ['Jazz'], comment: 'first' })
-    const b = makeTrack({ title: 'B', rating: 100, playCount: 9, genres: ['Modal'] })
-    addMedia(a, '/a.flac')
-    addMedia(b, '/b.mp3', 'mp3')
-    addHistory(a, 1000)
-    addHistory(b, 2000)
+    const a = make_track({ title: 'A', rating: 40, play_count: 3, genres: ['Jazz'], comment: 'first' })
+    const b = make_track({ title: 'B', rating: 100, play_count: 9, genres: ['Modal'] })
+    add_media(a, '/a.flac')
+    add_media(b, '/b.mp3', 'mp3')
+    add_history(a, 1000)
+    add_history(b, 2000)
 
     const snapshot = {
       tracks: db.prepare('SELECT id, title, rating, play_count FROM tracks ORDER BY id').all(),
@@ -263,7 +263,7 @@ describe('unmerge', () => {
       extras: db.prepare('SELECT track_id, field_id, value FROM track_extras ORDER BY track_id').all()
     }
 
-    const result = mergeTracks(db, { ids: [a, b], survivor: a })
+    const result = merge_tracks(db, { ids: [a, b], survivor: a })
     expect(count('SELECT COUNT(*) AS n FROM tracks')).toBe(1)
 
     const undone = unmerge(db, result.batchId)
@@ -281,12 +281,12 @@ describe('unmerge', () => {
   })
 
   it('restores history that was dropped as a duplicate', () => {
-    const a = makeTrack()
-    const b = makeTrack()
-    addHistory(a, 5000)
-    addHistory(b, 5000)
+    const a = make_track()
+    const b = make_track()
+    add_history(a, 5000)
+    add_history(b, 5000)
 
-    const r = mergeTracks(db, { ids: [a, b], survivor: a })
+    const r = merge_tracks(db, { ids: [a, b], survivor: a })
     expect(count('SELECT COUNT(*) AS n FROM play_history')).toBe(1)
 
     unmerge(db, r.batchId)
@@ -294,13 +294,13 @@ describe('unmerge', () => {
   })
 
   it('restores playlist membership', () => {
-    const a = makeTrack()
-    const b = makeTrack()
-    const pl = addPlaylist()
+    const a = make_track()
+    const b = make_track()
+    const pl = add_playlist()
     db.prepare('INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, 0)').run(pl, a)
     db.prepare('INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, 1)').run(pl, b)
 
-    const r = mergeTracks(db, { ids: [a, b], survivor: a })
+    const r = merge_tracks(db, { ids: [a, b], survivor: a })
     unmerge(db, r.batchId)
 
     expect(db.prepare('SELECT track_id, position FROM playlist_tracks ORDER BY position').all())
@@ -308,9 +308,9 @@ describe('unmerge', () => {
   })
 
   it('refuses to undo the same merge twice', () => {
-    const a = makeTrack()
-    const b = makeTrack()
-    const r = mergeTracks(db, { ids: [a, b], survivor: a })
+    const a = make_track()
+    const b = make_track()
+    const r = merge_tracks(db, { ids: [a, b], survivor: a })
     unmerge(db, r.batchId)
     expect(() => unmerge(db, r.batchId)).toThrow(/already been undone/)
   })
@@ -320,9 +320,9 @@ describe('unmerge', () => {
   })
 
   it('refuses to bring a track back over a different track that has its id', () => {
-    const a = makeTrack({ title: 'Keeper' })
-    const b = makeTrack({ title: 'Duplicate' })
-    const r = mergeTracks(db, { ids: [a, b], survivor: a })
+    const a = make_track({ title: 'Keeper' })
+    const b = make_track({ title: 'Duplicate' })
+    const r = merge_tracks(db, { ids: [a, b], survivor: a })
     db.prepare("INSERT INTO tracks (id, title, rating, added, modified) VALUES (?, 'Someone else', 100, 5000, 0)").run(b)
 
     expect(() => unmerge(db, r.batchId)).toThrow(/would overwrite a track this merge did not take/)
@@ -333,12 +333,12 @@ describe('unmerge', () => {
 
 describe('listing merges', () => {
   it('lists the latest merges newest first, with the tracks each took and whether it was undone', () => {
-    const keeper = makeTrack({ title: 'So What' })
-    const copy = makeTrack({ title: 'So What (copy)' })
-    const other = makeTrack({ title: 'Blue in Green' })
-    const other_copy = makeTrack({ title: 'Blue in Green' })
-    const first = mergeTracks(db, { ids: [keeper, copy], survivor: keeper })
-    const second = mergeTracks(db, { ids: [other, other_copy], survivor: other })
+    const keeper = make_track({ title: 'So What' })
+    const copy = make_track({ title: 'So What (copy)' })
+    const other = make_track({ title: 'Blue in Green' })
+    const other_copy = make_track({ title: 'Blue in Green' })
+    const first = merge_tracks(db, { ids: [keeper, copy], survivor: keeper })
+    const second = merge_tracks(db, { ids: [other, other_copy], survivor: other })
     db.prepare('UPDATE merge_journal SET at = 1000 WHERE batch_id = ?').run(first.batchId)
     db.prepare('UPDATE merge_journal SET at = 2000 WHERE batch_id = ?').run(second.batchId)
     unmerge(db, first.batchId)
@@ -351,9 +351,9 @@ describe('listing merges', () => {
   })
 
   it('names a survivor that is gone by its title before the merge', () => {
-    const keeper = makeTrack({ title: 'Freddie Freeloader' })
-    const copy = makeTrack({ title: 'Freddie Freeloader' })
-    mergeTracks(db, { ids: [keeper, copy], survivor: keeper })
+    const keeper = make_track({ title: 'Freddie Freeloader' })
+    const copy = make_track({ title: 'Freddie Freeloader' })
+    merge_tracks(db, { ids: [keeper, copy], survivor: keeper })
     db.prepare('DELETE FROM tracks WHERE id = ?').run(keeper)
 
     expect(list_recent_merges(db, 10)[0]!.survivor_title).toBe('Freddie Freeloader')

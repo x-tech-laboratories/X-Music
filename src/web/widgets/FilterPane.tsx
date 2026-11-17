@@ -8,8 +8,8 @@ import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { use_store } from '@x-tech-laboratories/x-libs/web/react/store'
 import type { GroupRow } from '@shared/ipc'
-import { field, fieldsWith, ratingToStars } from '@shared/fields'
-import { sanitizePaneField } from '@shared/viewstate'
+import { field, fields_with, rating_to_stars } from '@shared/fields'
+import { sanitize_pane_field } from '@shared/viewstate'
 import { browse, library, results } from '../stores/library.ts'
 
 const FALLBACK_ROW_HEIGHT = 28
@@ -21,7 +21,7 @@ function row_height(): number {
 }
 
 // Every field that can group the library, by name, so no field is second class.
-const groupable: [string, string][] = fieldsWith('groupable')
+const groupable: [string, string][] = fields_with('groupable')
   .map((descriptor): [string, string] => [descriptor.id, descriptor.name])
   .sort((first, second) => first[1].localeCompare(second[1]))
 
@@ -31,14 +31,14 @@ export function facet_values(field_id: string, groups: readonly GroupRow[]): Fac
     if (group.label === null || group.label === '') return []
     const value = String(group.label)
     if (field_id !== 'rating') return [{ value, count: group.n }]
-    return [{ value, count: group.n, label: <Rating value={ratingToStars(Number(value))} label={`${ratingToStars(Number(value))} stars`} /> }]
+    return [{ value, count: group.n, label: <Rating value={rating_to_stars(Number(value))} label={`${rating_to_stars(Number(value))} stars`} /> }]
   })
 }
 
 export function FilterPane({ field: default_field = 'genre', id = 'pane' }: { field?: string; id?: string }) {
   // What the user last chose wins over the default, while it still names a real field.
   const [remembered, remember] = use_pref<string>(`x-music.pref.pane.${id}.field`, default_field)
-  const current = sanitizePaneField(remembered, default_field)
+  const current = sanitize_pane_field(remembered, default_field)
   const state = use_store(browse)
   const groups = use_resource(() => library.groups_for(current), [current], { watch: results.watch })
   const values = facet_values(current, groups.data ?? [])

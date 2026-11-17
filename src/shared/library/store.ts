@@ -8,7 +8,7 @@ import { migrate_drizzle } from '@x-tech-laboratories/x-libs/drizzle'
 import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import type { GroupRow, LibraryStats, QueryRequest, Root, TrackRow } from '../ipc.ts'
-import { compileFilter, compileGroupBy } from '../query/compile.ts'
+import { compile_filter, compile_group_by } from '../query/compile.ts'
 import { all_rows, drizzle_of, first_row, new_id, run } from './database.ts'
 import { install_history, track_history } from './history.ts'
 import { is_legacy, upgrade_legacy, type UpgradeReport } from './legacy.ts'
@@ -72,13 +72,13 @@ const track_columns = `
 
 // The tracks a filter picks, as the song list shows them; the filter compiles to SQL, which Drizzle cannot build.
 export function query_tracks(database: SqlDatabase, request: QueryRequest): TrackRow[] {
-  const { sql, params } = compileFilter(request.filter, { sort: request.sort, limit: request.limit, select: track_columns })
+  const { sql, params } = compile_filter(request.filter, { sort: request.sort, limit: request.limit, select: track_columns })
   const paged = request.offset ? `${sql} OFFSET ${Number(request.offset)}` : sql
   return all_rows<TrackRow>(database, paged, ...params).map((row) => ({ ...row }))
 }
 
 export function group_tracks(database: SqlDatabase, request: { filter: QueryRequest['filter']; field: string }): GroupRow[] {
-  const { sql, params } = compileGroupBy(request.filter, request.field)
+  const { sql, params } = compile_group_by(request.filter, request.field)
   return all_rows<GroupRow>(database, sql, ...params).map((row) => ({ ...row }))
 }
 

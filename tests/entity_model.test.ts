@@ -3,36 +3,36 @@
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { new_id } from '@shared/library/database'
-import { addTrack, freshDb, type TestDb } from './sqlite.ts'
+import { add_track, fresh_db, type TestDb } from './sqlite.ts'
 
 let db: TestDb
 
-const addMedia = (trackId: string, uri: string, opts: Partial<{
+const add_media = (track_id: string, uri: string, opts: Partial<{
   kind: string; codec: string; subtrack: number; start: number | null; end: number | null
 }> = {}): string => {
   const id = new_id()
   db.prepare(`INSERT INTO media (id, track_id, kind, uri, codec, subtrack_index, start_ms, end_ms, added)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`)
-    .run(id, trackId, opts.kind ?? 'file', uri, opts.codec ?? 'flac',
+    .run(id, track_id, opts.kind ?? 'file', uri, opts.codec ?? 'flac',
          opts.subtrack ?? 0, opts.start ?? null, opts.end ?? null)
   return id
 }
 
-beforeEach(() => { db = freshDb() })
+beforeEach(() => { db = fresh_db() })
 afterEach(() => db.close())
 
 describe('track and media', () => {
   it('a track can exist with no media at all', () => {
-    const id = addTrack(db, { title: 'Wishlist item' })
+    const id = add_track(db, { title: 'Wishlist item' })
     const media = db.prepare('SELECT COUNT(*) AS n FROM media WHERE track_id = ?').get(id) as { n: number }
     expect(media.n).toBe(0)
   })
 
   it('one track can have several media in different formats', () => {
-    const t = addTrack(db, { title: 'Blue in Green' })
-    addMedia(t, '/music/blue.flac', { codec: 'flac' })
-    addMedia(t, '/music/blue.mp3', { codec: 'mp3' })
-    addMedia(t, 'subsonic://server/42', { kind: 'stream', codec: 'opus' })
+    const t = add_track(db, { title: 'Blue in Green' })
+    add_media(t, '/music/blue.flac', { codec: 'flac' })
+    add_media(t, '/music/blue.mp3', { codec: 'mp3' })
+    add_media(t, 'subsonic://server/42', { kind: 'stream', codec: 'opus' })
 
     const rows = db.prepare('SELECT kind, codec FROM media WHERE track_id = ? ORDER BY rowid').all(t)
     expect(rows).toHaveLength(3)
@@ -40,8 +40,8 @@ describe('track and media', () => {
   })
 
   it('deleting a media row leaves the track and its statistics intact', () => {
-    const t = addTrack(db, { title: 'So What', rating: 80, play_count: 12 })
-    const m = addMedia(t, '/music/sowhat.flac')
+    const t = add_track(db, { title: 'So What', rating: 80, play_count: 12 })
+    const m = add_media(t, '/music/sowhat.flac')
 
     db.prepare('DELETE FROM media WHERE id = ?').run(m)
 
@@ -52,8 +52,8 @@ describe('track and media', () => {
   })
 
   it('deleting a track cascades to its media', () => {
-    const t = addTrack(db, { title: 'Flamenco Sketches' })
-    addMedia(t, '/music/flamenco.flac')
+    const t = add_track(db, { title: 'Flamenco Sketches' })
+    add_media(t, '/music/flamenco.flac')
 
     db.prepare('DELETE FROM tracks WHERE id = ?').run(t)
     const n = db.prepare('SELECT COUNT(*) AS n FROM media').get() as { n: number }
@@ -61,11 +61,11 @@ describe('track and media', () => {
   })
 
   it('CUE ranges are ordinary media rows addressing one container', () => {
-    const t1 = addTrack(db, { title: 'Side A track 1' })
-    const t2 = addTrack(db, { title: 'Side A track 2' })
+    const t1 = add_track(db, { title: 'Side A track 1' })
+    const t2 = add_track(db, { title: 'Side A track 2' })
 
-    addMedia(t1, '/music/live.flac', { subtrack: 1, start: 0, end: 240_000 })
-    addMedia(t2, '/music/live.flac', { subtrack: 2, start: 240_000, end: 511_000 })
+    add_media(t1, '/music/live.flac', { subtrack: 1, start: 0, end: 240_000 })
+    add_media(t2, '/music/live.flac', { subtrack: 2, start: 240_000, end: 511_000 })
 
     const rows = db.prepare('SELECT COUNT(*) AS n FROM media WHERE uri = ?').get('/music/live.flac') as
       { n: number }
@@ -73,14 +73,14 @@ describe('track and media', () => {
   })
 
   it('refuses two media rows for the same range of the same file', () => {
-    const t = addTrack(db, { title: 'dupe' })
-    addMedia(t, '/music/x.flac', { subtrack: 0 })
-    expect(() => addMedia(t, '/music/x.flac', { subtrack: 0 })).toThrow()
+    const t = add_track(db, { title: 'dupe' })
+    add_media(t, '/music/x.flac', { subtrack: 0 })
+    expect(() => add_media(t, '/music/x.flac', { subtrack: 0 })).toThrow()
   })
 
   it('a missing file is flagged, not deleted', () => {
-    const t = addTrack(db, { title: 'On an external drive' })
-    const m = addMedia(t, '/mnt/usb/track.flac')
+    const t = add_track(db, { title: 'On an external drive' })
+    const m = add_media(t, '/mnt/usb/track.flac')
 
     db.prepare('UPDATE media SET present = 0 WHERE id = ?').run(m)
 
@@ -91,7 +91,7 @@ describe('track and media', () => {
   })
 
   it('a pinned identity is recorded so automated passes can skip it', () => {
-    const id = addTrack(db, { title: 'Manually merged', pinned: 1, identity_source: 'manual' })
+    const id = add_track(db, { title: 'Manually merged', pinned: 1, identity_source: 'manual' })
     const row = db.prepare('SELECT pinned, identity_source FROM tracks WHERE id = ?')
       .get(id) as { pinned: number; identity_source: string }
     expect(row.pinned).toBe(1)

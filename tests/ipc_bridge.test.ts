@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { trustedSender } from '@main/sender'
+import { trusted_sender } from '@main/sender'
 import { api_method_names, history_channels, page_method_names, x_music_bridge, x_music_events, x_music_history_bridge, x_music_page_bridge, type PlayerStatus } from '@shared/ipc'
 
 type Answer = (event: unknown, ...args: unknown[]) => Promise<unknown>
@@ -70,7 +70,7 @@ describe('IPC bridge', () => {
     const own = { senderFrame: { url: pathToFileURL(page.file).href } }
     const stranger = { senderFrame: { url: 'https://example.com/' } }
 
-    x_music_bridge.handle(ipc_main, { get_default_gmbrc_path: () => '/home/user/.config/gmusicbrowser/gmbrc' } as never, { trusted: trustedSender(page), envelopes: true })
+    x_music_bridge.handle(ipc_main, { get_default_gmbrc_path: () => '/home/user/.config/gmusicbrowser/gmbrc' } as never, { trusted: trusted_sender(page), envelopes: true })
     const answer = answers.get('xMusic:get_default_gmbrc_path')!
 
     expect(await answer(own)).toEqual({ ok: true, result: '/home/user/.config/gmusicbrowser/gmbrc' })
@@ -79,7 +79,7 @@ describe('IPC bridge', () => {
   })
 
   it('trusts the dev server\'s origin while developing', () => {
-    const trusted = trustedSender({ dev_url: 'http://localhost:5173/', file: '/unused/index.html' })
+    const trusted = trusted_sender({ dev_url: 'http://localhost:5173/', file: '/unused/index.html' })
 
     expect(trusted({ senderFrame: { url: 'http://localhost:5173/index.html' } })).toBe(true)
     expect(trusted({ senderFrame: { url: 'http://localhost:9999/' } })).toBe(false)

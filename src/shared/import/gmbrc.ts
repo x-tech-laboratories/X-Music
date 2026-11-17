@@ -8,10 +8,10 @@
 // Reading only. Nothing here opens a file for writing, and the importer never touches the music.
 
 export interface GmbSong {
-  gmbId: number
+  gmb_id: number
   added?: number
   album?: string
-  albumArtist?: string
+  album_artist?: string
   artist?: string
   bitrate?: number
   channels?: number
@@ -24,21 +24,21 @@ export interface GmbSong {
   genre: string[]
   grouping: string[]
   label: string[]
-  lastPlay?: number
-  lastSkip?: number
+  last_play?: number
+  last_skip?: number
   length?: number
   missing?: boolean
   modif?: number
   /** Directory, already percent-decoded. */
   path?: string
-  playCount?: number
-  playHistory: number[]
+  play_count?: number
+  play_history: number[]
   rating?: number
-  rgAlbumGain?: number
-  rgTrackGain?: number
-  sampleRate?: number
+  rg_album_gain?: number
+  rg_track_gain?: number
+  sample_rate?: number
   size?: number
-  skipCount?: number
+  skip_count?: number
   title?: string
   track?: number
   version?: string
@@ -53,17 +53,17 @@ export interface GmbSavedFilter {
 
 export interface GmbSavedList {
   name: string
-  gmbIds: number[]
+  gmb_ids: number[]
 }
 
 export interface GmbrcData {
   version?: string
-  baseFolder?: string
+  base_folder?: string
   songs: GmbSong[]
-  savedFilters: GmbSavedFilter[]
-  savedLists: GmbSavedList[]
+  saved_filters: GmbSavedFilter[]
+  saved_lists: GmbSavedList[]
   /** Column names present in [Songs] that this parser does not map. */
-  unmappedColumns: string[]
+  unmapped_columns: string[]
 }
 
 const MULTI_SEP = '\\x00'
@@ -78,7 +78,7 @@ function decode(v: string): string {
   }
 }
 
-const splitMulti = (v: string): string[] =>
+const split_multi = (v: string): string[] =>
   v === '' ? [] : v.split(MULTI_SEP).map((s) => s.trim()).filter((s) => s !== '')
 
 const num = (v: string): number | undefined => {
@@ -95,12 +95,12 @@ const KNOWN_COLUMNS = new Set([
   'replaygain_track_peak', 'samprate', 'size', 'skipcount', 'title', 'track', 'version', 'year'
 ])
 
-function parseSongRow(columns: readonly string[], line: string): GmbSong | null {
+function parse_song_row(columns: readonly string[], line: string): GmbSong | null {
   const cells = line.split('\t')
   if (cells.length < 2) return null
 
-  const gmbId = Number(cells[0])
-  if (!Number.isFinite(gmbId)) return null
+  const gmb_id = Number(cells[0])
+  if (!Number.isFinite(gmb_id)) return null
 
   const get = (name: string): string => {
     const i = columns.indexOf(name)
@@ -109,10 +109,10 @@ function parseSongRow(columns: readonly string[], line: string): GmbSong | null 
   }
 
   const song: GmbSong = {
-    gmbId,
+    gmb_id,
     added: num(get('added')),
     album: get('album') || undefined,
-    albumArtist: get('album_artist_raw') || get('album_artist') || undefined,
+    album_artist: get('album_artist_raw') || get('album_artist') || undefined,
     artist: get('artist') || undefined,
     bitrate: num(get('bitrate')),
     channels: num(get('channel')),
@@ -121,23 +121,23 @@ function parseSongRow(columns: readonly string[], line: string): GmbSong | null 
     disc: num(get('disc')),
     file: get('file') ? decode(get('file')) : undefined,
     filetype: get('filetype') || undefined,
-    genre: splitMulti(get('genre')),
-    grouping: splitMulti(get('grouping')),
-    label: splitMulti(get('label')),
-    lastPlay: num(get('lastplay')),
-    lastSkip: num(get('lastskip')),
+    genre: split_multi(get('genre')),
+    grouping: split_multi(get('grouping')),
+    label: split_multi(get('label')),
+    last_play: num(get('lastplay')),
+    last_skip: num(get('lastskip')),
     length: num(get('length')),
     missing: get('missing') === '1',
     modif: num(get('modif')),
     path: get('path') ? decode(get('path')) : undefined,
-    playCount: num(get('playcount')),
-    playHistory: get('playhistory').split(/\s+/).map(Number).filter((n) => Number.isFinite(n) && n > 0),
+    play_count: num(get('playcount')),
+    play_history: get('playhistory').split(/\s+/).map(Number).filter((n) => Number.isFinite(n) && n > 0),
     rating: num(get('rating')),
-    rgAlbumGain: num(get('replaygain_album_gain')),
-    rgTrackGain: num(get('replaygain_track_gain')),
-    sampleRate: num(get('samprate')),
+    rg_album_gain: num(get('replaygain_album_gain')),
+    rg_track_gain: num(get('replaygain_track_gain')),
+    sample_rate: num(get('samprate')),
     size: num(get('size')),
-    skipCount: num(get('skipcount')),
+    skip_count: num(get('skipcount')),
     title: get('title') || undefined,
     track: num(get('track')),
     version: get('version') || undefined,
@@ -159,40 +159,40 @@ function unquote(v: string): string {
   return t
 }
 
-export function parseGmbrc(text: string): GmbrcData {
+export function parse_gmbrc(text: string): GmbrcData {
   const lines = text.split('\n')
 
   const data: GmbrcData = {
-    songs: [], savedFilters: [], savedLists: [], unmappedColumns: []
+    songs: [], saved_filters: [], saved_lists: [], unmapped_columns: []
   }
 
   const first = lines[0] ?? ''
-  const versionMatch = /version=(\S+)/.exec(first)
-  if (versionMatch) data.version = versionMatch[1]
+  const version_match = /version=(\S+)/.exec(first)
+  if (version_match) data.version = version_match[1]
 
   let section = ''
-  let songColumns: string[] | null = null
-  let optionKey: string | null = null
+  let song_columns: string[] | null = null
+  let option_key: string | null = null
 
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i]!
     if (raw === '' || raw.startsWith('#')) continue
 
-    const sectionMatch = /^\[(.+)\]$/.exec(raw)
-    if (sectionMatch) {
-      section = sectionMatch[1]!
-      songColumns = null
-      optionKey = null
+    const section_match = /^\[(.+)\]$/.exec(raw)
+    if (section_match) {
+      section = section_match[1]!
+      song_columns = null
+      option_key = null
       continue
     }
 
     if (section === 'Songs') {
-      if (songColumns === null) {
-        songColumns = raw.split('\t')
-        data.unmappedColumns = songColumns.filter((c) => !KNOWN_COLUMNS.has(c))
+      if (song_columns === null) {
+        song_columns = raw.split('\t')
+        data.unmapped_columns = song_columns.filter((c) => !KNOWN_COLUMNS.has(c))
         continue
       }
-      const song = parseSongRow(songColumns, raw)
+      const song = parse_song_row(song_columns, raw)
       if (song) data.songs.push(song)
       continue
     }
@@ -203,15 +203,15 @@ export function parseGmbrc(text: string): GmbrcData {
     if (/^\s/.test(raw)) {
       const body = raw.trim()
 
-      if (optionKey === 'SavedFilters') {
+      if (option_key === 'SavedFilters') {
         const m = /^(.+?):\s*!Filter\s+"(.*)"$/.exec(body)
-        if (m) data.savedFilters.push({ name: unquote(m[1]!), expression: m[2]! })
-      } else if (optionKey === 'SavedLists') {
+        if (m) data.saved_filters.push({ name: unquote(m[1]!), expression: m[2]! })
+      } else if (option_key === 'SavedLists') {
         const m = /^(.+?):\s*!SongArray(?:::Named)?\s+(.*)$/.exec(body)
         if (m) {
-          data.savedLists.push({
+          data.saved_lists.push({
             name: unquote(m[1]!),
-            gmbIds: m[2]!.split(/\s+/).map(Number).filter(Number.isFinite)
+            gmb_ids: m[2]!.split(/\s+/).map(Number).filter(Number.isFinite)
           })
         }
       }
@@ -221,17 +221,17 @@ export function parseGmbrc(text: string): GmbrcData {
     const kv = /^([A-Za-z_0-9]+):\s*(.*)$/.exec(raw)
     if (!kv) continue
 
-    optionKey = kv[1]!
+    option_key = kv[1]!
     const value = kv[2]!
 
-    if (optionKey === 'BaseFolder' && value !== '') data.baseFolder = unquote(value)
+    if (option_key === 'BaseFolder' && value !== '') data.base_folder = unquote(value)
   }
 
   return data
 }
 
 /** Where gmusicbrowser keeps its configuration by default. */
-export function defaultGmbrcPath(home: string, platform: string): string {
+export function default_gmbrc_path(home: string, platform: string): string {
   if (platform === 'win32') return `${home}/gmusicbrowser/gmbrc`
   if (platform === 'darwin') return `${home}/Library/Preferences/gmusicbrowser/gmbrc`
   return `${home}/.config/gmusicbrowser/gmbrc`

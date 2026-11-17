@@ -40,7 +40,7 @@ describe('song properties', () => {
   it('lays the overview out as facts under section headings', async () => {
     record_calls({ 'get_track': details, 'get_cover_url': { url: null, source: 'none' } })
 
-    render(<SongProperties trackId="track-7" onclose={() => undefined} />)
+    render(<SongProperties track_id="track-7" on_close={() => undefined} />)
 
     await screen.findByRole('heading', { level: 2, name: 'All metadata' })
     expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Morning Tone', 'All metadata', 'Identity', 'Statistics', 'Merge history'])
@@ -53,7 +53,7 @@ describe('song properties', () => {
   it('shows each source with its facts and reveals it in its folder', async () => {
     const calls = record_calls({ 'get_track': details })
 
-    render(<SongProperties trackId="track-7" onclose={() => undefined} />)
+    render(<SongProperties track_id="track-7" on_close={() => undefined} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Sources (1)' }))
 
     expect(screen.getByText('44100 Hz')).toBeTruthy()
@@ -65,7 +65,7 @@ describe('song properties', () => {
   it('joins repeated raw tags and says when a track was never played', async () => {
     record_calls({ 'get_track': details })
 
-    render(<SongProperties trackId="track-7" onclose={() => undefined} />)
+    render(<SongProperties track_id="track-7" on_close={() => undefined} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Raw tags' }))
     expect(screen.getByText('Example Band, Guest')).toBeTruthy()
 
@@ -78,7 +78,7 @@ describe('song properties', () => {
     const list_versions = vi.fn(async () => [])
     Object.assign(window, { xMusicHistory: { list_versions } })
 
-    render(<><SongProperties trackId="track-7" onclose={() => undefined} /><Dialogs /></>)
+    render(<><SongProperties track_id="track-7" on_close={() => undefined} /><Dialogs /></>)
     await screen.findByRole('heading', { level: 2, name: 'All metadata' })
     fireEvent.click(screen.getByRole('button', { name: 'History' }))
 
@@ -89,12 +89,12 @@ describe('song properties', () => {
 
   it('says when the track no longer exists, and closes', async () => {
     record_calls({ 'get_track': null })
-    const onclose = vi.fn()
+    const on_close = vi.fn()
 
-    render(<SongProperties trackId="track-7" onclose={onclose} />)
+    render(<SongProperties track_id="track-7" on_close={on_close} />)
 
     expect(await screen.findByText('This track no longer exists')).toBeTruthy()
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }))
-    expect(onclose).toHaveBeenCalled()
+    expect(on_close).toHaveBeenCalled()
   })
 })

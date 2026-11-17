@@ -15,7 +15,7 @@ const KEY_SEP = '\x1f'
 export const COMPILATION_ARTISTS = 3
 
 /** Splits a tag that holds several values, which containers do inconsistently. */
-export function splitValues(value: string | string[] | null | undefined): string[] {
+export function split_values(value: string | string[] | null | undefined): string[] {
   if (value === undefined || value === null) return []
   const raw = Array.isArray(value) ? value : [value]
   return raw
@@ -42,7 +42,7 @@ const EDITION_SUFFIX =
 const GENERIC_ALBUM = /^(?:unknown(?: album)?|untitled|various(?: artists)?|(?:cd|disc|disk)\s*\d+)$/
 
 /** The album name as keyed: normalized, with edition notes removed so editions share an album. */
-export function albumKeyName(album: string): string {
+export function album_key_name(album: string): string {
   let name = album
   for (let prev = ''; prev !== name;) {
     prev = name
@@ -55,20 +55,20 @@ export function albumKeyName(album: string): string {
  * The first artist in a tag, normalized and without featured guests, so "A; B" from one reader and
  * "A feat. C" from another both count as A.
  */
-const primaryArtist = (raw: string | null | undefined): string =>
-  normalize((splitValues(raw)[0] ?? '').split(/\s+(?:feat\.?|ft\.|featuring)\s+/i)[0])
+const primary_artist = (raw: string | null | undefined): string =>
+  normalize((split_values(raw)[0] ?? '').split(/\s+(?:feat\.?|ft\.|featuring)\s+/i)[0])
 
 export interface AlbumInput {
   album?: string | null
   artist?: string | null
-  albumArtist?: string | null
+  album_artist?: string | null
   year?: number | null
   compilation?: boolean
-  mbReleaseId?: string | null
+  mb_release_id?: string | null
 }
 
 /** The folder, only when the album name is too generic to tell albums apart on its own. */
-function folderTieBreak(album: string, uri: string | null | undefined): string {
+function folder_tie_break(album: string, uri: string | null | undefined): string {
   return uri && GENERIC_ALBUM.test(normalize(album)) ? folder_of(uri) : ''
 }
 
@@ -91,40 +91,40 @@ export function folder_of(path: string): string {
 }
 
 /** The key an album of many artists is filed under: no artist component. */
-export function compilationKey(t: AlbumInput, uri?: string | null): string | null {
+export function compilation_key(t: AlbumInput, uri?: string | null): string | null {
   if (!t.album?.trim()) return null
-  return ['c', albumKeyName(t.album), t.year ?? '', folderTieBreak(t.album, uri)].join(KEY_SEP)
+  return ['c', album_key_name(t.album), t.year ?? '', folder_tie_break(t.album, uri)].join(KEY_SEP)
 }
 
 /**
  * The album a track belongs to: its MusicBrainz release when tagged, otherwise album artist (or
  * track artist), name and year, with tagged compilations dropping the artist.
  */
-export function albumMatchKey(t: AlbumInput, uri?: string | null): string | null {
+export function album_match_key(t: AlbumInput, uri?: string | null): string | null {
   if (!t.album?.trim()) return null
-  if (t.mbReleaseId) return ['mb', t.mbReleaseId].join(KEY_SEP)
+  if (t.mb_release_id) return ['mb', t.mb_release_id].join(KEY_SEP)
 
-  const albumArtist = primaryArtist(t.albumArtist)
-  if (!albumArtist && t.compilation) return compilationKey(t, uri)
+  const album_artist = primary_artist(t.album_artist)
+  if (!album_artist && t.compilation) return compilation_key(t, uri)
 
-  return ['a', albumArtist || primaryArtist(t.artist), albumKeyName(t.album), t.year ?? '',
-    folderTieBreak(t.album, uri)].join(KEY_SEP)
+  return ['a', album_artist || primary_artist(t.artist), album_key_name(t.album), t.year ?? '',
+    folder_tie_break(t.album, uri)].join(KEY_SEP)
 }
 
 export interface RegroupReport {
-  compilationsFound: number
-  tracksMoved: number
-  albumsRemoved: number
+  compilations_found: number
+  tracks_moved: number
+  albums_removed: number
 }
 
 /**
  * Moves albums with no album artist and at least three track artists onto one compilation album,
  * then deletes album rows nothing points at. Pinned albums and pinned tracks are left alone.
  */
-export function regroupAlbums(database: SqlDatabase): RegroupReport {
-  const report: RegroupReport = { compilationsFound: 0, tracksMoved: 0, albumsRemoved: 0 }
-  const artistField = field('artist').fieldId!
-  const albumArtistField = field('album_artist').fieldId!
+export function regroup_albums(database: SqlDatabase): RegroupReport {
+  const report: RegroupReport = { compilations_found: 0, tracks_moved: 0, albums_removed: 0 }
+  const artist_field = field('artist').field_id!
+  const album_artist_field = field('album_artist').field_id!
 
   // Tracks filed under a per-artist key, i.e. every candidate for being part of a compilation.
   const rows = all_rows<{ id: string; year: number | null; name: string | null; artist: string | null; uri: string | null }>(
@@ -137,18 +137,18 @@ export function regroupAlbums(database: SqlDatabase): RegroupReport {
      WHERE t.pinned = 0 AND a.pinned = 0 AND a.match_key LIKE 'a' || char(31) || '%'
        AND NOT EXISTS (SELECT 1 FROM track_values tv
                         WHERE tv.track_id = t.id AND tv.field_id = ?)`,
-    artistField,
-    albumArtistField
+    artist_field,
+    album_artist_field
   )
 
   const groups = new Map<string, { input: AlbumInput; uri: string | null; artists: Set<string>; tracks: string[] }>()
   for (const r of rows) {
     const input = { album: r.name, year: r.year }
-    const key = compilationKey(input, r.uri)
+    const key = compilation_key(input, r.uri)
     if (key === null) continue
     let g = groups.get(key)
     if (!g) groups.set(key, g = { input, uri: r.uri, artists: new Set(), tracks: [] })
-    g.artists.add(primaryArtist(r.artist))
+    g.artists.add(primary_artist(r.artist))
     g.tracks.push(r.id)
   }
 
@@ -158,14 +158,14 @@ export function regroupAlbums(database: SqlDatabase): RegroupReport {
     if (g.artists.size < COMPILATION_ARTISTS) continue
     run(database, `INSERT INTO albums (id, match_key, name, year, is_compilation, added) VALUES (?, ?, ?, ?, 1, ?)
                    ON CONFLICT(match_key) DO UPDATE SET is_compilation = 1`, new_id(), key, g.input.album ?? null, g.input.year ?? null, now)
-    const albumId = first_row<{ id: string }>(database, 'SELECT id FROM albums WHERE match_key = ?', key)!.id
-    for (const trackId of g.tracks) run(database, 'UPDATE tracks SET album_id = ? WHERE id = ?', albumId, trackId)
-    report.compilationsFound++
-    report.tracksMoved += g.tracks.length
+    const album_id = first_row<{ id: string }>(database, 'SELECT id FROM albums WHERE match_key = ?', key)!.id
+    for (const track_id of g.tracks) run(database, 'UPDATE tracks SET album_id = ? WHERE id = ?', album_id, track_id)
+    report.compilations_found++
+    report.tracks_moved += g.tracks.length
   }
 
   // An album a merge could still be undone onto has to survive, or the undo has nothing to restore.
-  report.albumsRemoved = run(database, `
+  report.albums_removed = run(database, `
     DELETE FROM albums
      WHERE pinned = 0
        AND id NOT IN (SELECT album_id FROM tracks WHERE album_id IS NOT NULL)

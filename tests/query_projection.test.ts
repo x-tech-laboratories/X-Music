@@ -4,14 +4,14 @@
 import { describe, expect, it } from 'vitest'
 import { and, leaf } from '@shared/filter'
 import { group_tracks, query_tracks } from '@shared/library/store'
-import { makeCorpus } from './corpus.ts'
-import { freshDb, loadCorpus } from './sqlite.ts'
+import { make_corpus } from './corpus.ts'
+import { fresh_db, load_corpus } from './sqlite.ts'
 
 describe('song list row projection', () => {
   it('resolves every displayed column against the real schema', () => {
-    const corpus = makeCorpus(50, 9)
-    const db = freshDb()
-    loadCorpus(db, corpus)
+    const corpus = make_corpus(50, 9)
+    const db = fresh_db()
+    load_corpus(db, corpus)
 
     const rows = query_tracks(db, {
       filter: and(),
@@ -32,18 +32,18 @@ describe('song list row projection', () => {
   })
 
   it('still projects correctly under a filter that joins other tables', () => {
-    const corpus = makeCorpus(50, 11)
-    const db = freshDb()
-    loadCorpus(db, corpus)
+    const corpus = make_corpus(50, 11)
+    const db = fresh_db()
+    load_corpus(db, corpus)
 
     expect(() => query_tracks(db, { filter: and(leaf('genre', 'any', ['Jazz', 'Rock']), leaf('codec', 'is', 'flac')) })).not.toThrow()
     db.close()
   })
 
   it('pages with an offset and groups a set field by its values', () => {
-    const corpus = makeCorpus(50, 13)
-    const db = freshDb()
-    loadCorpus(db, corpus)
+    const corpus = make_corpus(50, 13)
+    const db = fresh_db()
+    load_corpus(db, corpus)
 
     const all = query_tracks(db, { filter: and(), sort: [{ field: 'title' }] })
     const page = query_tracks(db, { filter: and(), sort: [{ field: 'title' }], limit: { count: 5 }, offset: 5 })

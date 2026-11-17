@@ -7,8 +7,8 @@ import { page_ipc } from './ipc.ts'
 // The renderer cannot read the environment, so the main process states the level at start-up.
 let spec = parse_level_spec(undefined)
 
-export function configureLogging(levelSpec: string | undefined): void {
-  spec = parse_level_spec(levelSpec)
+export function configure_logging(level_spec: string | undefined): void {
+  spec = parse_level_spec(level_spec)
 }
 
 const sink = (record: { level: Level; scope: string; message: string; data?: unknown }): void => {

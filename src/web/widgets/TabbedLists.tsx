@@ -53,7 +53,7 @@ function Queue({ queue }: { queue: TrackId[] }) {
     <div className={s.queue}>
       <div className="panel-head">
         <span className="muted small">{plural(queue.length, 'track')} queued</span>
-        <button type="button" onClick={() => void player.clearQueue()}>Clear queue</button>
+        <button type="button" onClick={() => void player.clear_queue()}>Clear queue</button>
       </div>
       <DataTable
         caption="Queue"

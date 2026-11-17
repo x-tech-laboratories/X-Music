@@ -3,16 +3,16 @@
 
 import { describe, expect, it } from 'vitest'
 import { existsSync } from 'node:fs'
-import { hasLiveLibrary, openLiveCopy } from './live.ts'
+import { has_live_library, open_live_copy } from './live.ts'
 
-import { MpvEngine, findMpv } from '@main/play/mpv'
+import { MpvEngine, find_mpv } from '@main/play/mpv'
 import { Player } from '@main/play/player'
 
-const mpv = (await findMpv()) ?? undefined
+const mpv = (await find_mpv()) ?? undefined
 
-describe.runIf(hasLiveLibrary() && mpv)('playback against the real library', () => {
+describe.runIf(has_live_library() && mpv)('playback against the real library', () => {
   it('loads a real track and the position advances', async () => {
-    const db = openLiveCopy('x-music-play-check.db')
+    const db = open_live_copy('x-music-play-check.db')
 
     const row = db.prepare(`
       SELECT t.id, t.title, m.uri, COUNT(m.id) AS files
@@ -25,15 +25,15 @@ describe.runIf(hasLiveLibrary() && mpv)('playback against the real library', () 
     console.log(`  exists on disk: ${existsSync(row.uri)}`)
 
     const engine = new MpvEngine({ binary: mpv })
-    const player = new Player(db, engine, { replayGain: 'track' })
+    const player = new Player(db, engine, { replay_gain: 'track' })
 
     const states: string[] = []
     player.subscribe((e, p) => {
       if (e === 'status') states.push((p as { state: string }).state)
     })
 
-    await player.setVolume(0)
-    await player.playTrack(row.id)
+    await player.set_volume(0)
+    await player.play_track(row.id)
 
     // Poll rather than sleep a fixed amount: mpv start-up is slower when the whole suite is
     // running in parallel, and a fixed wait turns that into a flake.
@@ -66,14 +66,14 @@ describe.runIf(hasLiveLibrary() && mpv)('playback against the real library', () 
 
     // Start-up used to hang here: the setup commands waited on the promise start-up itself
     // resolves. A timeout rather than a hang is the point of this assertion.
-    await engine.setVolume(0)
+    await engine.set_volume(0)
 
-    const db = openLiveCopy('x-music-play-check.db')
+    const db = open_live_copy('x-music-play-check.db')
     const uri = (db.prepare('SELECT uri FROM media WHERE present = 1 LIMIT 1').get() as
       { uri: string }).uri
 
     // Options go in mpv's options slot, not its index slot; the wrong slot is 'invalid parameter'.
-    await engine.load(uri, { startMs: 5000, gainDb: -6 })
+    await engine.load(uri, { start_ms: 5000, gain_db: -6 })
     await new Promise((r) => setTimeout(r, 800))
 
     expect(seen).toContain('playing')

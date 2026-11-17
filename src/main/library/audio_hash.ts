@@ -19,7 +19,7 @@ export interface AudioHash {
 const HASH_CHUNK = 1 << 20
 
 /** Reads FLAC's STREAMINFO MD5 of the decoded audio — already in the file, free and exact. */
-async function flacStreaminfoMd5(fh: FileHandle): Promise<AudioHash | null> {
+async function flac_streaminfo_md5(fh: FileHandle): Promise<AudioHash | null> {
   const head = Buffer.alloc(4)
   await fh.read(head, 0, 4, 0)
   if (head.toString('latin1') !== 'fLaC') return null
@@ -27,26 +27,26 @@ async function flacStreaminfoMd5(fh: FileHandle): Promise<AudioHash | null> {
   let offset = 4
   for (;;) {
     const header = Buffer.alloc(4)
-    const { bytesRead } = await fh.read(header, 0, 4, offset)
-    if (bytesRead < 4) return null
+    const { bytesRead: bytes_read } = await fh.read(header, 0, 4, offset)
+    if (bytes_read < 4) return null
 
-    const isLast = (header[0]! & 0x80) !== 0
-    const blockType = header[0]! & 0x7f
-    const blockLen = (header[1]! << 16) | (header[2]! << 8) | header[3]!
+    const is_last = (header[0]! & 0x80) !== 0
+    const block_type = header[0]! & 0x7f
+    const block_len = (header[1]! << 16) | (header[2]! << 8) | header[3]!
     offset += 4
 
-    if (blockType === 0) {
+    if (block_type === 0) {
       // STREAMINFO: the decoded-audio MD5 occupies the final 16 bytes of the block.
-      if (blockLen < 34) return null
+      if (block_len < 34) return null
       const md5 = Buffer.alloc(16)
-      await fh.read(md5, 0, 16, offset + blockLen - 16)
+      await fh.read(md5, 0, 16, offset + block_len - 16)
       // An all-zero MD5 means the encoder declined to compute one.
       if (md5.every((b) => b === 0)) return null
       return { hash: md5, algo: 'flac-streaminfo-md5' }
     }
 
-    if (isLast) return null
-    offset += blockLen
+    if (is_last) return null
+    offset += block_len
   }
 }
 
@@ -54,37 +54,37 @@ async function flacStreaminfoMd5(fh: FileHandle): Promise<AudioHash | null> {
  * Hashes the payload of every top-level MP4 `mdat` box, which holds the audio samples; tags live
  * in `moov`, so rewriting them never touches what is hashed.
  */
-async function mp4Mdat(fh: FileHandle, fileSize: number): Promise<AudioHash | null> {
+async function mp4_mdat(fh: FileHandle, file_size: number): Promise<AudioHash | null> {
   const ranges: [number, number][] = []
   const header = Buffer.alloc(16)
   let offset = 0
 
-  while (offset + 8 <= fileSize) {
+  while (offset + 8 <= file_size) {
     await fh.read(header, 0, 16, offset)
     const size32 = header.readUInt32BE(0)
     const type = header.toString('latin1', 4, 8)
     if (offset === 0 && type !== 'ftyp') return null
 
-    let headerLen = 8
-    let boxLen: number
+    let header_len = 8
+    let box_len: number
     if (size32 === 1) {
-      boxLen = Number(header.readBigUInt64BE(8))
-      headerLen = 16
+      box_len = Number(header.readBigUInt64BE(8))
+      header_len = 16
     } else if (size32 === 0) {
-      boxLen = fileSize - offset
+      box_len = file_size - offset
     } else {
-      boxLen = size32
+      box_len = size32
     }
     // A box that overruns the file or undercuts its own header means this is not a sound MP4.
-    if (boxLen < headerLen || offset + boxLen > fileSize) return null
+    if (box_len < header_len || offset + box_len > file_size) return null
 
-    if (type === 'mdat') ranges.push([offset + headerLen, offset + boxLen])
-    offset += boxLen
+    if (type === 'mdat') ranges.push([offset + header_len, offset + box_len])
+    offset += box_len
   }
 
   if (ranges.length === 0) return null
   const h = createHash('sha256')
-  for (const [start, end] of ranges) await hashRangeInto(h, fh, start, end)
+  for (const [start, end] of ranges) await hash_range_into(h, fh, start, end)
   return { hash: h.digest(), algo: 'sha256-mdat' }
 }
 
@@ -99,15 +99,15 @@ const OGG_COMMENT_PACKET: readonly [magic: string, index: number][] = [
  * Hashes the packets of an Ogg stream with the comment packet left out. Packets rather than pages,
  * because retagging repaginates everything after the comment and so changes every page header.
  */
-async function oggPackets(fh: FileHandle, fileSize: number, start: number): Promise<AudioHash | null> {
+async function ogg_packets(fh: FileHandle, file_size: number, start: number): Promise<AudioHash | null> {
   const h = createHash('sha256')
   // Per logical stream: how many packets have completed, and which one is the comment.
   const streams = new Map<number, { packet: number; skip: number }>()
-  const reader = new ChunkReader(fh, fileSize)
+  const reader = new ChunkReader(fh, file_size)
   let offset = start
   let hashed = false
 
-  while (offset < fileSize) {
+  while (offset < file_size) {
     const head = await reader.at(offset, 27)
     if (!head || head.toString('latin1', 0, 4) !== 'OggS') return null
     const flags = head[5]!
@@ -116,11 +116,11 @@ async function oggPackets(fh: FileHandle, fileSize: number, start: number): Prom
 
     const lacing = await reader.at(offset + 27, segments)
     if (!lacing) return null
-    let bodyLen = 0
-    for (const l of lacing) bodyLen += l
-    const lacingCopy = Buffer.from(lacing)
+    let body_len = 0
+    for (const l of lacing) body_len += l
+    const lacing_copy = Buffer.from(lacing)
 
-    const body = await reader.at(offset + 27 + segments, bodyLen)
+    const body = await reader.at(offset + 27 + segments, body_len)
     if (!body) return null
 
     let s = streams.get(serial)
@@ -134,7 +134,7 @@ async function oggPackets(fh: FileHandle, fileSize: number, start: number): Prom
     }
 
     let pos = 0
-    for (const len of lacingCopy) {
+    for (const len of lacing_copy) {
       if (s.packet !== s.skip) {
         h.update(body.subarray(pos, pos + len))
         hashed = true
@@ -144,7 +144,7 @@ async function oggPackets(fh: FileHandle, fileSize: number, start: number): Prom
       if (len < 255) s.packet++
     }
 
-    offset += 27 + segments + bodyLen
+    offset += 27 + segments + body_len
   }
 
   return hashed ? { hash: h.digest(), algo: 'sha256-ogg-packets' } : null
@@ -153,35 +153,35 @@ async function oggPackets(fh: FileHandle, fileSize: number, start: number): Prom
 /** Serves small reads from one large buffered read, so walking thousands of Ogg pages stays cheap. */
 class ChunkReader {
   private buf = Buffer.alloc(0)
-  private bufStart = 0
+  private buf_start = 0
 
   private fh: FileHandle
-  private fileSize: number
+  private file_size: number
 
-  constructor(fh: FileHandle, fileSize: number) {
+  constructor(fh: FileHandle, file_size: number) {
     this.fh = fh
-    this.fileSize = fileSize
+    this.file_size = file_size
   }
 
   /** The `n` bytes at `pos`, valid until the next call, or null if the file ends first. */
   async at(pos: number, n: number): Promise<Buffer | null> {
-    if (pos + n > this.fileSize) return null
-    if (pos < this.bufStart || pos + n > this.bufStart + this.buf.length) {
-      const len = Math.min(Math.max(HASH_CHUNK, n), this.fileSize - pos)
+    if (pos + n > this.file_size) return null
+    if (pos < this.buf_start || pos + n > this.buf_start + this.buf.length) {
+      const len = Math.min(Math.max(HASH_CHUNK, n), this.file_size - pos)
       this.buf = Buffer.alloc(len)
-      const { bytesRead } = await this.fh.read(this.buf, 0, len, pos)
-      if (bytesRead < n) return null
-      this.bufStart = pos
+      const { bytesRead: bytes_read } = await this.fh.read(this.buf, 0, len, pos)
+      if (bytes_read < n) return null
+      this.buf_start = pos
     }
-    return this.buf.subarray(pos - this.bufStart, pos - this.bufStart + n)
+    return this.buf.subarray(pos - this.buf_start, pos - this.buf_start + n)
   }
 }
 
 /** Size of a leading ID3v2 tag, or 0 if there is none. */
-async function id3v2Length(fh: FileHandle): Promise<number> {
+async function id3v2_length(fh: FileHandle): Promise<number> {
   const b = Buffer.alloc(10)
-  const { bytesRead } = await fh.read(b, 0, 10, 0)
-  if (bytesRead < 10 || b.toString('latin1', 0, 3) !== 'ID3') return 0
+  const { bytesRead: bytes_read } = await fh.read(b, 0, 10, 0)
+  if (bytes_read < 10 || b.toString('latin1', 0, 3) !== 'ID3') return 0
 
   // Syncsafe integer: 7 significant bits per byte.
   const size = ((b[6]! & 0x7f) << 21) | ((b[7]! & 0x7f) << 14) | ((b[8]! & 0x7f) << 7) | (b[9]! & 0x7f)
@@ -190,45 +190,45 @@ async function id3v2Length(fh: FileHandle): Promise<number> {
 }
 
 /** Combined size of trailing APEv2 and ID3v1 tags, or 0 if there are none. */
-async function trailerLength(fh: FileHandle, fileSize: number): Promise<number> {
+async function trailer_length(fh: FileHandle, file_size: number): Promise<number> {
   let trailer = 0
 
-  if (fileSize >= 128) {
+  if (file_size >= 128) {
     const b = Buffer.alloc(3)
-    await fh.read(b, 0, 3, fileSize - 128)
+    await fh.read(b, 0, 3, file_size - 128)
     if (b.toString('latin1') === 'TAG') trailer = 128
   }
 
-  const apeFooterAt = fileSize - trailer - 32
-  if (apeFooterAt >= 0) {
+  const ape_footer_at = file_size - trailer - 32
+  if (ape_footer_at >= 0) {
     const b = Buffer.alloc(32)
-    await fh.read(b, 0, 32, apeFooterAt)
+    await fh.read(b, 0, 32, ape_footer_at)
     if (b.toString('latin1', 0, 8) === 'APETAGEX') {
-      const tagSize = b.readUInt32LE(12)
+      const tag_size = b.readUInt32LE(12)
       const flags = b.readUInt32LE(20)
-      const hasHeader = (flags & 0x80000000) !== 0
-      trailer += tagSize + (hasHeader ? 32 : 0)
+      const has_header = (flags & 0x80000000) !== 0
+      trailer += tag_size + (has_header ? 32 : 0)
     }
   }
 
   return trailer
 }
 
-async function hashRangeInto(h: Hash, fh: FileHandle, start: number, end: number): Promise<void> {
+async function hash_range_into(h: Hash, fh: FileHandle, start: number, end: number): Promise<void> {
   const buf = Buffer.alloc(HASH_CHUNK)
   let pos = start
   while (pos < end) {
     const want = Math.min(HASH_CHUNK, end - pos)
-    const { bytesRead } = await fh.read(buf, 0, want, pos)
-    if (bytesRead <= 0) break
-    h.update(buf.subarray(0, bytesRead))
-    pos += bytesRead
+    const { bytesRead: bytes_read } = await fh.read(buf, 0, want, pos)
+    if (bytes_read <= 0) break
+    h.update(buf.subarray(0, bytes_read))
+    pos += bytes_read
   }
 }
 
-async function hashRange(fh: FileHandle, start: number, end: number): Promise<Buffer> {
+async function hash_range(fh: FileHandle, start: number, end: number): Promise<Buffer> {
   const h = createHash('sha256')
-  await hashRangeInto(h, fh, start, end)
+  await hash_range_into(h, fh, start, end)
   return h.digest()
 }
 
@@ -238,30 +238,30 @@ async function hashRange(fh: FileHandle, start: number, end: number): Promise<Bu
  * frame region hashed; anything else falls back to a whole-file hash, which is still stable under
  * moves but not under retagging.
  */
-export async function hashAudio(path: string): Promise<AudioHash> {
+export async function hash_audio(path: string): Promise<AudioHash> {
   const fh = await open(path, 'r')
   try {
     const { size } = await fh.stat()
 
-    const flac = await flacStreaminfoMd5(fh)
+    const flac = await flac_streaminfo_md5(fh)
     if (flac) return flac
 
-    const mp4 = await mp4Mdat(fh, size)
+    const mp4 = await mp4_mdat(fh, size)
     if (mp4) return mp4
 
-    const start = await id3v2Length(fh)
+    const start = await id3v2_length(fh)
 
-    const ogg = await oggPackets(fh, size, start)
+    const ogg = await ogg_packets(fh, size, start)
     if (ogg) return ogg
 
-    const trailer = await trailerLength(fh, size)
+    const trailer = await trailer_length(fh, size)
     const end = size - trailer
 
-    if (end <= start) return { hash: await hashRange(fh, 0, size), algo: 'sha256-file' }
+    if (end <= start) return { hash: await hash_range(fh, 0, size), algo: 'sha256-file' }
 
     const tagged = start > 0 || trailer > 0
     return {
-      hash: await hashRange(fh, start, end),
+      hash: await hash_range(fh, start, end),
       algo: tagged ? 'sha256-frames' : 'sha256-file'
     }
   } finally {
@@ -272,9 +272,9 @@ export async function hashAudio(path: string): Promise<AudioHash> {
 const CONTAINER_EXTENSIONS = new Set(['.m4a', '.m4b', '.mp4', '.aac', '.ogg', '.oga', '.opus', '.spx'])
 
 /** Whether a stored hash should be recomputed: never hashed, or hashed whole before its container was understood. */
-export function needsRehash(path: string, algo: string | null): boolean {
+export function needs_rehash(path: string, algo: string | null): boolean {
   if (algo === null) return true
   return algo === 'sha256-file' && CONTAINER_EXTENSIONS.has(extname(path).toLowerCase())
 }
 
-export const hashToHex = (h: Buffer): string => h.toString('hex')
+export const hash_to_hex = (h: Buffer): string => h.toString('hex')

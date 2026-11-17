@@ -53,7 +53,7 @@ function members(database: SqlDatabase, ids: readonly string[]): DuplicateMember
 }
 
 /** Groups of track ids sharing a key, only where the group has more than one member. */
-function groupsByKey(database: SqlDatabase, sql: string): { key: string; ids: string[] }[] {
+function groups_by_key(database: SqlDatabase, sql: string): { key: string; ids: string[] }[] {
   return all_rows<{ key: string; ids: string }>(database, sql)
     .map((r) => ({ key: r.key, ids: r.ids.split(',') }))
     .filter((g) => g.ids.length > 1)
@@ -87,7 +87,7 @@ const norm = (s: string | null): string =>
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
 
-export function findDuplicates(database: SqlDatabase, opts: FindOptions = {}): DuplicateGroup[] {
+export function find_duplicates(database: SqlDatabase, opts: FindOptions = {}): DuplicateGroup[] {
   // Fuzzy matching is left out by default: on a real library it proposes far more than a person
   // can review, and most of it needs judgement. It is a deliberate deeper sweep, not a baseline.
   const reasons = new Set<DuplicateReason>(
@@ -106,7 +106,7 @@ export function findDuplicates(database: SqlDatabase, opts: FindOptions = {}): D
 
   // ── identical audio, in different track records ──────────────────────────
   if (reasons.has('audio_hash')) {
-    for (const g of groupsByKey(database, `
+    for (const g of groups_by_key(database, `
       SELECT hex(m.audio_hash) AS key, GROUP_CONCAT(DISTINCT m.track_id) AS ids
       FROM media m WHERE m.audio_hash IS NOT NULL
       GROUP BY m.audio_hash HAVING COUNT(DISTINCT m.track_id) > 1`)) {
@@ -120,7 +120,7 @@ export function findDuplicates(database: SqlDatabase, opts: FindOptions = {}): D
 
   // ── the same MusicBrainz recording ───────────────────────────────────────
   if (reasons.has('mb_recording_id')) {
-    for (const g of groupsByKey(database, `
+    for (const g of groups_by_key(database, `
       SELECT mb_recording_id AS key, GROUP_CONCAT(id) AS ids FROM tracks
       WHERE mb_recording_id IS NOT NULL AND mb_recording_id != ''
       GROUP BY mb_recording_id HAVING COUNT(*) > 1`)) {
@@ -134,7 +134,7 @@ export function findDuplicates(database: SqlDatabase, opts: FindOptions = {}): D
 
   // ── same artist, title and album by tag ──────────────────────────────────
   if (reasons.has('tags')) {
-    for (const g of groupsByKey(database, `
+    for (const g of groups_by_key(database, `
       SELECT identity_key AS key, GROUP_CONCAT(id) AS ids FROM tracks
       WHERE identity_key IS NOT NULL AND identity_key != ''
       GROUP BY identity_key HAVING COUNT(*) > 1`)) {
@@ -162,18 +162,18 @@ export function findDuplicates(database: SqlDatabase, opts: FindOptions = {}): D
       if (group.length < 2) continue
 
       // Split a bucket by duration, so a cover and the original do not merge on title alone.
-      const byLength: DuplicateMember[][] = []
+      const by_length: DuplicateMember[][] = []
       for (const m of group.sort((a, b) => (a.lengthMs ?? 0) - (b.lengthMs ?? 0))) {
-        const bucket = byLength.find((b) => {
+        const bucket = by_length.find((b) => {
           const ref = b[0]!.lengthMs
           if (ref === null || m.lengthMs === null) return false
           return Math.abs(ref - m.lengthMs) <= tolerance
         })
         if (bucket) bucket.push(m)
-        else byLength.push([m])
+        else by_length.push([m])
       }
 
-      for (const bucket of byLength) {
+      for (const bucket of by_length) {
         if (bucket.length < 2) continue
         const albums = new Set(bucket.map((m) => norm(m.album)))
         take({

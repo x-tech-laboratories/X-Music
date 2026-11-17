@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FilterStack } from '@shared/view'
-import { leaf, and, isGroup } from '@shared/filter'
+import { leaf, and, is_group } from '@shared/filter'
 
 describe('filter stack', () => {
   it('collapses to a single AST', () => {
@@ -8,9 +8,9 @@ describe('filter stack', () => {
     st.push({ id: 'genre', label: 'Jazz', node: leaf('genre', 'any', ['Jazz']), removable: true })
     st.push({ id: 'rating', label: '4+', node: leaf('rating', '>=', 80), removable: true })
 
-    const f = st.toFilter()
-    expect(isGroup(f) && f.op === 'and').toBe(true)
-    expect(isGroup(f) && f.children).toHaveLength(2)
+    const f = st.to_filter()
+    expect(is_group(f) && f.op === 'and').toBe(true)
+    expect(is_group(f) && f.children).toHaveLength(2)
   })
 
   it('replaces a chip with the same id rather than stacking duplicates', () => {

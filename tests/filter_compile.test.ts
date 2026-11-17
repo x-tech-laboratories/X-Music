@@ -1,29 +1,29 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 
-import { compileFilter, compileGroupBy } from '@shared/query/compile'
+import { compile_filter, compile_group_by } from '@shared/query/compile'
 import { and, or, not, leaf } from '@shared/filter'
-import { makeCorpus, FIXED_NOW, type Corpus } from './corpus.ts'
-import { freshDb, loadCorpus, runQuery, type TestDb } from './sqlite.ts'
+import { make_corpus, FIXED_NOW, type Corpus } from './corpus.ts'
+import { fresh_db, load_corpus, run_query, type TestDb } from './sqlite.ts'
 
 describe('filter compiler', () => {
   let db: TestDb
   let corpus: Corpus
 
   beforeAll(() => {
-    corpus = makeCorpus(300, 7)
-    db = freshDb()
-    loadCorpus(db, corpus)
+    corpus = make_corpus(300, 7)
+    db = fresh_db()
+    load_corpus(db, corpus)
   })
 
   afterAll(() => db.close())
 
-  const ids = (node: Parameters<typeof compileFilter>[0]): string[] => {
-    const { sql, params } = compileFilter(node, { now: FIXED_NOW })
-    return runQuery(db, sql, params)
+  const ids = (node: Parameters<typeof compile_filter>[0]): string[] => {
+    const { sql, params } = compile_filter(node, { now: FIXED_NOW })
+    return run_query(db, sql, params)
   }
 
   it('parameterizes every value rather than interpolating it', () => {
-    const { sql, params } = compileFilter(leaf('title', 'contains', "'; DROP TABLE tracks; --"))
+    const { sql, params } = compile_filter(leaf('title', 'contains', "'; DROP TABLE tracks; --"))
     expect(sql).not.toContain('DROP TABLE')
     expect(params).toContain("%''; DROP TABLE tracks; --%".replace("''", "'"))
   })
@@ -42,13 +42,13 @@ describe('filter compiler', () => {
   })
 
   it('applies set semantics: any is OR, all is AND, none is neither', () => {
-    const anyOf = ids(leaf('genre', 'any', ['Jazz', 'Blues']))
-    const allOf = ids(leaf('genre', 'all', ['Jazz', 'Blues']))
-    const noneOf = ids(leaf('genre', 'none', ['Jazz', 'Blues']))
+    const any_of = ids(leaf('genre', 'any', ['Jazz', 'Blues']))
+    const all_of = ids(leaf('genre', 'all', ['Jazz', 'Blues']))
+    const none_of = ids(leaf('genre', 'none', ['Jazz', 'Blues']))
 
-    expect(allOf.every((id) => anyOf.includes(id))).toBe(true)
-    expect(anyOf.filter((id) => noneOf.includes(id))).toHaveLength(0)
-    expect(anyOf.length + noneOf.length).toBe(corpus.tracks.length)
+    expect(all_of.every((id) => any_of.includes(id))).toBe(true)
+    expect(any_of.filter((id) => none_of.includes(id))).toHaveLength(0)
+    expect(any_of.length + none_of.length).toBe(corpus.tracks.length)
   })
 
   it('composes boolean groups', () => {
@@ -68,21 +68,21 @@ describe('filter compiler', () => {
   })
 
   it('respects sort direction and puts NULLs last either way', () => {
-    const { sql, params } = compileFilter(and(), {
+    const { sql, params } = compile_filter(and(), {
       now: FIXED_NOW,
       sort: [{ field: 'year', dir: 'desc' }]
     })
     const rows = db.prepare(sql.replace('t.id', 't.id, t.year')).all(...params) as
       { id: number; year: number | null }[]
 
-    const firstNull = rows.findIndex((r) => r.year === null)
-    if (firstNull !== -1) {
-      expect(rows.slice(firstNull).every((r) => r.year === null)).toBe(true)
+    const first_null = rows.findIndex((r) => r.year === null)
+    if (first_null !== -1) {
+      expect(rows.slice(first_null).every((r) => r.year === null)).toBe(true)
     }
   })
 
   it('breaks ties in a sort by id, so the same query always lists tracks in the same order', () => {
-    const { sql, params } = compileFilter(and(), { now: FIXED_NOW, sort: [{ field: 'compilation' }] })
+    const { sql, params } = compile_filter(and(), { now: FIXED_NOW, sort: [{ field: 'compilation' }] })
     const rows = db.prepare(sql.replace('t.id', 't.id, t.compilation')).all(...params) as { id: string; compilation: number }[]
 
     const expected = [...rows].sort((a, b) => a.compilation - b.compilation || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
@@ -91,7 +91,7 @@ describe('filter compiler', () => {
   })
 
   it('groups multi-value fields by interned value with counts and durations', () => {
-    const { sql, params } = compileGroupBy(and(), 'genre', FIXED_NOW)
+    const { sql, params } = compile_group_by(and(), 'genre', FIXED_NOW)
     const rows = db.prepare(sql).all(...params) as
       { label: string; n: number; total_ms: number }[]
 
@@ -102,10 +102,10 @@ describe('filter compiler', () => {
   })
 
   it('rejects operators that do not apply to a field type', () => {
-    expect(() => compileFilter(leaf('genre', '>', 5))).toThrow(/not valid on set field/)
+    expect(() => compile_filter(leaf('genre', '>', 5))).toThrow(/not valid on set field/)
   })
 
   it('rejects unknown fields rather than silently matching nothing', () => {
-    expect(() => compileFilter(leaf('nonexistent', 'is', 'x'))).toThrow(/unknown field/)
+    expect(() => compile_filter(leaf('nonexistent', 'is', 'x'))).toThrow(/unknown field/)
   })
 })

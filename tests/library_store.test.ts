@@ -5,27 +5,27 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { posix } from 'node:path'
 import fc from 'fast-check'
 
-import { clearLibraryBackedUp } from '@main/backups'
+import { clear_library_backed_up } from '@main/backups'
 import { folder_of } from '@shared/library/albums'
 import { join_path } from '@shared/import/gmb_import'
 import { record_history } from '@shared/library/history'
-import { createUpserter } from '@shared/library/identity'
+import { create_upserter } from '@shared/library/identity'
 import {
   add_root, enabled_root_paths, library_stats, list_roots, mark_roots_scanned, remove_root
 } from '@shared/library/store'
-import { freshDb, type TestDb } from './sqlite.ts'
+import { fresh_db, type TestDb } from './sqlite.ts'
 
 let db: TestDb
 
-beforeEach(() => { db = freshDb() })
+beforeEach(() => { db = fresh_db() })
 afterEach(() => db.close())
 
 const count = (table: string): number => (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n
 
 function fill(): void {
-  const upsert = createUpserter(db)
-  upsert({ title: 'So What', lengthMs: 1000, sets: { artist: ['Miles Davis'], genre: ['Jazz'] } }, { uri: '/music/a.flac' }, { metadata: true })
-  upsert({ title: 'Blue in Green', album: 'Kind of Blue', artist: 'Miles Davis', lengthMs: 2000 }, { uri: '/music/b.flac', present: false }, { metadata: true })
+  const upsert = create_upserter(db)
+  upsert({ title: 'So What', length_ms: 1000, sets: { artist: ['Miles Davis'], genre: ['Jazz'] } }, { uri: '/music/a.flac' }, { metadata: true })
+  upsert({ title: 'Blue in Green', album: 'Kind of Blue', artist: 'Miles Davis', length_ms: 2000 }, { uri: '/music/b.flac', present: false }, { metadata: true })
   record_history(db)
 }
 
@@ -64,7 +64,7 @@ describe('clearing the library', () => {
     const order: string[] = []
     const backups = { create: async () => { order.push(`backup with ${count('tracks')} tracks`); return { name: 'b', automatic: false, size: 0, created: '' } as never } }
 
-    await clearLibraryBackedUp(db, backups)
+    await clear_library_backed_up(db, backups)
 
     expect(order).toEqual(['backup with 2 tracks'])
     for (const table of ['tracks', 'media', 'albums', 'values_', 'track_values', 'play_history', 'merge_journal', 'track_versions']) {
@@ -78,7 +78,7 @@ describe('clearing the library', () => {
     fill()
     const backups = { create: async () => { throw new Error('disk full') } }
 
-    await expect(clearLibraryBackedUp(db, backups)).rejects.toThrow('disk full')
+    await expect(clear_library_backed_up(db, backups)).rejects.toThrow('disk full')
 
     expect(count('tracks')).toBe(2)
   })

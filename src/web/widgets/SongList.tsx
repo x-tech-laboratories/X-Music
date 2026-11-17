@@ -17,7 +17,7 @@ import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import { row_after_key } from '@x-tech-laboratories/x-libs/web/selection'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import type { TrackRow } from '@shared/ipc'
-import { field, ratingToStars } from '@shared/fields'
+import { field, rating_to_stars } from '@shared/fields'
 import { browse, chips_of, library, loading, results, type TrackId } from '../stores/library.ts'
 import { player } from '../stores/player.ts'
 import { logger } from '../lib/log.ts'
@@ -50,7 +50,7 @@ const columns: TableColumn<TrackRow>[] = [
   column('album', 220, (track) => track.album ?? ''),
   column('year', 60, (track) => track.year ?? '', true),
   column('length', 70, (track) => format_clock(track.length_ms, ''), true),
-  column('rating', 96, (track) => <Rating value={ratingToStars(track.rating)} />),
+  column('rating', 96, (track) => <Rating value={rating_to_stars(track.rating)} />),
   column('play_count', 60, (track) => track.play_count, true)
 ]
 
@@ -115,7 +115,7 @@ export function SongList() {
   // Playing from the list makes the whole list the context, as every player does.
   function play_from(index: number): void {
     const id = order[index]
-    if (id !== undefined) void player.playTrack(id, order, index)
+    if (id !== undefined) void player.play_track(id, order, index)
   }
 
   // Right-clicking a row that is not picked picks it, as every list does.
@@ -169,7 +169,7 @@ export function SongList() {
   }
 
   const selected_count = library.selected_count()
-  const current_id = player.currentId
+  const current_id = player.current_id
   const chips = chips_of(state)
   const narrowed = stats !== null && tracks.length < stats.tracks
   const keys = (combination: string) => <kbd>{describe_keys(combination)}</kbd>
@@ -244,12 +244,12 @@ export function SongList() {
         </SelectionBar>
       )}
 
-      {inspecting !== null && <SongProperties trackId={inspecting} onclose={() => set_inspecting(null)} />}
+      {inspecting !== null && <SongProperties track_id={inspecting} on_close={() => set_inspecting(null)} />}
 
       {merging && (
         <MergeView
           ids={merging}
-          onclose={(merged) => {
+          on_close={(merged) => {
             set_merging(null)
             if (merged) library.clear_selection()
           }}

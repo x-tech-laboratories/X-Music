@@ -1,7 +1,7 @@
 // The filter stack, framework-free: plain TypeScript with no reactivity primitives, so a second front
 // end can reuse it unchanged. Selection, sorting and virtualization come from X-Libs.
 
-import { and, isGroup, type FilterNode } from './filter.ts'
+import { and, is_group, type FilterNode } from './filter.ts'
 
 export interface FilterChip {
   id: string
@@ -33,8 +33,8 @@ export class FilterStack {
   clear(): void { this.chips = this.chips.filter((c) => !c.removable); this.version++ }
 
   /** Collapses the stack into a single AST; an empty stack means the whole library. */
-  toFilter(): FilterNode {
-    const nodes = this.chips.map((c) => c.node).filter((n) => !(isGroup(n) && n.children.length === 0))
+  to_filter(): FilterNode {
+    const nodes = this.chips.map((c) => c.node).filter((n) => !(is_group(n) && n.children.length === 0))
     return nodes.length === 1 ? nodes[0]! : and(...nodes)
   }
 }

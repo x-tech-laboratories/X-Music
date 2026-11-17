@@ -2,23 +2,23 @@
 // finder and merge preview behave on real data rather than only on fixtures.
 
 import { describe, expect, it } from 'vitest'
-import { hasLiveLibrary, openLiveCopy } from './live.ts'
+import { has_live_library, open_live_copy } from './live.ts'
 
-import { findDuplicates } from '@shared/library/duplicates'
-import { mergePreview } from '@shared/library/merge'
+import { find_duplicates } from '@shared/library/duplicates'
+import { merge_preview } from '@shared/library/merge'
 
-describe.runIf(hasLiveLibrary())('against the real library on this machine', () => {
+describe.runIf(has_live_library())('against the real library on this machine', () => {
   it('finds duplicates and previews a merge without throwing', () => {
     // Copy first: this test must never touch the live database.
-    const db = openLiveCopy('x-music-real-check.db')
+    const db = open_live_copy('x-music-real-check.db')
 
     const total = (db.prepare('SELECT COUNT(*) AS n FROM tracks').get() as { n: number }).n
     expect(total).toBeGreaterThan(0)
 
-    const groups = findDuplicates(db)
-    const byReason: Record<string, number> = {}
-    for (const g of groups) byReason[g.reason] = (byReason[g.reason] ?? 0) + 1
-    console.log(`  by reason: ${JSON.stringify(byReason)}`)
+    const groups = find_duplicates(db)
+    const by_reason: Record<string, number> = {}
+    for (const g of groups) by_reason[g.reason] = (by_reason[g.reason] ?? 0) + 1
+    console.log(`  by reason: ${JSON.stringify(by_reason)}`)
     console.log(`  real library: ${total} tracks, ${groups.length} duplicate groups`)
     const fuzzy = groups.filter((g) => g.reason === 'fuzzy')
     console.log(`  sample fuzzy groups:`)
@@ -34,7 +34,7 @@ describe.runIf(hasLiveLibrary())('against the real library on this machine', () 
 
     if (groups.length > 0) {
       const ids = groups[0]!.members.map((m) => m.trackId)
-      const p = mergePreview(db, ids)
+      const p = merge_preview(db, ids)
 
       expect(p.ids).toEqual(ids)
       expect(p.fields.length).toBeGreaterThan(0)

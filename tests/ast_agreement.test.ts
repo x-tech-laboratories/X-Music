@@ -5,32 +5,32 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 import fc from 'fast-check'
 
-import { compileFilter } from '@shared/query/compile'
-import { selectIds } from '@shared/query/evaluate'
-import { filterArb } from './arbitraries.ts'
-import { makeCorpus, type Corpus } from './corpus.ts'
-import { freshDb, loadCorpus, runQuery, type TestDb } from './sqlite.ts'
+import { compile_filter } from '@shared/query/compile'
+import { select_ids } from '@shared/query/evaluate'
+import { filter_arb } from './arbitraries.ts'
+import { make_corpus, type Corpus } from './corpus.ts'
+import { fresh_db, load_corpus, run_query, type TestDb } from './sqlite.ts'
 
 describe('filter AST: SQL and native predicate agree', () => {
   let db: TestDb
   let corpus: Corpus
 
   beforeAll(() => {
-    corpus = makeCorpus(400, 1337)
-    db = freshDb()
-    loadCorpus(db, corpus)
+    corpus = make_corpus(400, 1337)
+    db = fresh_db()
+    load_corpus(db, corpus)
   })
 
   afterAll(() => db.close())
 
   it('returns identical id sets for arbitrary filters', () => {
     fc.assert(
-      fc.property(filterArb, (filter) => {
-        const { sql, params } = compileFilter(filter, { now: corpus.now })
-        const viaSql = runQuery(db, sql, params).sort()
-        const viaNative = selectIds(filter, corpus.tracks, { now: corpus.now }).sort()
+      fc.property(filter_arb, (filter) => {
+        const { sql, params } = compile_filter(filter, { now: corpus.now })
+        const via_sql = run_query(db, sql, params).sort()
+        const via_native = select_ids(filter, corpus.tracks, { now: corpus.now }).sort()
 
-        expect(viaNative).toEqual(viaSql)
+        expect(via_native).toEqual(via_sql)
       }),
       { numRuns: 500 }
     )
@@ -38,10 +38,10 @@ describe('filter AST: SQL and native predicate agree', () => {
 
   it('serialization round-trips without changing results', () => {
     fc.assert(
-      fc.property(filterArb, (filter) => {
+      fc.property(filter_arb, (filter) => {
         const revived = JSON.parse(JSON.stringify(filter))
-        const a = compileFilter(filter, { now: corpus.now })
-        const b = compileFilter(revived, { now: corpus.now })
+        const a = compile_filter(filter, { now: corpus.now })
+        const b = compile_filter(revived, { now: corpus.now })
         expect(b.sql).toEqual(a.sql)
         expect(b.params).toEqual(a.params)
       }),

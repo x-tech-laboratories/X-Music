@@ -16,7 +16,7 @@ import { on_path } from '@x-tech-laboratories/x-libs/agent/programs'
 import type { EngineListener, EngineState, LoadOptions, PlaybackEngine } from './engine.ts'
 
 // Finds an mpv that can run: an explicit setting, then X_MUSIC_MPV, then the PATH.
-export async function findMpv(explicit?: string): Promise<string | null> {
+export async function find_mpv(explicit?: string): Promise<string | null> {
   for (const candidate of [explicit, process.env.X_MUSIC_MPV]) {
     const found = candidate ? await on_path(candidate) : null
     if (found) return found
@@ -30,7 +30,7 @@ interface Pending {
 }
 
 /** Unique per engine instance: two engines in one process must not share an IPC socket. */
-let instanceCounter = 0
+let instance_counter = 0
 
 /** A Unix socket path holds about a hundred bytes, so a long temporary folder falls back to /tmp. */
 const SOCKET_PATH_LIMIT = 100
@@ -43,30 +43,30 @@ const PROP_IDLE = 4
 export interface MpvOptions {
   binary?: string
   /** Receives mpv's own diagnostics, which are otherwise discarded. */
-  onLog?: (line: string) => void
+  on_log?: (line: string) => void
   /** How often mpv reports position, in seconds. The UI interpolates between ticks. */
-  positionInterval?: number
+  position_interval?: number
   /** How long mpv has to open its socket before start-up counts as failed. */
-  startTimeoutMs?: number
-  extraArgs?: readonly string[]
+  start_timeout_ms?: number
+  extra_args?: readonly string[]
 }
 
 export class MpvEngine implements PlaybackEngine {
   private proc: ChildProcess | null = null
   private socket: Socket | null = null
-  private readonly socketPath: string
+  private readonly socket_path: string
   private buffer = ''
-  private nextId = 1
+  private next_id = 1
   private pending = new Map<number, Pending>()
   private listeners = new Set<EngineListener>()
 
   private state: EngineState = 'idle'
-  private positionMs = 0
-  private durationMs: number | null = null
+  private position_ms = 0
+  private duration_ms: number | null = null
   /** Start-up under way or done; null before the first command and after mpv fails or exits. */
   private ready: Promise<void> | null = null
   /** mpv's last diagnostic line, which explains a failed start. */
-  private lastLog = ''
+  private last_log = ''
   /** Set while a load is in flight, so mpv going idle mid-swap is not read as the track ending. */
   private swapping = false
 
@@ -74,16 +74,16 @@ export class MpvEngine implements PlaybackEngine {
 
   constructor(opts: MpvOptions = {}) {
     this.opts = opts
-    const name = `x-music-mpv-${process.pid}-${++instanceCounter}.sock`
+    const name = `x-music-mpv-${process.pid}-${++instance_counter}.sock`
     const folder = join(tmpdir(), name).length <= SOCKET_PATH_LIMIT ? tmpdir() : '/tmp'
-    this.socketPath = join(folder, name)
+    this.socket_path = join(folder, name)
   }
 
   private emit: EngineListener = (event, payload) => {
     for (const l of this.listeners) l(event, payload)
   }
 
-  private setState(state: EngineState, error?: string): void {
+  private set_state(state: EngineState, error?: string): void {
     if (this.state === state && !error) return
     this.state = state
     this.emit('state', error ? { state, error } : { state })
@@ -95,7 +95,7 @@ export class MpvEngine implements PlaybackEngine {
       this.ready = this.start().catch((err: Error) => {
         this.ready = null
         this.halt()
-        this.setState('error', err.message)
+        this.set_state('error', err.message)
         throw err
       })
     }
@@ -103,12 +103,12 @@ export class MpvEngine implements PlaybackEngine {
   }
 
   private async start(): Promise<void> {
-    const binary = await findMpv(this.opts.binary)
+    const binary = await find_mpv(this.opts.binary)
     if (!binary) throw new Error('mpv was not found; set X_MUSIC_MPV or install mpv')
 
     // A leftover socket file stops mpv binding, so clear it before starting.
-    rmSync(this.socketPath, { force: true })
-    this.lastLog = ''
+    rmSync(this.socket_path, { force: true })
+    this.last_log = ''
 
     const proc = spawn(binary, [
       '--idle=yes',
@@ -118,8 +118,8 @@ export class MpvEngine implements PlaybackEngine {
       '--audio-display=no',
       // Without this mpv's diagnostics go nowhere, which makes a failed load unexplainable.
       '--msg-level=all=warn',
-      `--input-ipc-server=${this.socketPath}`,
-      ...(this.opts.extraArgs ?? [])
+      `--input-ipc-server=${this.socket_path}`,
+      ...(this.opts.extra_args ?? [])
     ], { stdio: ['ignore', 'ignore', 'pipe'] })
     this.proc = proc
     let stopped: string | null = null
@@ -128,8 +128,8 @@ export class MpvEngine implements PlaybackEngine {
     proc.stderr?.on('data', (chunk: string) => {
       for (const line of chunk.split('\n')) {
         if (line.trim() === '') continue
-        this.lastLog = line.trim()
-        this.opts.onLog?.(this.lastLog)
+        this.last_log = line.trim()
+        this.opts.on_log?.(this.last_log)
       }
     })
 
@@ -144,7 +144,7 @@ export class MpvEngine implements PlaybackEngine {
         this.ready = null
         this.socket.destroy()
         this.socket = null
-        if (code !== 0) this.setState('error', `mpv stopped (${stopped})`)
+        if (code !== 0) this.set_state('error', `mpv stopped (${stopped})`)
       }
     })
 
@@ -154,9 +154,9 @@ export class MpvEngine implements PlaybackEngine {
 
   /** mpv creates the socket a moment after starting, so connecting retries until mpv stops or time runs out. */
   private connect(stopped: () => string | null): Promise<void> {
-    const timeoutMs = this.opts.startTimeoutMs ?? 10_000
-    const deadline = Date.now() + timeoutMs
-    const detail = (): string => (this.lastLog ? `: ${this.lastLog}` : '')
+    const timeout_ms = this.opts.start_timeout_ms ?? 10_000
+    const deadline = Date.now() + timeout_ms
+    const detail = (): string => (this.last_log ? `: ${this.last_log}` : '')
 
     return new Promise((resolve, reject) => {
       const attempt = (): void => {
@@ -166,16 +166,16 @@ export class MpvEngine implements PlaybackEngine {
           return
         }
 
-        const socket = createConnection(this.socketPath)
+        const socket = createConnection(this.socket_path)
 
         socket.once('connect', () => {
           this.socket = socket
           socket.setEncoding('utf8')
-          socket.on('data', (chunk: string) => this.onData(chunk))
+          socket.on('data', (chunk: string) => this.on_data(chunk))
           socket.on('error', () => socket.destroy())
           socket.on('close', () => {
             if (this.socket === socket) this.socket = null
-            this.failPending(new Error('mpv stopped answering'))
+            this.fail_pending(new Error('mpv stopped answering'))
           })
           resolve()
         })
@@ -186,14 +186,14 @@ export class MpvEngine implements PlaybackEngine {
             setTimeout(attempt, 40)
             return
           }
-          reject(new Error(`mpv did not answer within ${Math.round(timeoutMs / 1000)} seconds${detail()}`))
+          reject(new Error(`mpv did not answer within ${Math.round(timeout_ms / 1000)} seconds${detail()}`))
         })
       }
       attempt()
     })
   }
 
-  private failPending(err: Error): void {
+  private fail_pending(err: Error): void {
     for (const waiter of this.pending.values()) waiter.reject(err)
     this.pending.clear()
   }
@@ -204,10 +204,10 @@ export class MpvEngine implements PlaybackEngine {
     this.socket = null
     this.proc?.kill()
     this.proc = null
-    rmSync(this.socketPath, { force: true })
+    rmSync(this.socket_path, { force: true })
   }
 
-  private onData(chunk: string): void {
+  private on_data(chunk: string): void {
     this.buffer += chunk
 
     let index: number
@@ -233,28 +233,28 @@ export class MpvEngine implements PlaybackEngine {
         continue
       }
 
-      this.onEvent(message)
+      this.on_event(message)
     }
   }
 
-  private onEvent(message: Record<string, unknown>): void {
+  private on_event(message: Record<string, unknown>): void {
     if (message.event === 'property-change') {
       const id = message.id as number
       const value = message.data
 
       if (id === PROP_POSITION && typeof value === 'number') {
-        this.positionMs = Math.round(value * 1000)
-        this.emit('position', { positionMs: this.positionMs, durationMs: this.durationMs })
+        this.position_ms = Math.round(value * 1000)
+        this.emit('position', { position_ms: this.position_ms, duration_ms: this.duration_ms })
       } else if (id === PROP_DURATION) {
-        this.durationMs = typeof value === 'number' ? Math.round(value * 1000) : null
+        this.duration_ms = typeof value === 'number' ? Math.round(value * 1000) : null
       } else if (id === PROP_PAUSE && typeof value === 'boolean') {
         if (this.state === 'playing' || this.state === 'paused') {
-          this.setState(value ? 'paused' : 'playing')
+          this.set_state(value ? 'paused' : 'playing')
         }
       } else if (id === PROP_IDLE && value === true && !this.swapping) {
         // mpv goes idle when its playlist runs out, which is how a finished track reports itself.
         if (this.state === 'playing' || this.state === 'paused') {
-          this.setState('ended')
+          this.set_state('ended')
           this.emit('ended', {})
         }
       }
@@ -263,8 +263,8 @@ export class MpvEngine implements PlaybackEngine {
 
     if (message.event === 'end-file' && message.reason === 'error') {
       const detail = String(message.file_error ?? 'playback failed')
-      this.opts.onLog?.(`end-file error: ${JSON.stringify(message)}`)
-      this.setState('error', detail)
+      this.opts.on_log?.(`end-file error: ${JSON.stringify(message)}`)
+      this.set_state('error', detail)
     }
   }
 
@@ -278,7 +278,7 @@ export class MpvEngine implements PlaybackEngine {
         reject(new Error('mpv is not connected'))
         return
       }
-      const id = this.nextId++
+      const id = this.next_id++
       this.pending.set(id, { resolve, reject })
       this.socket.write(`${JSON.stringify({ command: args, request_id: id })}\n`)
     })
@@ -290,7 +290,7 @@ export class MpvEngine implements PlaybackEngine {
   }
 
   private async observe(): Promise<void> {
-    const interval = this.opts.positionInterval ?? 0.25
+    const interval = this.opts.position_interval ?? 0.25
     await this.send('observe_property', PROP_POSITION, 'time-pos')
     await this.send('observe_property', PROP_DURATION, 'duration')
     await this.send('observe_property', PROP_PAUSE, 'pause')
@@ -305,20 +305,20 @@ export class MpvEngine implements PlaybackEngine {
    * "invalid parameter", and an empty options string is rejected outright — so the argument list
    * is built rather than padded.
    */
-  private loadArgs(uri: string, mode: 'replace' | 'append', opts?: LoadOptions): unknown[] {
-    const flags = this.applyOptions(opts)
+  private load_args(uri: string, mode: 'replace' | 'append', opts?: LoadOptions): unknown[] {
+    const flags = this.apply_options(opts)
     return flags.length > 0
       ? ['loadfile', uri, mode, -1, flags.join(',')]
       : ['loadfile', uri, mode]
   }
 
-  private applyOptions(opts?: LoadOptions): string[] {
+  private apply_options(opts?: LoadOptions): string[] {
     const flags: string[] = []
-    if (opts?.startMs != null) flags.push(`start=${(opts.startMs / 1000).toFixed(3)}`)
-    if (opts?.endMs != null) flags.push(`end=${(opts.endMs / 1000).toFixed(3)}`)
+    if (opts?.start_ms != null) flags.push(`start=${(opts.start_ms / 1000).toFixed(3)}`)
+    if (opts?.end_ms != null) flags.push(`end=${(opts.end_ms / 1000).toFixed(3)}`)
     // ReplayGain is applied as a volume adjustment rather than by re-encoding anything.
-    if (opts?.gainDb != null) {
-      const factor = Math.pow(10, opts.gainDb / 20)
+    if (opts?.gain_db != null) {
+      const factor = Math.pow(10, opts.gain_db / 20)
       flags.push(`af-add=volume=${factor.toFixed(4)}`)
     }
     return flags
@@ -326,14 +326,14 @@ export class MpvEngine implements PlaybackEngine {
 
   async load(uri: string, opts?: LoadOptions): Promise<void> {
     this.swapping = true
-    this.setState('loading')
-    this.positionMs = 0
-    this.durationMs = null
+    this.set_state('loading')
+    this.position_ms = 0
+    this.duration_ms = null
 
     try {
-      await this.command(...this.loadArgs(uri, 'replace', opts))
+      await this.command(...this.load_args(uri, 'replace', opts))
       await this.command('set_property', 'pause', false)
-      this.setState('playing')
+      this.set_state('playing')
     } finally {
       this.swapping = false
     }
@@ -341,39 +341,39 @@ export class MpvEngine implements PlaybackEngine {
 
   async preload(uri: string, opts?: LoadOptions): Promise<void> {
     // Appending puts the next file in mpv's own playlist, which is what makes the join gapless.
-    await this.command(...this.loadArgs(uri, 'append', opts))
+    await this.command(...this.load_args(uri, 'append', opts))
   }
 
   async play(): Promise<void> {
     await this.command('set_property', 'pause', false)
-    this.setState('playing')
+    this.set_state('playing')
   }
 
   async pause(): Promise<void> {
     await this.command('set_property', 'pause', true)
-    this.setState('paused')
+    this.set_state('paused')
   }
 
   async stop(): Promise<void> {
     if (!this.ready) {
-      this.setState('idle')
+      this.set_state('idle')
       return
     }
     this.swapping = true
     try {
       await this.command('stop')
-      this.setState('idle')
+      this.set_state('idle')
     } finally {
       this.swapping = false
     }
   }
 
-  async seek(positionMs: number): Promise<void> {
-    await this.command('seek', positionMs / 1000, 'absolute')
-    this.positionMs = positionMs
+  async seek(position_ms: number): Promise<void> {
+    await this.command('seek', position_ms / 1000, 'absolute')
+    this.position_ms = position_ms
   }
 
-  async setVolume(volume: number): Promise<void> {
+  async set_volume(volume: number): Promise<void> {
     await this.command('set_property', 'volume', volume)
   }
 

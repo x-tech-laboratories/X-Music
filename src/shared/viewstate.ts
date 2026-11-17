@@ -9,10 +9,10 @@
 import { FIELDS_BY_ID } from './fields.ts'
 import type { SortKey } from './filter.ts'
 
-const known = (fieldId: unknown): fieldId is string =>
-  typeof fieldId === 'string' && FIELDS_BY_ID.has(fieldId)
+const known = (field_id: unknown): field_id is string =>
+  typeof field_id === 'string' && FIELDS_BY_ID.has(field_id)
 
-export function sanitizeSortKeys(value: unknown): SortKey[] {
+export function sanitize_sort_keys(value: unknown): SortKey[] {
   if (!Array.isArray(value)) return []
 
   const out: SortKey[] = []
@@ -33,21 +33,21 @@ export function sanitizeSortKeys(value: unknown): SortKey[] {
   return out
 }
 
-export function sanitizePaneValues(value: unknown): Record<string, string[]> {
+export function sanitize_pane_values(value: unknown): Record<string, string[]> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return {}
 
   const out: Record<string, string[]> = {}
-  for (const [fieldId, values] of Object.entries(value as Record<string, unknown>)) {
-    if (!known(fieldId)) continue
+  for (const [field_id, values] of Object.entries(value as Record<string, unknown>)) {
+    if (!known(field_id)) continue
     if (!Array.isArray(values)) continue
 
     const strings = values.filter((v): v is string => typeof v === 'string' && v !== '')
-    if (strings.length > 0) out[fieldId] = strings
+    if (strings.length > 0) out[field_id] = strings
   }
   return out
 }
 
 /** A pane remembers which field it is showing; an unknown field falls back to the default. */
-export function sanitizePaneField(value: unknown, fallback: string): string {
+export function sanitize_pane_field(value: unknown, fallback: string): string {
   return known(value) ? value : fallback
 }

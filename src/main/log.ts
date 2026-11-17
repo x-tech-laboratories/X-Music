@@ -12,7 +12,7 @@ import {
 const spec = parse_level_spec(process.env.X_MUSIC_LOG)
 const file = process.env.X_MUSIC_LOG_FILE
 
-const toConsole = (record: LogRecord): void => {
+const to_console = (record: LogRecord): void => {
   const line = format_record(record)
   // Warnings and worse go to stderr so they survive stdout redirection.
   if (record.level === 'info' || record.level === 'debug') console.log(line)
@@ -20,7 +20,7 @@ const toConsole = (record: LogRecord): void => {
 }
 
 const sink = (record: LogRecord): void => {
-  toConsole(record)
+  to_console(record)
   if (!file) return
   try {
     appendFileSync(file, `${format_record(record)}\n`)
@@ -34,11 +34,11 @@ export const log = create_logger('app', spec, sink)
 export const logger = (scope: string): Logger => create_logger(scope, spec, sink)
 
 /** Records arriving from the renderer, already levelled and scoped there. */
-export function logFromRenderer(level: Level, scope: string, message: string, data?: unknown): void {
+export function log_from_renderer(level: Level, scope: string, message: string, data?: unknown): void {
   create_logger(`ui:${scope}`, spec, sink)[level](message, data)
 }
 
-export const describeLogging = (): string =>
+export const describe_logging = (): string =>
   `level=${spec.default}` +
   (Object.keys(spec.scopes).length ? ` scopes=${JSON.stringify(spec.scopes)}` : '') +
   (file ? ` file=${file}` : '')

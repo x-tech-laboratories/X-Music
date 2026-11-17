@@ -6,14 +6,14 @@ import { existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { resolveArtwork } from '@main/library/artwork'
-import { hasLiveLibrary, openLiveCopy } from './live.ts'
+import { resolve_artwork } from '@main/library/artwork'
+import { has_live_library, open_live_copy } from './live.ts'
 
-describe.runIf(hasLiveLibrary())('artwork against the real library', () => {
+describe.runIf(has_live_library())('artwork against the real library', () => {
   it('finds covers for real tracks', async () => {
     const cache = join(tmpdir(), 'x-music-art-real-cache')
     rmSync(cache, { recursive: true, force: true })
-    const db = openLiveCopy('x-music-art-real.db')
+    const db = open_live_copy('x-music-art-real.db')
 
     const ids = (db.prepare(`
       SELECT t.id FROM tracks t JOIN media m ON m.track_id = t.id
@@ -21,7 +21,7 @@ describe.runIf(hasLiveLibrary())('artwork against the real library', () => {
 
     const tally: Record<string, number> = {}
     for (const id of ids) {
-      const art = await resolveArtwork(db, id, { cacheDir: cache })
+      const art = await resolve_artwork(db, id, { cache_dir: cache })
       tally[art.source] = (tally[art.source] ?? 0) + 1
       if (art.path) expect(existsSync(art.path)).toBe(true)
     }

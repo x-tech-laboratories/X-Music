@@ -52,14 +52,14 @@ describe('merge view', () => {
 
   it('sends the winners the grid shows, then offers Undo in a toast', async () => {
     const calls = record_calls({ 'get_merge_preview': preview, 'merge_tracks': result, 'undo_merge': { restored: 1 } })
-    const onclose = vi.fn()
+    const on_close = vi.fn()
     const on_undone = vi.fn()
 
-    render(<><MergeView ids={['track-11', 'track-12']} onclose={onclose} on_undone={on_undone} /><Toasts /></>)
+    render(<><MergeView ids={['track-11', 'track-12']} on_close={on_close} on_undone={on_undone} /><Toasts /></>)
     fireEvent.click(await screen.findByRole('button', { name: 'Live' }))
     fireEvent.click(screen.getByRole('button', { name: 'Merge' }))
 
-    await waitFor(() => expect(onclose).toHaveBeenCalledWith(true))
+    await waitFor(() => expect(on_close).toHaveBeenCalledWith(true))
     expect(calls.find((call) => call.channel === 'merge_tracks')?.args).toEqual([
       ['track-11', 'track-12'], 'track-11',
       { length: { kind: 'value', from: 'track-11' }, album: { kind: 'value', from: 'track-12' }, genre: { kind: 'union' } }
@@ -74,7 +74,7 @@ describe('merge view', () => {
   it('takes every field and the survivor from one source', async () => {
     const calls = record_calls({ 'get_merge_preview': preview, 'merge_tracks': result })
 
-    render(<MergeView ids={['track-11', 'track-12']} onclose={() => undefined} />)
+    render(<MergeView ids={['track-11', 'track-12']} on_close={() => undefined} />)
     const second = await screen.findByRole('columnheader', { name: /Source 2/ })
     fireEvent.click(within(second).getByRole('button', { name: 'Take all from this' }))
     fireEvent.click(screen.getByRole('button', { name: 'Merge' }))
@@ -89,7 +89,7 @@ describe('merge view', () => {
     record_calls({ 'get_merge_preview': preview, 'merge_tracks': () => { throw new Error("Error invoking remote method 'merge_tracks': Error: the library is locked") } })
     const onclose = vi.fn()
 
-    render(<><MergeView ids={['track-11', 'track-12']} onclose={onclose} /><Toasts /></>)
+    render(<><MergeView ids={['track-11', 'track-12']} on_close={onclose} /><Toasts /></>)
     fireEvent.click(await screen.findByRole('button', { name: 'Merge' }))
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Could not merge: the library is locked'))

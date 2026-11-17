@@ -11,7 +11,7 @@ import { leaf, or } from '@shared/filter'
 import { FilterStack } from '@shared/view'
 import type { GroupRow, LibraryStats, TrackRow } from '@shared/ipc'
 import { field } from '@shared/fields'
-import { sanitizePaneValues, sanitizeSortKeys } from '@shared/viewstate'
+import { sanitize_pane_values, sanitize_sort_keys } from '@shared/viewstate'
 import { ipc } from '../lib/ipc.ts'
 
 // A track's id as the main process hands it over, never read as a number.
@@ -45,11 +45,11 @@ const DEFAULT_SORT: SortKey[] = [{ field: 'album' }, { field: 'disc_number' }, {
 
 function remembered(): Browse {
   const storage = browser_storage()
-  const sort = sanitizeSortKeys(read_pref<unknown>(storage, SORT_KEY, null))
+  const sort = sanitize_sort_keys(read_pref<unknown>(storage, SORT_KEY, null))
   const search = read_pref<unknown>(storage, SEARCH_KEY, '')
   return {
     sort: sort.length > 0 ? sort : DEFAULT_SORT,
-    panes: sanitizePaneValues(read_pref<unknown>(storage, PANES_KEY, null)),
+    panes: sanitize_pane_values(read_pref<unknown>(storage, PANES_KEY, null)),
     search: typeof search === 'string' ? search : ''
   }
 }
@@ -96,7 +96,7 @@ function stack_of(state: Browse, leave_out?: string): FilterStack {
   return stack
 }
 
-export const filter_of = (state: Browse, leave_out?: string): FilterNode => stack_of(state, leave_out).toFilter()
+export const filter_of = (state: Browse, leave_out?: string): FilterNode => stack_of(state, leave_out).to_filter()
 
 // The chips that say why the list is narrowed, each one removable.
 export const chips_of = (state: Browse): { id: string; label: string }[] =>

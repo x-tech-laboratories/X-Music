@@ -12,7 +12,7 @@ import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { AppInfo } from '@shared/ipc'
 import app_icon from '../../resources/icon.svg'
 import { ipc, page_ipc } from './lib/ipc.ts'
-import { configureLogging, log } from './lib/log.ts'
+import { configure_logging, log } from './lib/log.ts'
 import { theme } from './lib/theme.ts'
 import { library } from './stores/library.ts'
 import { player } from './stores/player.ts'
@@ -36,7 +36,7 @@ const SEEK_STEP_IN_MILLISECONDS = 10_000
 const seek_by = (step: number): void => {
   const duration = player.status?.durationMs ?? null
   if (duration === null) return
-  void player.seek(Math.min(duration, Math.max(0, player.positionMs + step)))
+  void player.seek(Math.min(duration, Math.max(0, player.position_ms + step)))
 }
 
 // ============================================================================
@@ -90,7 +90,7 @@ export function App() {
   }, [])
 
   async function boot(): Promise<void> {
-    configureLogging((await page_ipc('get_log_config')).spec)
+    configure_logging((await page_ipc('get_log_config')).spec)
     log.debug('renderer booting')
     set_info(await ipc('get_app_info'))
     await library.refresh()

@@ -6,9 +6,9 @@ import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 
-import { parseGmbrc, defaultGmbrcPath } from '@shared/import/gmbrc'
-import { importGmbrc } from '@shared/import/gmb_import'
-import { freshDb } from './sqlite.ts'
+import { parse_gmbrc, default_gmbrc_path } from '@shared/import/gmbrc'
+import { import_gmbrc } from '@shared/import/gmb_import'
+import { fresh_db } from './sqlite.ts'
 
 const HEADER = [
   'added', 'album', 'album_artist_raw', 'artist', 'bitrate', 'channel', 'comment', 'compilation',
@@ -39,41 +39,41 @@ const gmbrc = (rows: string[], extra = ''): string =>
 
 describe('gmbrc parser', () => {
   it('reads the header and one song', () => {
-    const d = parseGmbrc(gmbrc([row(1)]))
+    const d = parse_gmbrc(gmbrc([row(1)]))
     expect(d.songs).toHaveLength(1)
-    expect(d.baseFolder).toBe('/music')
+    expect(d.base_folder).toBe('/music')
     expect(d.version).toBe('1.109901')
 
     const s = d.songs[0]!
     expect(s.title).toBe('So What')
     expect(s.artist).toBe('Miles Davis')
     expect(s.rating).toBe(80)
-    expect(s.playCount).toBe(12)
-    expect(s.playHistory).toEqual([1557762781, 1558323959])
+    expect(s.play_count).toBe(12)
+    expect(s.play_history).toEqual([1557762781, 1558323959])
   })
 
   it('splits multi-value fields on the literal backslash-x-0-0 separator', () => {
-    const d = parseGmbrc(gmbrc([row(1, { genre: 'Instrumentals\\x00Songs' })]))
+    const d = parse_gmbrc(gmbrc([row(1, { genre: 'Instrumentals\\x00Songs' })]))
     expect(d.songs[0]!.genre).toEqual(['Instrumentals', 'Songs'])
   })
 
   it('percent-decodes filesystem names', () => {
-    const d = parseGmbrc(gmbrc([row(1, { file: 'With Gun %26 Crucifix.mp3' })]))
+    const d = parse_gmbrc(gmbrc([row(1, { file: 'With Gun %26 Crucifix.mp3' })]))
     expect(d.songs[0]!.file).toBe('With Gun & Crucifix.mp3')
   })
 
   it('keeps a malformed escape rather than losing the value', () => {
-    const d = parseGmbrc(gmbrc([row(1, { file: 'brokenpercent%ZZ.mp3' })]))
+    const d = parse_gmbrc(gmbrc([row(1, { file: 'brokenpercent%ZZ.mp3' })]))
     expect(d.songs[0]!.file).toBe('brokenpercent%ZZ.mp3')
   })
 
   it('treats gmusicbrowser rating 255 as unrated, not as a rating of 255', () => {
-    const d = parseGmbrc(gmbrc([row(1, { rating: '255' })]))
+    const d = parse_gmbrc(gmbrc([row(1, { rating: '255' })]))
     expect(d.songs[0]!.rating).toBeUndefined()
   })
 
   it('distinguishes an explicit zero rating from unrated', () => {
-    const d = parseGmbrc(gmbrc([row(1, { rating: '0' }), row(2, { rating: '' })]))
+    const d = parse_gmbrc(gmbrc([row(1, { rating: '0' }), row(2, { rating: '' })]))
     expect(d.songs[0]!.rating).toBe(0)
     expect(d.songs[1]!.rating).toBeUndefined()
   })
@@ -84,21 +84,21 @@ describe('gmbrc parser', () => {
       '  "50 Most Played": !Filter "playcount:h:50"\n' +
       'SavedLists:\n' +
       '  list000: !SongArray::Named 1 2\n'
-    const d = parseGmbrc(gmbrc([row(1), row(2)], extra))
-    expect(d.savedFilters).toEqual([{ name: '50 Most Played', expression: 'playcount:h:50' }])
-    expect(d.savedLists).toEqual([{ name: 'list000', gmbIds: [1, 2] }])
+    const d = parse_gmbrc(gmbrc([row(1), row(2)], extra))
+    expect(d.saved_filters).toEqual([{ name: '50 Most Played', expression: 'playcount:h:50' }])
+    expect(d.saved_lists).toEqual([{ name: 'list000', gmb_ids: [1, 2] }])
   })
 
   it('reports columns it does not understand instead of dropping them silently', () => {
     const text = gmbrc([]).replace(HEADER, `${HEADER}\tsome_future_column`)
-    expect(parseGmbrc(text).unmappedColumns).toEqual(['some_future_column'])
+    expect(parse_gmbrc(text).unmapped_columns).toEqual(['some_future_column'])
   })
 })
 
 describe('gmbrc import', () => {
   it('creates a track and its media, preserving statistics', () => {
-    const db = freshDb()
-    const report = importGmbrc(db, parseGmbrc(gmbrc([row(1)])))
+    const db = fresh_db()
+    const report = import_gmbrc(db, parse_gmbrc(gmbrc([row(1)])))
 
     expect(report.tracksCreated).toBe(1)
     expect(report.mediaCreated).toBe(1)
@@ -116,16 +116,16 @@ describe('gmbrc import', () => {
   })
 
   it('converts unix seconds to milliseconds', () => {
-    const db = freshDb()
-    importGmbrc(db, parseGmbrc(gmbrc([row(1)])))
+    const db = fresh_db()
+    import_gmbrc(db, parse_gmbrc(gmbrc([row(1)])))
     const t = db.prepare('SELECT last_played FROM tracks').get() as { last_played: number }
     expect(t.last_played).toBe(1783048616 * 1000)
     db.close()
   })
 
   it('imports genre, grouping and labels as multi-value fields', () => {
-    const db = freshDb()
-    importGmbrc(db, parseGmbrc(gmbrc([
+    const db = fresh_db()
+    import_gmbrc(db, parse_gmbrc(gmbrc([
       row(1, { genre: 'Jazz\\x00Blues', label: 'Sad', grouping: 'Games - Portal' })
     ])))
 
@@ -139,8 +139,8 @@ describe('gmbrc import', () => {
   })
 
   it('keeps the track when gmusicbrowser flagged the file missing', () => {
-    const db = freshDb()
-    const report = importGmbrc(db, parseGmbrc(gmbrc([row(1, { missing: '1' })])))
+    const db = fresh_db()
+    const report = import_gmbrc(db, parse_gmbrc(gmbrc([row(1, { missing: '1' })])))
 
     expect(report.missingFlagged).toBe(1)
     expect((db.prepare('SELECT COUNT(*) AS n FROM tracks').get() as { n: number }).n).toBe(1)
@@ -150,8 +150,8 @@ describe('gmbrc import', () => {
 
   it('imports saved lists as static playlists in order', () => {
     const extra = 'SavedLists:\n  Favourites: !SongArray::Named 2 1\n'
-    const db = freshDb()
-    const report = importGmbrc(db, parseGmbrc(gmbrc([row(1), row(2)], extra)))
+    const db = fresh_db()
+    const report = import_gmbrc(db, parse_gmbrc(gmbrc([row(1), row(2)], extra)))
 
     expect(report.playlistsCreated).toBe(1)
     const rows = db.prepare(
@@ -162,8 +162,8 @@ describe('gmbrc import', () => {
   })
 
   it('can import without statistics when asked', () => {
-    const db = freshDb()
-    importGmbrc(db, parseGmbrc(gmbrc([row(1)])), { statistics: false })
+    const db = fresh_db()
+    import_gmbrc(db, parse_gmbrc(gmbrc([row(1)])), { statistics: false })
     const t = db.prepare('SELECT rating, play_count FROM tracks').get() as
       { rating: number | null; play_count: number }
     expect(t.rating).toBeNull()
@@ -172,25 +172,25 @@ describe('gmbrc import', () => {
   })
 
   it('rolls back cleanly if a row is malformed', () => {
-    const db = freshDb()
-    const data = parseGmbrc(gmbrc([row(1)]))
+    const db = fresh_db()
+    const data = parse_gmbrc(gmbrc([row(1)]))
     // A title SQLite cannot store, to force the failure path.
     ;(data.songs[0] as { title?: unknown }).title = { not: 'text' }
-    expect(() => importGmbrc(db, data)).toThrow()
+    expect(() => import_gmbrc(db, data)).toThrow()
     expect((db.prepare('SELECT COUNT(*) AS n FROM tracks').get() as { n: number }).n).toBe(0)
     db.close()
   })
 })
 
 // This runs only on a machine that actually has gmusicbrowser configured.
-const realGmbrc = defaultGmbrcPath(homedir(), process.platform)
-describe.runIf(existsSync(realGmbrc))('against the real gmbrc on this machine', () => {
+const real_gmbrc = default_gmbrc_path(homedir(), process.platform)
+describe.runIf(existsSync(real_gmbrc))('against the real gmbrc on this machine', () => {
   it('parses and imports the whole library', () => {
-    const data = parseGmbrc(readFileSync(realGmbrc, 'utf8'))
+    const data = parse_gmbrc(readFileSync(real_gmbrc, 'utf8'))
     expect(data.songs.length).toBeGreaterThan(0)
 
-    const db = freshDb()
-    const report = importGmbrc(db, data)
+    const db = fresh_db()
+    const report = import_gmbrc(db, data)
 
     expect(report.tracksCreated).toBe(data.songs.length)
     // Every imported track must be reachable by the query engine.

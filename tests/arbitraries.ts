@@ -15,7 +15,7 @@ const MOODS = ['calm', 'energetic', 'melancholy']
 const ARTISTS = ['Miles Davis', 'The Beatles', 'Aphex Twin', 'Nina Simone', 'Bill Evans']
 const ALBUMS = ['Kind of Blue', 'Revolver', 'Selected Ambient Works', 'Pastel Blues']
 
-const stringLeaf: fc.Arbitrary<LeafNode> = fc.record({
+const string_leaf: fc.Arbitrary<LeafNode> = fc.record({
   field: fc.constantFrom(...STRING_FIELDS, ...EXTRA_FIELDS),
   op: fc.constantFrom('is', 'not_is', 'contains', 'starts', 'ends', 'empty', 'defined'),
   value: fc.oneof(
@@ -24,7 +24,7 @@ const stringLeaf: fc.Arbitrary<LeafNode> = fc.record({
   )
 }).map((r) => (r.op === 'empty' || r.op === 'defined' ? { field: r.field, op: r.op } : r) as LeafNode)
 
-const numericLeaf: fc.Arbitrary<LeafNode> = fc.oneof(
+const numeric_leaf: fc.Arbitrary<LeafNode> = fc.oneof(
   fc.record({
     field: fc.constantFrom(...NUMERIC_FIELDS),
     op: fc.constantFrom('is', 'not_is', '>', '<', '>=', '<='),
@@ -42,7 +42,7 @@ const numericLeaf: fc.Arbitrary<LeafNode> = fc.oneof(
   })
 ) as fc.Arbitrary<LeafNode>
 
-const setLeaf: fc.Arbitrary<LeafNode> = fc.oneof(
+const set_leaf: fc.Arbitrary<LeafNode> = fc.oneof(
   fc.record({
     field: fc.constantFrom(...SET_FIELDS),
     op: fc.constantFrom('any', 'all', 'none'),
@@ -60,7 +60,7 @@ const setLeaf: fc.Arbitrary<LeafNode> = fc.oneof(
   })
 ) as fc.Arbitrary<LeafNode>
 
-const dateLeaf: fc.Arbitrary<LeafNode> = fc.record({
+const date_leaf: fc.Arbitrary<LeafNode> = fc.record({
   field: fc.constantFrom(...DATE_FIELDS),
   op: fc.constantFrom('in_last', 'not_in_last'),
   value: fc.record({
@@ -69,12 +69,12 @@ const dateLeaf: fc.Arbitrary<LeafNode> = fc.record({
   })
 }) as fc.Arbitrary<LeafNode>
 
-export const leafArb: fc.Arbitrary<LeafNode> =
-  fc.oneof(stringLeaf, numericLeaf, setLeaf, dateLeaf)
+export const leaf_arb: fc.Arbitrary<LeafNode> =
+  fc.oneof(string_leaf, numeric_leaf, set_leaf, date_leaf)
 
-export const filterArb: fc.Arbitrary<FilterNode> = fc.letrec<{ node: FilterNode }>((tie) => ({
+export const filter_arb: fc.Arbitrary<FilterNode> = fc.letrec<{ node: FilterNode }>((tie) => ({
   node: fc.oneof(
-    { weight: 5, arbitrary: leafArb },
+    { weight: 5, arbitrary: leaf_arb },
     {
       weight: 2,
       arbitrary: fc.record({

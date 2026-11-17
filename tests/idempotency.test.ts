@@ -2,10 +2,10 @@
 // initially to prove that it did not.
 
 import { describe, expect, it } from 'vitest'
-import { parseGmbrc } from '@shared/import/gmbrc'
-import { importGmbrc } from '@shared/import/gmb_import'
-import { createUpserter } from '@shared/library/identity'
-import { freshDb } from './sqlite.ts'
+import { parse_gmbrc } from '@shared/import/gmbrc'
+import { import_gmbrc } from '@shared/import/gmb_import'
+import { create_upserter } from '@shared/library/identity'
+import { fresh_db } from './sqlite.ts'
 
 const HEADER = [
   'added', 'album', 'album_artist_raw', 'artist', 'bitrate', 'channel', 'comment', 'compilation',
@@ -33,7 +33,7 @@ const row = (id: number, over: Record<string, string> = {}): string => {
 const gmbrc = (rows: string[]): string =>
   `# gmbrc version=1.1 time=1\n[Options]\nBaseFolder: '/music'\n[Songs]\n${HEADER}\n${rows.join('\n')}\n[EOF]\n`
 
-const counts = (db: ReturnType<typeof freshDb>) => ({
+const counts = (db: ReturnType<typeof fresh_db>) => ({
   tracks: (db.prepare('SELECT COUNT(*) AS n FROM tracks').get() as { n: number }).n,
   media: (db.prepare('SELECT COUNT(*) AS n FROM media').get() as { n: number }).n,
   history: (db.prepare('SELECT COUNT(*) AS n FROM play_history').get() as { n: number }).n,
@@ -42,13 +42,13 @@ const counts = (db: ReturnType<typeof freshDb>) => ({
 
 describe('importing the same gmbrc twice', () => {
   it('does not duplicate tracks, media, history or values', () => {
-    const db = freshDb()
-    const data = parseGmbrc(gmbrc([row(1), row(2), row(3)]))
+    const db = fresh_db()
+    const data = parse_gmbrc(gmbrc([row(1), row(2), row(3)]))
 
-    importGmbrc(db, data)
+    import_gmbrc(db, data)
     const first = counts(db)
 
-    importGmbrc(db, data)
+    import_gmbrc(db, data)
     const second = counts(db)
 
     expect(second).toEqual(first)
@@ -56,10 +56,10 @@ describe('importing the same gmbrc twice', () => {
   })
 
   it('leaves every track with exactly one media row', () => {
-    const db = freshDb()
-    const data = parseGmbrc(gmbrc([row(1), row(2)]))
-    importGmbrc(db, data)
-    importGmbrc(db, data)
+    const db = fresh_db()
+    const data = parse_gmbrc(gmbrc([row(1), row(2)]))
+    import_gmbrc(db, data)
+    import_gmbrc(db, data)
 
     const orphans = (db.prepare(
       'SELECT COUNT(*) AS n FROM tracks t WHERE NOT EXISTS (SELECT 1 FROM media m WHERE m.track_id = t.id)'
@@ -69,9 +69,9 @@ describe('importing the same gmbrc twice', () => {
   })
 
   it('updates statistics rather than stacking a second copy', () => {
-    const db = freshDb()
-    importGmbrc(db, parseGmbrc(gmbrc([row(1)])))
-    importGmbrc(db, parseGmbrc(gmbrc([row(1, { playcount: '20', rating: '100' })])))
+    const db = fresh_db()
+    import_gmbrc(db, parse_gmbrc(gmbrc([row(1)])))
+    import_gmbrc(db, parse_gmbrc(gmbrc([row(1, { playcount: '20', rating: '100' })])))
 
     const t = db.prepare('SELECT rating, play_count FROM tracks').get() as
       { rating: number; play_count: number }
@@ -82,19 +82,19 @@ describe('importing the same gmbrc twice', () => {
 })
 
 describe('importing over a scanned library', () => {
-  const albums = (db: ReturnType<typeof freshDb>) =>
+  const albums = (db: ReturnType<typeof fresh_db>) =>
     db.prepare('SELECT a.name, a.match_key, a.mb_release_id FROM tracks t JOIN albums a ON a.id = t.album_id').all()
 
   it('adds nothing when the gmbrc names the files the scan found', () => {
-    const db = freshDb()
-    const scan = createUpserter(db)
+    const db = fresh_db()
+    const scan = create_upserter(db)
     for (const id of [1, 2]) {
-      scan({ title: `Track ${id}`, album: 'Kind of Blue', artist: 'Miles Davis', year: 1959, trackNumber: id,
+      scan({ title: `Track ${id}`, album: 'Kind of Blue', artist: 'Miles Davis', year: 1959, track_number: id,
              sets: { artist: ['Miles Davis'] } }, { uri: `/music/miles/track${id}.flac` }, { metadata: true })
     }
     const before = { ...counts(db), albums: (db.prepare('SELECT COUNT(*) AS n FROM albums').get() as { n: number }).n }
 
-    importGmbrc(db, parseGmbrc(gmbrc([row(1), row(2)])))
+    import_gmbrc(db, parse_gmbrc(gmbrc([row(1), row(2)])))
 
     expect({ ...counts(db), albums: (db.prepare('SELECT COUNT(*) AS n FROM albums').get() as { n: number }).n })
       .toEqual({ ...before, history: 4, values: before.values + 4 })
@@ -102,11 +102,11 @@ describe('importing over a scanned library', () => {
   })
 
   it('keeps a scanned track on its MusicBrainz album, which the gmbrc cannot name', () => {
-    const db = freshDb()
-    createUpserter(db)({ title: 'Track 1', album: 'Kind of Blue', artist: 'Miles Davis', year: 1959, mbReleaseId: 'release-1' },
+    const db = fresh_db()
+    create_upserter(db)({ title: 'Track 1', album: 'Kind of Blue', artist: 'Miles Davis', year: 1959, mb_release_id: 'release-1' },
                        { uri: '/music/miles/track1.flac' }, { metadata: true })
 
-    importGmbrc(db, parseGmbrc(gmbrc([row(1)])))
+    import_gmbrc(db, parse_gmbrc(gmbrc([row(1)])))
 
     expect(albums(db)).toEqual([{ name: 'Kind of Blue', match_key: 'mb\x1frelease-1', mb_release_id: 'release-1' }])
     expect((db.prepare('SELECT COUNT(*) AS n FROM albums').get() as { n: number }).n).toBe(1)

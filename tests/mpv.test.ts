@@ -49,7 +49,7 @@ function set_mode(mode: 'serve' | 'exit' | 'silent'): void {
   writeFileSync(join(folder, 'mode'), mode)
 }
 
-function start_engine(options: { startTimeoutMs?: number } = {}): { engine: MpvEngine; states: { state: string; error?: string }[] } {
+function start_engine(options: { start_timeout_ms?: number } = {}): { engine: MpvEngine; states: { state: string; error?: string }[] } {
   const states: { state: string; error?: string }[] = []
   engine = new MpvEngine({ binary, ...options })
   engine.subscribe((event, payload) => { if (event === 'state') states.push(payload as { state: string; error?: string }) })
@@ -115,7 +115,7 @@ describe('starting mpv', () => {
 
   it('gives up on an mpv that never opens its socket', async () => {
     set_mode('silent')
-    const { engine, states } = start_engine({ startTimeoutMs: 300 })
+    const { engine, states } = start_engine({ start_timeout_ms: 300 })
 
     await expect(engine.load('/music/song.flac')).rejects.toThrow(/did not answer/)
 
@@ -137,7 +137,7 @@ describe('starting mpv', () => {
     const long_folder = join(folder, 'a-temporary-folder-whose-path-is-far-too-long-for-a-unix-socket-to-live-inside-it')
     mkdirSync(long_folder)
     process.env.TMPDIR = long_folder
-    const { engine, states } = start_engine({ startTimeoutMs: 2000 })
+    const { engine, states } = start_engine({ start_timeout_ms: 2000 })
 
     await engine.load('/music/song.flac')
 

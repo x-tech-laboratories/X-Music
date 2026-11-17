@@ -11,7 +11,7 @@ import {
 import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { VolumeButton } from '@x-tech-laboratories/x-libs/web/react/volume'
 import type { RepeatMode } from '@shared/ipc'
-import { ratingToStars } from '@shared/fields'
+import { rating_to_stars } from '@shared/fields'
 import { player, player_position, player_status } from '../stores/player.ts'
 import { TrackCover } from './Cover.tsx'
 import s from './PlayerBlock.module.css'
@@ -69,15 +69,15 @@ export function PlayerBlock() {
   return (
     <section className={s.player} aria-label="Player">
       <div className={s.indicators}>
-        <button className="icon" title="Shuffle" aria-label="Shuffle" aria-pressed={shuffle} onClick={() => void player.setShuffle(!shuffle)}>
+        <button className="icon" title="Shuffle" aria-label="Shuffle" aria-pressed={shuffle} onClick={() => void player.set_shuffle(!shuffle)}>
           <Icon icon={ShuffleIcon} />
         </button>
-        <button className="icon" title={repeat_label[repeat]} aria-label={repeat_label[repeat]} aria-pressed={repeat !== 'off'} onClick={() => void player.setRepeat(next_repeat[repeat])}>
+        <button className="icon" title={repeat_label[repeat]} aria-label={repeat_label[repeat]} aria-pressed={repeat !== 'off'} onClick={() => void player.set_repeat(next_repeat[repeat])}>
           <Icon icon={repeat === 'one' ? RepeatOneIcon : RepeatIcon} />
         </button>
         {queued > 0 && <Badge tone="info">{queued} queued</Badge>}
         <span className={s.spacer} />
-        {track && <Rating value={ratingToStars(track.rating)} />}
+        {track && <Rating value={rating_to_stars(track.rating)} />}
       </div>
 
       <div className={s.main}>
@@ -96,7 +96,7 @@ export function PlayerBlock() {
               <Icon icon={NextIcon} />
             </button>
             <span className={s.spacer} />
-            <VolumeButton volume={status?.volume ?? 80} on_change={(volume) => void player.setVolume(volume)} />
+            <VolumeButton volume={status?.volume ?? 80} on_change={(volume) => void player.set_volume(volume)} />
           </div>
 
           <div className={cx(s.line, s.title)} title={track?.title ?? ''}>{track?.title ?? 'Nothing playing'}</div>

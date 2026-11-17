@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatRecord, templateFields } from '@shared/format'
+import { format_record, template_fields } from '@shared/format'
 
 const row = {
   title: 'So What',
@@ -17,57 +17,57 @@ const row = {
 
 describe('format strings', () => {
   it('substitutes plain fields', () => {
-    expect(formatRecord('{artist} — {title}', row)).toBe('Miles Davis — So What')
+    expect(format_record('{artist} — {title}', row)).toBe('Miles Davis — So What')
   })
 
   it('falls back to the first non-empty alternative', () => {
-    expect(formatRecord('{album_artist|artist}', row)).toBe('Miles Davis')
+    expect(format_record('{album_artist|artist}', row)).toBe('Miles Davis')
   })
 
   it('drops a bracketed group when a field inside it is empty', () => {
-    expect(formatRecord('[{disc}.]{track}. {title}', row)).toBe('1. So What')
+    expect(format_record('[{disc}.]{track}. {title}', row)).toBe('1. So What')
   })
 
   it('keeps a bracketed group when every field inside it is present', () => {
-    expect(formatRecord('[{year} ]{album}', row)).toBe('1959 Kind of Blue')
+    expect(format_record('[{year} ]{album}', row)).toBe('1959 Kind of Blue')
   })
 
   it('applies zero-padding', () => {
-    expect(formatRecord('{track:%02d}', row)).toBe('01')
-    expect(formatRecord('{year:%04d}', row)).toBe('1959')
+    expect(format_record('{track:%02d}', row)).toBe('01')
+    expect(format_record('{year:%04d}', row)).toBe('1959')
   })
 
   it('formats durations', () => {
-    expect(formatRecord('{length:m:ss}', row)).toBe('9:22')
-    expect(formatRecord('{length:h:mm:ss}', row)).toBe('0:09:22')
+    expect(format_record('{length:m:ss}', row)).toBe('9:22')
+    expect(format_record('{length:h:mm:ss}', row)).toBe('0:09:22')
   })
 
   it('renders ratings as stars', () => {
-    expect(formatRecord('{rating:stars}', row)).toBe('★★★★☆')
+    expect(format_record('{rating:stars}', row)).toBe('★★★★☆')
   })
 
   it('joins set-valued fields with a chosen separator', () => {
-    expect(formatRecord('{genre:join(", ")}', row)).toBe('Jazz, Modal')
-    expect(formatRecord('{genre:count}', row)).toBe('2')
+    expect(format_record('{genre:join(", ")}', row)).toBe('Jazz, Modal')
+    expect(format_record('{genre:count}', row)).toBe('2')
   })
 
   it('applies path transforms', () => {
-    expect(formatRecord('{path:basename}', row)).toBe('01 so what.flac')
-    expect(formatRecord('{path:ext}', row)).toBe('flac')
+    expect(format_record('{path:basename}', row)).toBe('01 so what.flac')
+    expect(format_record('{path:ext}', row)).toBe('flac')
   })
 
   it('supports the renamer pattern end to end', () => {
     const pattern = '{album_artist|artist}/{year} - {album}/[{disc}.]{track:%02d} - {title}'
-    expect(formatRecord(pattern, row))
+    expect(format_record(pattern, row))
       .toBe('Miles Davis/1959 - Kind of Blue/01 - So What')
   })
 
   it('escapes braces with a backslash', () => {
-    expect(formatRecord('\\{literal\\}', row)).toBe('{literal}')
+    expect(format_record('\\{literal\\}', row)).toBe('{literal}')
   })
 
   it('reports which fields a template needs', () => {
-    expect(templateFields('[{disc}.]{track}. {album_artist|artist}').sort())
+    expect(template_fields('[{disc}.]{track}. {album_artist|artist}').sort())
       .toEqual(['album_artist', 'artist', 'disc', 'track'])
   })
 })

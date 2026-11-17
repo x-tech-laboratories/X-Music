@@ -10,7 +10,7 @@ import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { plural, size, stamp } from '@x-tech-laboratories/x-libs/web/format'
 import { PageView } from '@x-tech-laboratories/x-libs/web/react/page_view'
 import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
-import { ratingToStars } from '@shared/fields'
+import { rating_to_stars } from '@shared/fields'
 import { ipc, page_ipc } from '../lib/ipc.ts'
 import { open_track_history } from '../views/HistoryView.tsx'
 import { TrackCover } from './Cover.tsx'
@@ -91,7 +91,7 @@ function Overview({ details }: { details: TrackDetails }) {
       <Section title="Statistics">
         <p className="muted small">These belong to the track, not to any one file, so they survive a re-rip.</p>
         <Facts layout="rows" rows={[
-          ['Rating', <Rating value={ratingToStars(statistics.rating)} />],
+          ['Rating', <Rating value={rating_to_stars(statistics.rating)} />],
           ['Plays', statistics.playCount],
           ['Skips', statistics.skipCount],
           ['First played', when(statistics.firstPlayed)],
@@ -235,9 +235,9 @@ function Plays({ details }: { details: TrackDetails }) {
 // Page
 // ============================================================================
 
-export function SongProperties({ trackId, onclose }: { trackId: string; onclose: () => void }) {
+export function SongProperties({ track_id, on_close }: { track_id: string; on_close: () => void }) {
   const [section, set_section] = useState<SectionId>('overview')
-  const resource = use_resource(() => ipc('get_track', trackId), [trackId])
+  const resource = use_resource(() => ipc('get_track', track_id), [track_id])
   const details = resource.data
 
   const sections: { id: SectionId; label: string }[] = [
@@ -251,7 +251,7 @@ export function SongProperties({ trackId, onclose }: { trackId: string; onclose:
     <PageView
       title={details?.title ?? 'Track'}
       subtitle={details ? `${plural(details.media.length, 'source')} · ${plural(details.statistics.playCount, 'play')}` : undefined}
-      on_close={onclose}
+      on_close={on_close}
       actions={details && <button onClick={() => open_track_history(details.id, details.title ?? 'Untitled track', () => void resource.reload(true))}>History</button>}
       sections={sections}
       section={section}

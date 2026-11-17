@@ -5,29 +5,29 @@ import { homedir } from 'node:os'
 import type { Implementation, IpcMainEventLike } from '@x-tech-laboratories/x-libs/electron/bridge'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
-import { defaultGmbrcPath, parseGmbrc } from '@shared/import/gmbrc'
-import { importGmbrc } from '@shared/import/gmb_import'
+import { default_gmbrc_path, parse_gmbrc } from '@shared/import/gmbrc'
+import { import_gmbrc } from '@shared/import/gmb_import'
 import {
   x_music_bridge, x_music_events, x_music_history_bridge, x_music_page_bridge,
   type XMusicApi, type XMusicEvents, type XMusicHistoryApi, type XMusicPageApi, type EventName, type FileResult
 } from '@shared/ipc'
-import { trackDetails } from '@shared/library/details'
-import { findDuplicates } from '@shared/library/duplicates'
+import { track_details } from '@shared/library/details'
+import { find_duplicates } from '@shared/library/duplicates'
 import {
   get_history_keep_days, record_history, set_history_keep_days, track_history_methods
 } from '@shared/library/history'
-import { list_recent_merges, mergePreview, mergeTracks, unmerge } from '@shared/library/merge'
+import { list_recent_merges, merge_preview, merge_tracks, unmerge } from '@shared/library/merge'
 import {
   add_root, enabled_root_paths, group_tracks, library_stats, list_roots, mark_roots_scanned,
   query_tracks, remove_root
 } from '@shared/library/store'
-import { artCacheDir, resizeImage } from './artcache.ts'
-import { clearLibraryBackedUp, type LibraryBackups } from './backups.ts'
-import { resolveArtwork, thumbnail } from './library/artwork.ts'
-import { scanRoots } from './library/scan.ts'
-import { logFromRenderer, logger } from './log.ts'
+import { art_cache_dir, resize_image } from './artcache.ts'
+import { clear_library_backed_up, type LibraryBackups } from './backups.ts'
+import { resolve_artwork, thumbnail } from './library/artwork.ts'
+import { scan_roots } from './library/scan.ts'
+import { log_from_renderer, logger } from './log.ts'
 import { Player } from './play/player.ts'
-import { MpvEngine, findMpv } from './play/mpv.ts'
+import { MpvEngine, find_mpv } from './play/mpv.ts'
 import { NullEngine } from './play/engine.ts'
 
 // Every call other programs may make too, answered on the library and the player.
@@ -56,23 +56,23 @@ function recording<Methods extends Record<string, (...args: never[]) => unknown>
 }
 
 // Returns the calls for the MCP server, and what stops the player, whose mpv is a process of its own that would otherwise outlive X-Music.
-export async function registerIpc(db: SqlDatabase, options: IpcOptions): Promise<{ api: ApiImplementation; stopPlayer: () => Promise<void> }> {
+export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promise<{ api: ApiImplementation; stop_player: () => Promise<void> }> {
   // A scan runs at most once at a time; the flag is what cancel flips.
   let scanning: { aborted: boolean } | null = null
 
   // Without mpv the app still runs and the library still works; only audio is unavailable, and the
   // player reports that plainly rather than failing at the first click.
-  const playLog = logger('play')
-  const mpvPath = await findMpv()
-  if (!mpvPath) playLog.warn('mpv not found; playback is disabled', { hint: 'set X_MUSIC_MPV' })
-  else playLog.info('using mpv', { path: mpvPath })
+  const play_log = logger('play')
+  const mpv_path = await find_mpv()
+  if (!mpv_path) play_log.warn('mpv not found; playback is disabled', { hint: 'set X_MUSIC_MPV' })
+  else play_log.info('using mpv', { path: mpv_path })
 
   const player = new Player(
     db,
-    mpvPath
-      ? new MpvEngine({ binary: mpvPath, onLog: (line) => playLog.debug(`mpv: ${line}`) })
+    mpv_path
+      ? new MpvEngine({ binary: mpv_path, on_log: (line) => play_log.debug(`mpv: ${line}`) })
       : new NullEngine(),
-    { replayGain: 'track', afterWrite: () => record_history(db) }
+    { replay_gain: 'track', after_write: () => record_history(db) }
   )
 
   player.subscribe((event, payload) => {
@@ -95,7 +95,7 @@ export async function registerIpc(db: SqlDatabase, options: IpcOptions): Promise
 
     list_track_groups: (filter, field) => group_tracks(db, { filter, field }),
 
-    get_default_gmbrc_path: () => defaultGmbrcPath(homedir(), process.platform),
+    get_default_gmbrc_path: () => default_gmbrc_path(homedir(), process.platform),
 
     // Reads and parses without writing anything, so the user can see what an import would do.
     get_gmbrc_preview: (path) => {
@@ -104,17 +104,17 @@ export async function registerIpc(db: SqlDatabase, options: IpcOptions): Promise
                  playHistoryEntries: 0, unmappedColumns: [] }
       }
       try {
-        const data = parseGmbrc(readFileSync(path, 'utf8'))
+        const data = parse_gmbrc(readFileSync(path, 'utf8'))
         return {
           path,
           exists: true,
           version: data.version,
-          baseFolder: data.baseFolder,
+          baseFolder: data.base_folder,
           songs: data.songs.length,
-          savedFilters: data.savedFilters.length,
-          savedLists: data.savedLists.length,
-          playHistoryEntries: data.songs.reduce((n, s) => n + s.playHistory.length, 0),
-          unmappedColumns: data.unmappedColumns
+          savedFilters: data.saved_filters.length,
+          savedLists: data.saved_lists.length,
+          playHistoryEntries: data.songs.reduce((n, s) => n + s.play_history.length, 0),
+          unmappedColumns: data.unmapped_columns
         }
       } catch (err) {
         return { path, exists: true, songs: 0, savedFilters: 0, savedLists: 0,
@@ -123,8 +123,8 @@ export async function registerIpc(db: SqlDatabase, options: IpcOptions): Promise
     },
 
     import_gmbrc: (path, statistics, labels, playlists) => {
-      const data = parseGmbrc(readFileSync(path, 'utf8'))
-      return importGmbrc(db, data, { statistics, labels, playlists })
+      const data = parse_gmbrc(readFileSync(path, 'utf8'))
+      return import_gmbrc(db, data, { statistics, labels, playlists })
     },
 
     list_folders: () => list_roots(db),
@@ -158,10 +158,10 @@ export async function registerIpc(db: SqlDatabase, options: IpcOptions): Promise
       }
 
       try {
-        const report = await scanRoots(db, roots, {
+        const report = await scan_roots(db, roots, {
           signal: scanning,
-          onProgress: (p) => emit('scan_progress', p),
-          onFile: (r) => {
+          on_progress: (p) => emit('scan_progress', p),
+          on_file: (r) => {
             pending.push(r)
             if (pending.length >= 40) flush()
           }
@@ -175,13 +175,13 @@ export async function registerIpc(db: SqlDatabase, options: IpcOptions): Promise
       }
     },
 
-    get_track: (track_id) => trackDetails(db, track_id),
+    get_track: (track_id) => track_details(db, track_id),
 
     get_player_status: () => player.status(),
 
     play_track: (track_id, context, index) => {
-      if (context) player.setContext(context, index ?? -1)
-      void player.playTrack(track_id, index ?? -1)
+      if (context) player.set_context(context, index ?? -1)
+      void player.play_track(track_id, index ?? -1)
       return player.status()
     },
 
@@ -190,7 +190,7 @@ export async function registerIpc(db: SqlDatabase, options: IpcOptions): Promise
     play_previous: () => { void player.previous(); return player.status() },
     stop_playback: () => { void player.stop(); return player.status() },
     seek: (ms) => { void player.seek(ms); return player.status() },
-    set_volume: (v) => { void player.setVolume(v); return player.status() },
+    set_volume: (v) => { void player.set_volume(v); return player.status() },
 
     queue_tracks: (track_ids, position) => {
       player.enqueue(track_ids, position ?? 'end')
@@ -198,21 +198,21 @@ export async function registerIpc(db: SqlDatabase, options: IpcOptions): Promise
     },
 
     remove_from_queue: (index) => { player.dequeue(index); return player.status() },
-    clear_queue: () => { player.clearQueue(); return player.status() },
-    set_repeat: (mode) => { player.setRepeat(mode); return player.status() },
-    set_shuffle: (on) => { player.setShuffle(on); return player.status() },
+    clear_queue: () => { player.clear_queue(); return player.status() },
+    set_repeat: (mode) => { player.set_repeat(mode); return player.status() },
+    set_shuffle: (on) => { player.set_shuffle(on); return player.status() },
 
-    get_merge_preview: (track_ids) => mergePreview(db, track_ids),
+    get_merge_preview: (track_ids) => merge_preview(db, track_ids),
 
-    merge_tracks: (track_ids, survivor_id, resolutions) => mergeTracks(db, { ids: track_ids, survivor: survivor_id, resolutions }),
+    merge_tracks: (track_ids, survivor_id, resolutions) => merge_tracks(db, { ids: track_ids, survivor: survivor_id, resolutions }),
 
     undo_merge: (batch_id) => unmerge(db, batch_id),
 
-    list_duplicates: (reasons, length_tolerance_ms, limit) => findDuplicates(db, { reasons, lengthToleranceMs: length_tolerance_ms, limit }),
+    list_duplicates: (reasons, length_tolerance_ms, limit) => find_duplicates(db, { reasons, lengthToleranceMs: length_tolerance_ms, limit }),
 
     // Clearing replaces the whole library, so a backup is taken first and the clear is refused if it fails.
     clear_library: async () => {
-      await clearLibraryBackedUp(db, options.backups)
+      await clear_library_backed_up(db, options.backups)
       return { cleared: true }
     }
   }
@@ -233,7 +233,7 @@ export async function registerIpc(db: SqlDatabase, options: IpcOptions): Promise
     pick_gmbrc_file: () => {
       const picked = dialog.showOpenDialogSync({
         title: 'Select a gmusicbrowser configuration file',
-        defaultPath: defaultGmbrcPath(homedir(), process.platform),
+        defaultPath: default_gmbrc_path(homedir(), process.platform),
         properties: ['openFile'],
         filters: [{ name: 'gmusicbrowser config', extensions: ['*'] }]
       })
@@ -246,14 +246,14 @@ export async function registerIpc(db: SqlDatabase, options: IpcOptions): Promise
     },
 
     get_cover_url: async (track_id, size) => {
-      const art_options = { cacheDir: artCacheDir(), resize: resizeImage }
-      const art = await resolveArtwork(db, track_id, art_options)
+      const art_options = { cache_dir: art_cache_dir(), resize: resize_image }
+      const art = await resolve_artwork(db, track_id, art_options)
       const path = size ? thumbnail(art_options, art, size) : art.path
       return { url: path ? `x-music-art://local${encodeURI(path)}` : null, source: art.source }
     },
 
     write_log: (record) => {
-      logFromRenderer(record.level, record.scope, record.message, record.data)
+      log_from_renderer(record.level, record.scope, record.message, record.data)
       return { logged: true }
     },
 
@@ -266,5 +266,5 @@ export async function registerIpc(db: SqlDatabase, options: IpcOptions): Promise
   x_music_bridge.handle(ipcMain, recorded, guard)
   x_music_history_bridge.handle(ipcMain, recorded_history, guard)
   x_music_page_bridge.handle(ipcMain, page, guard)
-  return { api: { ...recorded, ...recorded_history }, stopPlayer: () => player.dispose() }
+  return { api: { ...recorded, ...recorded_history }, stop_player: () => player.dispose() }
 }

@@ -8,9 +8,9 @@ import { describe_upgrade, is_legacy } from '@shared/library/legacy'
 import { unmerge } from '@shared/library/merge'
 import { migrations } from '@shared/library/migrations/index'
 import { needs_upgrade, open_library } from '@shared/library/store'
-import { createUpserter } from '@shared/library/identity'
-import { counts, HASH, legacyLibrary, legacySchema, OLD_MERGE_SNAPSHOT } from './legacy.ts'
-import { freshDb, type TestDb } from './sqlite.ts'
+import { create_upserter } from '@shared/library/identity'
+import { counts, HASH, legacy_library, legacy_schema, OLD_MERGE_SNAPSHOT } from './legacy.ts'
+import { fresh_db, type TestDb } from './sqlite.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
@@ -18,10 +18,10 @@ const one = <Row>(db: TestDb, sql: string, ...params: (string | number | null)[]
   db.prepare(sql).get(...params) as Row
 const all = <Row>(db: TestDb, sql: string, ...params: (string | number | null)[]): Row[] =>
   db.prepare(sql).all(...params) as Row[]
-const trackId = (db: TestDb, title: string): string => one<{ id: string }>(db, 'SELECT id FROM tracks WHERE title = ?', title).id
+const track_id = (db: TestDb, title: string): string => one<{ id: string }>(db, 'SELECT id FROM tracks WHERE title = ?', title).id
 
 function upgraded(): { db: TestDb; before: Record<string, number> } {
-  const db = legacyLibrary()
+  const db = legacy_library()
   const before = counts(db)
   open_library(db)
   return { db, before }
@@ -29,8 +29,8 @@ function upgraded(): { db: TestDb; before: Record<string, number> } {
 
 describe('upgrading a library from the old schema', () => {
   it('says an old library needs upgrading, and a new or current one does not', () => {
-    expect(needs_upgrade(legacyLibrary())).toBe(true)
-    expect(needs_upgrade(freshDb())).toBe(false)
+    expect(needs_upgrade(legacy_library())).toBe(true)
+    expect(needs_upgrade(fresh_db())).toBe(false)
     expect(needs_upgrade(upgraded().db)).toBe(false)
   })
 
@@ -63,7 +63,7 @@ describe('upgrading a library from the old schema', () => {
 
   it('points every reference at the row it pointed at before', () => {
     const { db } = upgraded()
-    const so_what = trackId(db, 'So What')
+    const so_what = track_id(db, 'So What')
 
     expect(one(db, `SELECT a.name, v.value AS album_artist FROM tracks t JOIN albums a ON a.id = t.album_id
                     JOIN values_ v ON v.id = a.album_artist_id WHERE t.id = ?`, so_what))
@@ -124,7 +124,7 @@ describe('upgrading a library from the old schema', () => {
 
   it('rewrites the merge journal so an earlier merge can still be undone', () => {
     const { db } = upgraded()
-    const survivor = trackId(db, 'Survivor')
+    const survivor = track_id(db, 'Survivor')
 
     const snapshot = JSON.parse(one<{ snapshot: string }>(db, 'SELECT snapshot FROM merge_journal').snapshot) as typeof OLD_MERGE_SNAPSHOT
     expect(snapshot.tracks.map((track) => track.id)).toContain(survivor)
@@ -160,17 +160,17 @@ describe('upgrading a library from the old schema', () => {
   it('gives every track a first version in its history', () => {
     const { db } = upgraded()
 
-    expect(all(db, "SELECT kind FROM track_versions WHERE item_id = ?", trackId(db, 'So What'))).toEqual([{ kind: 'first_seen' }])
+    expect(all(db, "SELECT kind FROM track_versions WHERE item_id = ?", track_id(db, 'So What'))).toEqual([{ kind: 'first_seen' }])
     expect(one(db, 'SELECT COUNT(*) AS n FROM track_versions')).toEqual({ n: 3 })
   })
 
   it('still matches a scanned file to its track afterwards, rather than adding a second', () => {
     const { db } = upgraded()
-    const so_what = trackId(db, 'So What')
+    const so_what = track_id(db, 'So What')
 
-    const result = createUpserter(db)({ title: 'So What' }, { uri: '/music/so-what.flac', audioHash: HASH }, { metadata: false })
+    const result = create_upserter(db)({ title: 'So What' }, { uri: '/music/so-what.flac', audio_hash: HASH }, { metadata: false })
 
-    expect(result).toMatchObject({ trackId: so_what, created: false, matchedBy: 'uri' })
+    expect(result).toMatchObject({ track_id: so_what, created: false, matched_by: 'uri' })
     expect(one(db, 'SELECT COUNT(*) AS n FROM tracks')).toEqual({ n: 3 })
   })
 
@@ -184,7 +184,7 @@ describe('upgrading a library from the old schema', () => {
   })
 
   it('brings a library from the first old step through the rest before converting it', () => {
-    const db = legacySchema(1)
+    const db = legacy_schema(1)
     db.exec(`INSERT INTO tracks (id, title, added, modified) VALUES (1, 'Twice played', 0, 0);
              INSERT INTO play_history (track_id, at, kind) VALUES (1, 100, 0), (1, 100, 0), (1, 200, 0);`)
 
@@ -195,7 +195,7 @@ describe('upgrading a library from the old schema', () => {
   })
 
   it('changes nothing when a row cannot follow its references', () => {
-    const db = legacyLibrary()
+    const db = legacy_library()
     db.exec('PRAGMA foreign_keys = OFF')
     db.exec("INSERT INTO media (id, track_id, kind, uri, added) VALUES (99, 999, 'file', '/music/orphan.flac', 0)")
     const before = counts(db)
@@ -208,7 +208,7 @@ describe('upgrading a library from the old schema', () => {
   })
 
   it('says which references it emptied because the row they named was gone', () => {
-    const db = legacyLibrary()
+    const db = legacy_library()
     db.exec('PRAGMA foreign_keys = OFF')
     db.exec("UPDATE tracks SET album_id = 99 WHERE title = 'Blue in Green'; UPDATE play_history SET media_id = 77 WHERE id = 3")
 
@@ -223,7 +223,7 @@ describe('upgrading a library from the old schema', () => {
 describe('upgrading a merge whose absorbed numbers were reused', () => {
   // The old tables handed a deleted row's number to the next row made, so a merge's snapshot can name a live, unrelated row.
   function reused(): TestDb {
-    const db = legacyLibrary()
+    const db = legacy_library()
     db.exec(`
       INSERT INTO tracks (id, title, rating, play_count, added, modified) VALUES (9, 'Unrelated new song', 100, 77, 20000, 20000);
       INSERT INTO media (id, track_id, kind, uri, added) VALUES (6, 9, 'file', '/music/new.flac', 20000);
@@ -238,7 +238,7 @@ describe('upgrading a merge whose absorbed numbers were reused', () => {
     const db = reused()
 
     const report = open_library(db)
-    const unrelated = trackId(db, 'Unrelated new song')
+    const unrelated = track_id(db, 'Unrelated new song')
     const result = unmerge(db, 'merge-9500-3')
 
     expect(report?.reused).toContainEqual({ batch_id: 'merge-9500-3', kind: 'tracks', old: 9 })
@@ -255,14 +255,14 @@ describe('upgrading a merge whose absorbed numbers were reused', () => {
   })
 
   it('leaves a file or play whose number was reused with the track that has it now', () => {
-    const db = legacyLibrary()
+    const db = legacy_library()
     db.exec(`
       DELETE FROM media WHERE id = 5; DELETE FROM play_history WHERE id = 4;
       INSERT INTO media (id, track_id, kind, uri, added) VALUES (5, 2, 'file', '/music/other.flac', 20000);
       INSERT INTO play_history (id, track_id, at, kind) VALUES (4, 2, 20000, 0);`)
 
     const report = open_library(db)
-    const blue = trackId(db, 'Blue in Green')
+    const blue = track_id(db, 'Blue in Green')
     const result = unmerge(db, 'merge-9500-3')
 
     expect(report?.reused).toEqual(expect.arrayContaining([

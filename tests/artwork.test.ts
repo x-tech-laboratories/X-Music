@@ -6,10 +6,10 @@ import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { findFolderImage, imageSize, lookupArtwork, resolveArtwork, forgetMisses }
+import { find_folder_image, image_size, lookup_artwork, resolve_artwork, forget_misses }
   from '@main/library/artwork'
 import { new_id } from '@shared/library/database'
-import { addTrack, freshDb, type TestDb } from './sqlite.ts'
+import { add_track, fresh_db, type TestDb } from './sqlite.ts'
 
 let dir: string
 let cache: string
@@ -24,14 +24,14 @@ function png(width: number, height: number, fill = 0): Buffer {
   return buf
 }
 
-function makeTrack(uri: string, album?: string): string {
-  let albumId: string | null = null
+function make_track(uri: string, album?: string): string {
+  let album_id: string | null = null
   if (album) {
     db.prepare('INSERT OR IGNORE INTO albums (id, match_key, name, added) VALUES (?, ?, ?, 0)')
       .run(new_id(), album, album)
-    albumId = (db.prepare('SELECT id FROM albums WHERE match_key = ?').get(album) as { id: string }).id
+    album_id = (db.prepare('SELECT id FROM albums WHERE match_key = ?').get(album) as { id: string }).id
   }
-  const id = addTrack(db, { title: 'Song', album_id: albumId })
+  const id = add_track(db, { title: 'Song', album_id })
   db.prepare(`INSERT INTO media (id, track_id, kind, uri, present, added) VALUES (?, ?, 'file', ?, 1, 0)`)
     .run(new_id(), id, uri)
   return id
@@ -40,7 +40,7 @@ function makeTrack(uri: string, album?: string): string {
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'x-music-art-'))
   cache = join(dir, 'cache')
-  db = freshDb()
+  db = fresh_db()
 })
 
 afterEach(async () => {
@@ -50,11 +50,11 @@ afterEach(async () => {
 
 describe('imageSize', () => {
   it('reads PNG dimensions from the header', () => {
-    expect(imageSize(png(600, 400))).toEqual({ width: 600, height: 400 })
+    expect(image_size(png(600, 400))).toEqual({ width: 600, height: 400 })
   })
 
   it('returns null for something that is not an image', () => {
-    expect(imageSize(Buffer.from('not an image at all'))).toBeNull()
+    expect(image_size(Buffer.from('not an image at all'))).toBeNull()
   })
 })
 
@@ -64,31 +64,31 @@ describe('findFolderImage', () => {
     await writeFile(join(dir, 'album', 'random.png'), png(10, 10))
     await writeFile(join(dir, 'album', 'cover.png'), png(20, 20))
 
-    expect(findFolderImage(join(dir, 'album', 'track.flac')))
+    expect(find_folder_image(join(dir, 'album', 'track.flac')))
       .toBe(join(dir, 'album', 'cover.png'))
   })
 
   it('matches regardless of case and extension', async () => {
     await mkdir(join(dir, 'b'), { recursive: true })
     await writeFile(join(dir, 'b', 'Folder.JPG'), png(30, 30))
-    expect(findFolderImage(join(dir, 'b', 'track.flac'))).toBe(join(dir, 'b', 'Folder.JPG'))
+    expect(find_folder_image(join(dir, 'b', 'track.flac'))).toBe(join(dir, 'b', 'Folder.JPG'))
   })
 
   it('takes a lone image as the cover', async () => {
     await mkdir(join(dir, 'c'), { recursive: true })
     await writeFile(join(dir, 'c', 'scan001.png'), png(40, 40))
-    expect(findFolderImage(join(dir, 'c', 'track.flac'))).toBe(join(dir, 'c', 'scan001.png'))
+    expect(find_folder_image(join(dir, 'c', 'track.flac'))).toBe(join(dir, 'c', 'scan001.png'))
   })
 
   it('does not guess when several unnamed images are present', async () => {
     await mkdir(join(dir, 'd'), { recursive: true })
     await writeFile(join(dir, 'd', 'a.png'), png(1, 1))
     await writeFile(join(dir, 'd', 'b.png'), png(2, 2))
-    expect(findFolderImage(join(dir, 'd', 'track.flac'))).toBeNull()
+    expect(find_folder_image(join(dir, 'd', 'track.flac'))).toBeNull()
   })
 
   it('copes with an unreadable directory', () => {
-    expect(findFolderImage('/definitely/not/here/track.flac')).toBeNull()
+    expect(find_folder_image('/definitely/not/here/track.flac')).toBeNull()
   })
 })
 
@@ -96,9 +96,9 @@ describe('resolveArtwork', () => {
   it('caches a folder image and records where it came from', async () => {
     await mkdir(join(dir, 'kob'), { recursive: true })
     await writeFile(join(dir, 'kob', 'cover.png'), png(500, 500, 7))
-    const id = makeTrack(join(dir, 'kob', '01.flac'), 'Kind of Blue')
+    const id = make_track(join(dir, 'kob', '01.flac'), 'Kind of Blue')
 
-    const art = await resolveArtwork(db, id, { cacheDir: cache })
+    const art = await resolve_artwork(db, id, { cache_dir: cache })
 
     expect(art.source).toBe('folder')
     expect(art.path).toContain(cache)
@@ -109,32 +109,32 @@ describe('resolveArtwork', () => {
   it('shares one answer across every track on an album', async () => {
     await mkdir(join(dir, 'shared'), { recursive: true })
     await writeFile(join(dir, 'shared', 'cover.png'), png(300, 300, 3))
-    const a = makeTrack(join(dir, 'shared', '01.flac'), 'Shared')
-    const b = makeTrack(join(dir, 'shared', '02.flac'), 'Shared')
+    const a = make_track(join(dir, 'shared', '01.flac'), 'Shared')
+    const b = make_track(join(dir, 'shared', '02.flac'), 'Shared')
 
-    await resolveArtwork(db, a, { cacheDir: cache })
+    await resolve_artwork(db, a, { cache_dir: cache })
 
     // The second track finds the album's recorded answer without searching again.
-    expect(lookupArtwork(db, b)?.source).toBe('folder')
+    expect(lookup_artwork(db, b)?.source).toBe('folder')
     expect((db.prepare('SELECT COUNT(*) AS n FROM artwork').get() as { n: number }).n).toBe(1)
   })
 
   it('records a miss so a coverless track is not searched repeatedly', async () => {
     await mkdir(join(dir, 'bare'), { recursive: true })
-    const id = makeTrack(join(dir, 'bare', '01.flac'), 'Bare')
+    const id = make_track(join(dir, 'bare', '01.flac'), 'Bare')
 
-    const art = await resolveArtwork(db, id, { cacheDir: cache })
+    const art = await resolve_artwork(db, id, { cache_dir: cache })
     expect(art.source).toBe('none')
     expect(art.path).toBeNull()
-    expect(lookupArtwork(db, id)?.source).toBe('none')
+    expect(lookup_artwork(db, id)?.source).toBe('none')
   })
 
   it('attaches art to the track itself when it has no album', async () => {
     await mkdir(join(dir, 'single'), { recursive: true })
     await writeFile(join(dir, 'single', 'front.png'), png(200, 200, 9))
-    const id = makeTrack(join(dir, 'single', 'loose.flac'))
+    const id = make_track(join(dir, 'single', 'loose.flac'))
 
-    await resolveArtwork(db, id, { cacheDir: cache })
+    await resolve_artwork(db, id, { cache_dir: cache })
     const row = db.prepare('SELECT album_id, track_id FROM artwork').get() as
       { album_id: number | null; track_id: number | null }
     expect(row.album_id).toBeNull()
@@ -147,10 +147,10 @@ describe('resolveArtwork', () => {
     await writeFile(join(dir, 'x', 'cover.png'), png(100, 100, 5))
     await writeFile(join(dir, 'y', 'cover.png'), png(100, 100, 5))
 
-    const a = await resolveArtwork(db, makeTrack(join(dir, 'x', '1.flac'), 'X'),
-      { cacheDir: cache })
-    const b = await resolveArtwork(db, makeTrack(join(dir, 'y', '1.flac'), 'Y'),
-      { cacheDir: cache })
+    const a = await resolve_artwork(db, make_track(join(dir, 'x', '1.flac'), 'X'),
+      { cache_dir: cache })
+    const b = await resolve_artwork(db, make_track(join(dir, 'y', '1.flac'), 'Y'),
+      { cache_dir: cache })
 
     expect(a.hash).toBe(b.hash)
     expect(a.path).toBe(b.path)
@@ -158,12 +158,12 @@ describe('resolveArtwork', () => {
 
   it('forgets misses so newly added covers are picked up', async () => {
     await mkdir(join(dir, 'later'), { recursive: true })
-    const id = makeTrack(join(dir, 'later', '01.flac'), 'Later')
-    expect((await resolveArtwork(db, id, { cacheDir: cache })).source).toBe('none')
+    const id = make_track(join(dir, 'later', '01.flac'), 'Later')
+    expect((await resolve_artwork(db, id, { cache_dir: cache })).source).toBe('none')
 
     await writeFile(join(dir, 'later', 'cover.png'), png(120, 120, 4))
-    expect(forgetMisses(db)).toBe(1)
+    expect(forget_misses(db)).toBe(1)
 
-    expect((await resolveArtwork(db, id, { cacheDir: cache })).source).toBe('folder')
+    expect((await resolve_artwork(db, id, { cache_dir: cache })).source).toBe('folder')
   })
 })

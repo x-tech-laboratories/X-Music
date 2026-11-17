@@ -8,24 +8,24 @@ import { new_id } from '@shared/library/database'
 import {
   default_history_keep_days, get_history_keep_days, record_history, set_history_keep_days, track_history, track_history_methods
 } from '@shared/library/history'
-import { createUpserter } from '@shared/library/identity'
-import { mergeTracks, unmerge } from '@shared/library/merge'
+import { create_upserter } from '@shared/library/identity'
+import { merge_tracks, unmerge } from '@shared/library/merge'
 import { count_play } from '@shared/library/plays'
 import { set_extra, write_set } from '@shared/library/values'
-import { freshDb, type TestDb } from './sqlite.ts'
+import { fresh_db, type TestDb } from './sqlite.ts'
 
 let db: TestDb
 
-beforeEach(() => { db = freshDb() })
+beforeEach(() => { db = fresh_db() })
 afterEach(() => db.close())
 
-const genre = field('genre').fieldId!
-const comment = field('comment').fieldId!
+const genre = field('genre').field_id!
+const comment = field('comment').field_id!
 
 function scanned(title: string, uri: string, genres: string[] = []): string {
-  const result = createUpserter(db)({ title, artist: 'Miles Davis', sets: { artist: ['Miles Davis'], genre: genres } }, { uri }, { metadata: true })
+  const result = create_upserter(db)({ title, artist: 'Miles Davis', sets: { artist: ['Miles Davis'], genre: genres } }, { uri }, { metadata: true })
   record_history(db)
-  return result.trackId
+  return result.track_id
 }
 
 const versions = (track_id: string) => track_history_methods(() => db).list_versions(track_id)
@@ -82,7 +82,7 @@ describe('track history', () => {
     const survivor = scanned('So What', '/music/a.flac')
     const absorbed = scanned('So What', '/music/b.flac')
 
-    const merge = mergeTracks(db, { ids: [survivor, absorbed], survivor })
+    const merge = merge_tracks(db, { ids: [survivor, absorbed], survivor })
     record_history(db)
 
     expect(versions(survivor)[0]!.kind).toBe('edited')
@@ -99,7 +99,7 @@ describe('track history', () => {
   it('brings back a track a merge took away, with its file', () => {
     const survivor = scanned('So What', '/music/a.flac')
     const absorbed = scanned('So What', '/music/b.flac')
-    mergeTracks(db, { ids: [survivor, absorbed], survivor })
+    merge_tracks(db, { ids: [survivor, absorbed], survivor })
     record_history(db)
 
     track_history_methods(() => db).restore_version(versions(absorbed)[0]!.id)

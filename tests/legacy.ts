@@ -4,7 +4,7 @@
 import { migrate } from '@x-tech-laboratories/x-libs/sql'
 
 import { legacy_steps } from '@shared/library/legacy_steps'
-import { bareDb, type TestDb } from './sqlite.ts'
+import { bare_db, type TestDb } from './sqlite.ts'
 
 export const HASH = new Uint8Array([0xde, 0xad, 0xbe, 0xef, 0x01, 0x02])
 
@@ -32,16 +32,16 @@ export const OLD_MERGE_SNAPSHOT = {
 }
 
 // Builds the old schema up to the step given, without any rows.
-export function legacySchema(steps = legacy_steps.length, path = ':memory:'): TestDb {
-  const db = bareDb(path)
+export function legacy_schema(steps = legacy_steps.length, path = ':memory:'): TestDb {
+  const db = bare_db(path)
   db.exec('PRAGMA foreign_keys = ON')
   migrate(db, legacy_steps.slice(0, steps))
   return db
 }
 
 // A library at the last old step with a row in every table.
-export function legacyLibrary(path = ':memory:'): TestDb {
-  const db = legacySchema(legacy_steps.length, path)
+export function legacy_library(path = ':memory:'): TestDb {
+  const db = legacy_schema(legacy_steps.length, path)
   db.exec(`
     INSERT INTO values_ (id, field_id, value) VALUES (1, 1, 'Miles Davis'), (2, 4, 'Jazz'), (3, 2, 'Miles Davis'), (4, 4, 'Modal'), (5, 1, 'Bill Evans');
     INSERT INTO albums (id, match_key, name, album_artist_id, year, mb_release_id, added)

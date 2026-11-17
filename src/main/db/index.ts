@@ -7,12 +7,12 @@ import { app } from 'electron'
 
 import { regexp_matches } from '@shared/query/compile'
 
-export function libraryPath(): string {
+export function library_path(): string {
   return process.env.X_MUSIC_DB ?? join(app.getPath('userData'), 'library.db')
 }
 
 // Opens the file with the settings a large library wants and the REGEXP that filters compile to, which SQLite leaves to the host.
-export function openDatabase(path = libraryPath()): DatabaseSync {
+export function open_database(path = library_path()): DatabaseSync {
   mkdirSync(dirname(path), { recursive: true })
   const database = new DatabaseSync(path)
   database.exec(`PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA temp_store = MEMORY;

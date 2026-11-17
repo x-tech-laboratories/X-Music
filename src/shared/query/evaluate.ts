@@ -5,7 +5,7 @@
 // every comparison against a NULL yields false rather than throwing.
 
 import { field, type FieldDescriptor } from '../fields.ts'
-import { isGroup, type FilterNode, type LeafNode, type RelativeDate } from '../filter.ts'
+import { is_group, type FilterNode, type LeafNode, type RelativeDate } from '../filter.ts'
 
 /** One track as held by the in-memory index. */
 export interface IndexedTrack {
@@ -34,7 +34,7 @@ const MS: Record<RelativeDate['unit'], number> = {
 }
 
 /** SQLite's LIKE folds ASCII case only; Unicode case is left alone. Match that exactly. */
-function asciiLower(s: string): string {
+function ascii_lower(s: string): string {
   let out = ''
   for (let i = 0; i < s.length; i++) {
     const c = s.charCodeAt(i)
@@ -43,13 +43,13 @@ function asciiLower(s: string): string {
   return out
 }
 
-function scalarOf(t: IndexedTrack, d: FieldDescriptor): string | number | null {
-  if (d.storage === 'extra') return t.extras[d.fieldId!] ?? null
+function scalar_of(t: IndexedTrack, d: FieldDescriptor): string | number | null {
+  if (d.storage === 'extra') return t.extras[d.field_id!] ?? null
   return t.scalars[d.id] ?? null
 }
 
 /** Mirrors the SQL side's preferred-source ordering for sorting and grouping. */
-export function preferredMedia(t: IndexedTrack): Record<string, string | number | null> | null {
+export function preferred_media(t: IndexedTrack): Record<string, string | number | null> | null {
   if (!t.media.length) return null
   return [...t.media].sort(
     (a, b) => Number(b.quality_rank ?? 0) - Number(a.quality_rank ?? 0)
@@ -64,8 +64,8 @@ function cmp(a: string | number | null, b: unknown): number | null {
   return as < bs ? -1 : as > bs ? 1 : 0
 }
 
-function evalSet(t: IndexedTrack, d: FieldDescriptor, node: LeafNode): boolean {
-  const have = t.sets[d.fieldId!] ?? []
+function eval_set(t: IndexedTrack, d: FieldDescriptor, node: LeafNode): boolean {
+  const have = t.sets[d.field_id!] ?? []
   const want = (Array.isArray(node.value) ? node.value : [node.value]) as string[]
 
   switch (node.op) {
@@ -79,9 +79,9 @@ function evalSet(t: IndexedTrack, d: FieldDescriptor, node: LeafNode): boolean {
   }
 }
 
-function evalLeaf(t: IndexedTrack, node: LeafNode, ctx: EvalContext): boolean {
+function eval_leaf(t: IndexedTrack, node: LeafNode, ctx: EvalContext): boolean {
   const d = field(node.field)
-  if (d.storage === 'multi') return evalSet(t, d, node)
+  if (d.storage === 'multi') return eval_set(t, d, node)
 
   if (node.op === 'top' || node.op === 'bottom') {
     const key = `${node.field}:${node.op}:${Number(node.value)}`
@@ -91,18 +91,18 @@ function evalLeaf(t: IndexedTrack, node: LeafNode, ctx: EvalContext): boolean {
   // Physical properties belong to a source: the track matches when any of its media does.
   if (d.storage === 'media') {
     const col = d.column ?? d.id
-    return t.media.some((m) => applyOp(m[col] ?? null, node, ctx))
+    return t.media.some((m) => apply_op(m[col] ?? null, node, ctx))
   }
 
-  return applyOp(scalarOf(t, d), node, ctx)
+  return apply_op(scalar_of(t, d), node, ctx)
 }
 
-function applyOp(raw: string | number | null, node: LeafNode, ctx: EvalContext): boolean {
+function apply_op(raw: string | number | null, node: LeafNode, ctx: EvalContext): boolean {
   const v = node.value
   const cs = node.cs ?? false
 
   const text = (): string | null => (raw === null ? null : String(raw))
-  const fold = (s: string): string => (cs ? s : asciiLower(s))
+  const fold = (s: string): string => (cs ? s : ascii_lower(s))
 
   switch (node.op) {
     case 'is':      return raw !== null && v !== null && cmp(raw, v) === 0
@@ -159,7 +159,7 @@ function applyOp(raw: string | number | null, node: LeafNode, ctx: EvalContext):
 }
 
 export function evaluate(node: FilterNode, t: IndexedTrack, ctx: EvalContext): boolean {
-  if (!isGroup(node)) return evalLeaf(t, node, ctx)
+  if (!is_group(node)) return eval_leaf(t, node, ctx)
 
   switch (node.op) {
     case 'and': return node.children.every((c) => evaluate(c, t, ctx))
@@ -170,25 +170,25 @@ export function evaluate(node: FilterNode, t: IndexedTrack, ctx: EvalContext): b
   }
 }
 
-export function selectIds(node: FilterNode, tracks: readonly IndexedTrack[], ctx: EvalContext): string[] {
+export function select_ids(node: FilterNode, tracks: readonly IndexedTrack[], ctx: EvalContext): string[] {
   return tracks.filter((t) => evaluate(node, t, ctx)).map((t) => t.id)
 }
 
 /** Precomputes the id sets that `top` / `bottom` need, matching the SQL subquery's ordering. */
-export function rankFor(
+export function rank_for(
   tracks: readonly IndexedTrack[],
-  fieldId: string,
+  field_id: string,
   n: number
 ): { top: Set<string>; bottom: Set<string> } {
-  const d = field(fieldId)
-  const withValue = tracks
-    .map((t) => ({ id: t.id, v: scalarOf(t, d) }))
+  const d = field(field_id)
+  const with_value = tracks
+    .map((t) => ({ id: t.id, v: scalar_of(t, d) }))
     .filter((r): r is { id: string; v: string | number } => r.v !== null)
 
   // Ties go by id, as the SQL subquery orders them.
   const by_id = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
-  const asc = [...withValue].sort((a, b) => (cmp(a.v, b.v) ?? 0) || by_id(a, b))
-  const desc = [...withValue].sort((a, b) => -(cmp(a.v, b.v) ?? 0) || by_id(a, b))
+  const asc = [...with_value].sort((a, b) => (cmp(a.v, b.v) ?? 0) || by_id(a, b))
+  const desc = [...with_value].sort((a, b) => -(cmp(a.v, b.v) ?? 0) || by_id(a, b))
 
   return {
     top: new Set(desc.slice(0, n).map((r) => r.id)),

@@ -11,10 +11,10 @@ import { parseFile } from 'music-metadata'
 import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import type { FileResult, ScanProgress, ScanReport } from '@shared/ipc'
-import { regroupAlbums, splitValues } from '@shared/library/albums'
+import { regroup_albums, split_values } from '@shared/library/albums'
 import { all_rows, first_row, run } from '@shared/library/database'
-import { createUpserter, type MediaCandidate, type TrackCandidate } from '@shared/library/identity'
-import { hashAudio, needsRehash } from './audio_hash.ts'
+import { create_upserter, type MediaCandidate, type TrackCandidate } from '@shared/library/identity'
+import { hash_audio, needs_rehash } from './audio_hash.ts'
 
 export type { FileOutcome, FileResult, ScanProgress, ScanReport } from '@shared/ipc'
 
@@ -25,11 +25,11 @@ export const AUDIO_EXTENSIONS = new Set([
 
 export interface ScanOptions {
   /** Directory names skipped wholesale. */
-  excludeDirs?: readonly string[]
+  exclude_dirs?: readonly string[]
   /** Skip hashing; much faster, but move detection stops working. For slow network mounts. */
   slow?: boolean
-  onProgress?: (p: ScanProgress) => void
-  onFile?: (r: FileResult) => void
+  on_progress?: (p: ScanProgress) => void
+  on_file?: (r: FileResult) => void
   signal?: { aborted: boolean }
 }
 
@@ -39,7 +39,7 @@ const DEFAULT_EXCLUDES = ['.git', 'node_modules', '@eaDir', '.Trash-1000', 'lost
 async function* walk(
   root: string,
   excludes: ReadonlySet<string>,
-  onDir?: (path: string) => void
+  on_dir?: (path: string) => void
 ): AsyncGenerator<string> {
   let entries
   try {
@@ -48,14 +48,14 @@ async function* walk(
     return // An unreadable directory is skipped, not fatal.
   }
 
-  onDir?.(root)
+  on_dir?.(root)
 
   for (const entry of entries) {
     const full = join(root, entry.name)
 
     if (entry.isDirectory()) {
       if (excludes.has(entry.name)) continue
-      yield* walk(full, excludes, onDir)
+      yield* walk(full, excludes, on_dir)
     } else if (entry.isFile()) {
       if (AUDIO_EXTENSIONS.has(extname(entry.name).toLowerCase())) yield full
     }
@@ -73,13 +73,13 @@ interface ReadFile {
   media: MediaCandidate
 }
 
-export async function scanRoots(
+export async function scan_roots(
   db: SqlDatabase,
   roots: readonly string[],
   opts: ScanOptions = {}
 ): Promise<ScanReport> {
   const started = Date.now()
-  const excludes = new Set([...DEFAULT_EXCLUDES, ...(opts.excludeDirs ?? [])])
+  const excludes = new Set([...DEFAULT_EXCLUDES, ...(opts.exclude_dirs ?? [])])
 
   const report: ScanReport = {
     filesFound: 0, filesRead: 0, filesSkipped: 0, tracksCreated: 0, tracksMatched: 0,
@@ -92,14 +92,14 @@ export async function scanRoots(
     for await (const file of walk(root, excludes)) {
       files.push(file)
       if (files.length % 500 === 0) {
-        opts.onProgress?.({ phase: 'walking', found: files.length, processed: 0 })
+        opts.on_progress?.({ phase: 'walking', found: files.length, processed: 0 })
       }
       if (opts.signal?.aborted) break
     }
   }
   report.filesFound = files.length
 
-  const upsert = createUpserter(db)
+  const upsert = create_upserter(db)
   const seen = new Set<string>()
   let batch: ReadFile[] = []
   let touched: string[] = []
@@ -118,24 +118,24 @@ export async function scanRoots(
         try {
           // Tags are not authoritative for X-Music's own statistics.
           const result = upsert(track, media, { statistics: false, metadata: true })
-          seen.add(result.mediaId)
+          seen.add(result.media_id)
           report.filesRead++
-          const detail = `matched by ${result.matchedBy === 'audio_hash' ? 'audio content' : result.matchedBy}`
+          const detail = `matched by ${result.matched_by === 'audio_hash' ? 'audio content' : result.matched_by}`
           if (result.created) {
             report.tracksCreated++
-            opts.onFile?.({ path, outcome: 'new', trackId: result.trackId })
+            opts.on_file?.({ path, outcome: 'new', trackId: result.track_id })
           } else if (result.moved) {
             report.movesDetected++
             report.tracksMatched++
-            opts.onFile?.({ path, outcome: 'moved', trackId: result.trackId, detail })
+            opts.on_file?.({ path, outcome: 'moved', trackId: result.track_id, detail })
           } else {
             report.tracksMatched++
-            opts.onFile?.({ path, outcome: 'matched', trackId: result.trackId, detail })
+            opts.on_file?.({ path, outcome: 'matched', trackId: result.track_id, detail })
           }
         } catch (err) {
           const message = (err as Error).message
           report.errors.push({ path, message })
-          opts.onFile?.({ path, outcome: 'error', detail: message })
+          opts.on_file?.({ path, outcome: 'error', detail: message })
         }
       }
     })
@@ -146,7 +146,7 @@ export async function scanRoots(
     const path = files[i]!
 
     if (i % 25 === 0) {
-      opts.onProgress?.({
+      opts.on_progress?.({
         phase: 'reading', found: files.length, processed: i, currentPath: path
       })
     }
@@ -160,11 +160,11 @@ export async function scanRoots(
       const hit = first_row<{ id: string; algo: string | null }>(db,
         'SELECT id, audio_hash_algo AS algo FROM media WHERE uri = ? AND subtrack_index = 0 AND mtime = ? AND filesize = ?',
         path, mtime, info.size)
-      if (hit && (opts.slow || !needsRehash(path, hit.algo))) {
+      if (hit && (opts.slow || !needs_rehash(path, hit.algo))) {
         touched.push(hit.id)
         seen.add(hit.id)
         report.filesSkipped++
-        opts.onFile?.({ path, outcome: 'unchanged' })
+        opts.on_file?.({ path, outcome: 'unchanged' })
         continue
       }
 
@@ -175,23 +175,23 @@ export async function scanRoots(
       const track: TrackCandidate = {
         title: c.title ?? null,
         album: c.album ?? null,
-        artist: first(splitValues(c.artists ?? c.artist)) ?? c.artist ?? null,
-        albumArtist: c.albumartist ?? null,
+        artist: first(split_values(c.artists ?? c.artist)) ?? c.artist ?? null,
+        album_artist: c.albumartist ?? null,
         year: c.year ?? null,
-        trackNumber: c.track?.no ?? null,
-        discNumber: c.disk?.no ?? null,
-        lengthMs: f.duration !== undefined ? Math.round(f.duration * 1000) : null,
+        track_number: c.track?.no ?? null,
+        disc_number: c.disk?.no ?? null,
+        length_ms: f.duration !== undefined ? Math.round(f.duration * 1000) : null,
         compilation: c.compilation ?? false,
         bpm: typeof c.bpm === 'number' ? Math.round(c.bpm) : null,
-        mbRecordingId: c.musicbrainz_recordingid ?? null,
-        mbReleaseId: c.musicbrainz_albumid ?? null,
+        mb_recording_id: c.musicbrainz_recordingid ?? null,
+        mb_release_id: c.musicbrainz_albumid ?? null,
         acoustid: c.acoustid_id ?? null,
         comment: c.comment?.map((x) => (typeof x === 'string' ? x : x.text)).join(' ') || null,
         sets: {
-          artist: splitValues(c.artists ?? c.artist),
+          artist: split_values(c.artists ?? c.artist),
           album_artist: c.albumartist ? [c.albumartist] : [],
-          genre: splitValues(c.genre),
-          grouping: splitValues(c.grouping)
+          genre: split_values(c.genre),
+          grouping: split_values(c.grouping)
         }
       }
 
@@ -201,7 +201,7 @@ export async function scanRoots(
         bitrate: f.bitrate !== undefined ? Math.round(f.bitrate / 1000) : null,
         samplerate: f.sampleRate ?? null,
         channels: f.numberOfChannels ?? null,
-        bitsPerSample: f.bitsPerSample ?? null,
+        bits_per_sample: f.bitsPerSample ?? null,
         filesize: info.size,
         mtime,
         present: true
@@ -209,9 +209,9 @@ export async function scanRoots(
 
       if (!opts.slow) {
         try {
-          const h = await hashAudio(path)
-          media.audioHash = h.hash
-          media.audioHashAlgo = h.algo
+          const h = await hash_audio(path)
+          media.audio_hash = h.hash
+          media.audio_hash_algo = h.algo
         } catch {
           // A file that cannot be hashed still gets indexed; it just loses move detection.
         }
@@ -221,7 +221,7 @@ export async function scanRoots(
     } catch (err) {
       const message = (err as Error).message
       report.errors.push({ path, message })
-      opts.onFile?.({ path, outcome: 'error', detail: message })
+      opts.on_file?.({ path, outcome: 'error', detail: message })
     } finally {
       if (batch.length + touched.length >= BATCH) write()
     }
@@ -231,23 +231,23 @@ export async function scanRoots(
 
   // Anything under a scanned root that was not seen is gone from disk. The media is flagged, never
   // deleted, so its track keeps its rating and history (DESIGN-SPEC §3.4).
-  opts.onProgress?.({ phase: 'finishing', found: files.length, processed: files.length })
+  opts.on_progress?.({ phase: 'finishing', found: files.length, processed: files.length })
 
   if (!opts.signal?.aborted && roots.length > 0) {
     in_transaction(db, () => {
       const candidates = all_rows<{ id: string; uri: string }>(db, `SELECT id, uri FROM media WHERE kind = 'file' AND present = 1`)
       for (const m of candidates) {
-        const underRoot = roots.some((r) => m.uri.startsWith(r.endsWith('/') ? r : `${r}/`))
-        if (underRoot && !seen.has(m.id)) {
+        const under_root = roots.some((r) => m.uri.startsWith(r.endsWith('/') ? r : `${r}/`))
+        if (under_root && !seen.has(m.id)) {
           run(db, 'UPDATE media SET present = 0 WHERE id = ?', m.id)
           report.markedMissing++
-          opts.onFile?.({ path: m.uri, outcome: 'missing', detail: 'no longer on disk' })
+          opts.on_file?.({ path: m.uri, outcome: 'missing', detail: 'no longer on disk' })
         }
       }
     })
   }
 
-  in_transaction(db, () => regroupAlbums(db))
+  in_transaction(db, () => regroup_albums(db))
 
   report.durationMs = Date.now() - started
   return report

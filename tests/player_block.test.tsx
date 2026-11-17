@@ -99,6 +99,6 @@ describe('player block', () => {
     player_status.set({ ...idle, state: 'playing', track })
 
     expect(player.playing).toBe(true)
-    expect(player.currentId).toBe('track-7')
+    expect(player.current_id).toBe('track-7')
   })
 })

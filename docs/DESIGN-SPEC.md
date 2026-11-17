@@ -261,8 +261,8 @@ is generic over it:
 | Consumer | How it stays generic |
 |---|---|
 | Filter compilers | Dispatch on `storage` (§3.5.2) and `type` (§3.3); no field is named in either compiler |
-| Column picker | Lists `fieldsWith('columnar')`; a new field appears without touching the widget |
-| Filter panes | Any `groupable` field is selectable in a pane — the dropdown is built from `fieldsWith('groupable')`, so a new field appears without touching the widget |
+| Column picker | Lists `fields_with('columnar')`; a new field appears without touching the widget |
+| Filter panes | Any `groupable` field is selectable in a pane — the dropdown is built from `fields_with('groupable')`, so a new field appears without touching the widget |
 | Sort | Any `sortable` field is a sort key, in any position of a multi-key sort (§4.3.1) |
 | Format strings | `{any_field}` resolves through the same descriptor lookup (§5.5) |
 | Tag round-trip | A user field with a `tags` mapping writes to files; without one it lives only in the database |
@@ -278,7 +278,7 @@ numeric id for every multi-value and extra field, and an expression for every co
 2. **Persisting user fields.** The catalogue is currently a TypeScript constant. User fields need a
    `fields` table, merged with the built-ins at startup, with numeric ids allocated from a range
    that can never collide with built-in ids.
-3. **A column picker** in the song-list header context menu, driven by `fieldsWith('columnar')`.
+3. **A column picker** in the song-list header context menu, driven by `fields_with('columnar')`.
 4. **Derived-field expressions.** `storage: 'computed'` exists and is used for `album`, but the
    expression is authored in TypeScript. Letting a user write one means a small safe expression
    language over other fields — deliberately not raw SQL, which would be an injection surface.
@@ -401,7 +401,7 @@ overwrite it.
 Two policies fall out of the sources being different:
 
 - **The importer is authoritative for statistics**; the scanner is not. A tag must never overwrite
-  X-Music's own rating or play count, so `scanRoots` passes `statistics: false`.
+  X-Music's own rating or play count, so `scan_roots` passes `statistics: false`.
 - **Multi-value fields are replaced, not appended**, or a second import doubles every genre.
 
 Play history needed a uniqueness constraint (`UNIQUE(track_id, at, kind)`), without which
@@ -625,7 +625,7 @@ A smart playlist = filter AST + sort spec + optional limit + refresh policy.
 
 **The mechanism exists today.** The library store holds an ordered list of sort keys; the X-Libs
 table's headers append one on shift-click rather than replacing it, flip it on a second click and
-drop it on a third, and show each key's position in the order. `compileFilter` emits every key into the `ORDER BY`, with NULLs last in both
+drop it on a third, and show each key's position in the order. `compile_filter` emits every key into the `ORDER BY`, with NULLs last in both
 directions. Sorting by album, then disc, then track is the default view.
 
 What follows is the part still to build.
@@ -679,7 +679,7 @@ expressible without a second concept, and a grouped view saves to a playlist ide
 
 #### 4.3.1.4 What is needed
 
-1. Per-key `nulls: 'first' | 'last'` in `SortKey`, honoured by `compileFilter` and `evaluate`.
+1. Per-key `nulls: 'first' | 'last'` in `SortKey`, honoured by `compile_filter` and `evaluate`.
 2. A sort editor component driven by `SortState`, with drag reordering.
 3. `saveAsSmartPlaylist(filter, sort, limit, name)` plus its IPC channel and dialog.
 4. Tests: multi-key ordering against real data, NULL placement in both directions, and a round-trip
@@ -1029,7 +1029,7 @@ gains its strongest signal (§3.5.0). The scanner already reads the tag; nothing
 
 1. A `picard` setting: binary path, plus whether to rescan the affected paths on return.
 2. A "Tag with Picard" action on a track selection and on an album.
-3. A targeted rescan — `scanRoots` already takes a root list, so scanning specific paths is a small
+3. A targeted rescan — `scan_roots` already takes a root list, so scanning specific paths is a small
    generalization.
 4. A clear warning in the hand-off dialog that Picard writes to files.
 
@@ -1109,7 +1109,7 @@ Decisions worth recording:
   abandoned after at least three seconds counts as a skip; less than three seconds counts as
   neither, because changing your mind before it starts is not a skip.
 - **A track settles exactly once.** The first version double-counted skips, because both `next()`
-  and `playTrack()` recorded one. Play, skip, or neither — never two.
+  and `play_track()` recorded one. Play, skip, or neither — never two.
 - **Seeking backwards cannot fake a second play**: the threshold is measured against the furthest
   point reached, not the current position.
 - **The best source that is actually there wins.** Existence is checked rather than trusted: a
@@ -1213,7 +1213,7 @@ Still to do:
 
 - **Filesystem watching** (`chokidar` or `fs.watch`) for live updates; today a rescan is manual.
 - **Include/exclude globs** per root; only a default directory exclusion list exists.
-- **The `slow` flag** for network mounts is in the schema and honoured by `scanRoots`, but is not
+- **The `slow` flag** for network mounts is in the schema and honoured by `scan_roots`, but is not
   yet settable in the UI.
 - Running the scan in a **worker thread**. It currently runs on the main thread with batched
   transactions, which is acceptable at the §12 target but will block the UI on a very large first
@@ -1276,7 +1276,7 @@ the same way the scan does (§9.1) rather than a single summary.
 gap the user has to be able to close: **select several tracks and merge them into one, choosing
 which value to keep wherever they disagree.**
 
-`src/shared/library/merge.ts`, with `mergePreview`, `mergeTracks` and `unmerge`. Multi-select in the
+`src/shared/library/merge.ts`, with `merge_preview`, `merge_tracks` and `unmerge`. Multi-select in the
 song list, a merge dialog rendering the preview, and 20 tests including a full round-trip assertion
 that unmerge restores tracks, media, statistics, history, sets, extras and playlist positions
 exactly.
@@ -1322,7 +1322,7 @@ Escape, so no caller can forget.
 
 #### 9.4.2 The preview is the contract
 
-`mergePreview(ids)` returns, for every field, the distinct values across the sources and which
+`merge_preview(ids)` returns, for every field, the distinct values across the sources and which
 track each came from — so the UI is a rendering of that structure rather than its own logic, and the
 same preview can be unit-tested without a DOM.
 
@@ -1347,7 +1347,7 @@ same preview can be unit-tested without a DOM.
 A merge deletes rows, which makes it the most destructive operation in the app that does not touch a
 file. It must be reversible: the whole pre-merge state of every participating track, its plays
 and playlist places included, is written to `merge_journal` under one batch id, and
-`unmerge(batchId)` restores it. **This is a prerequisite, not a follow-up** — shipping merge without
+`unmerge(batch_id)` restores it. **This is a prerequisite, not a follow-up** — shipping merge without
 undo would be shipping a way to quietly lose ratings and history.
 
 #### 9.4.4 Decisions taken while building it

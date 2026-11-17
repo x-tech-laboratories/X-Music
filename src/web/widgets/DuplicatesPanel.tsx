@@ -13,7 +13,7 @@ import { is_number_in } from '@x-tech-laboratories/x-libs/web/prefs'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
-import { ratingToStars } from '@shared/fields'
+import { rating_to_stars } from '@shared/fields'
 import type { DuplicateGroup, DuplicateMember, DuplicateReason, MergeResult } from '@shared/ipc'
 import { ipc } from '../lib/ipc.ts'
 import { library } from '../stores/library.ts'
@@ -58,7 +58,7 @@ const MEMBER_COLUMNS: TableColumn<DuplicateMember>[] = [
   { label: 'Artist', sort: (member) => member.artist, cell: (member) => member.artist ?? '—' },
   { label: 'Album', sort: (member) => member.album, cell: (member) => member.album ?? '—' },
   { label: 'Length', class: 'number', sort: (member) => member.lengthMs, cell: (member) => format_clock(member.lengthMs, { empty: '—' }) },
-  { label: 'Rating', sort: (member) => member.rating, cell: (member) => <Rating value={ratingToStars(member.rating)} /> },
+  { label: 'Rating', sort: (member) => member.rating, cell: (member) => <Rating value={rating_to_stars(member.rating)} /> },
   { label: 'Plays', class: 'number', sort: (member) => member.playCount, cell: (member) => member.playCount.toLocaleString() },
   { label: 'Files', class: 'number', sort: (member) => member.mediaCount, cell: (member) => member.mediaCount.toLocaleString() },
   { label: 'Formats', sort: (member) => member.codecs, cell: (member) => member.codecs || '—' }
@@ -193,7 +193,7 @@ export function DuplicatesPanel() {
       {reviewing && (
         <MergeView
           ids={reviewing}
-          onclose={(merged) => {
+          on_close={(merged) => {
             set_reviewing(null)
             if (merged) {
               void library.refresh()

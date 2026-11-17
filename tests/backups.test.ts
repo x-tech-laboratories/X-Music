@@ -8,9 +8,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { take_staged_restore } from '@x-tech-laboratories/x-libs/server/sqlite_backups'
 
-import { libraryBackups, openLibraryBackedUp } from '@main/backups'
-import { legacyLibrary } from './legacy.ts'
-import { bareDb } from './sqlite.ts'
+import { library_backups, open_library_backed_up } from '@main/backups'
+import { legacy_library } from './legacy.ts'
+import { bare_db } from './sqlite.ts'
 
 let folder: string
 let path: string
@@ -29,7 +29,7 @@ function library(): DatabaseSync {
 describe('library backups', () => {
   it('takes a backup into backups beside the database', async () => {
     const db = library()
-    const backups = libraryBackups(() => db, path, () => {})
+    const backups = library_backups(() => db, path, () => {})
 
     const backup = await backups.methods.create_backup()
     backups.stop()
@@ -42,7 +42,7 @@ describe('library backups', () => {
   it('stages a restore, restarts, and puts the backup in place before the library opens again', async () => {
     let db = library()
     let restarts = 0
-    const backups = libraryBackups(() => db, path, () => restarts++)
+    const backups = library_backups(() => db, path, () => restarts++)
     const backup = await backups.methods.create_backup()
     db.exec("UPDATE tracks SET title = 'So What'")
 
@@ -60,11 +60,11 @@ describe('library backups', () => {
 
 describe('opening the library', () => {
   it('backs up an old library before upgrading it, and the backup keeps the old schema', async () => {
-    legacyLibrary(path).close()
-    const db = bareDb(path)
-    const backups = libraryBackups(() => db, path, () => {})
+    legacy_library(path).close()
+    const db = bare_db(path)
+    const backups = library_backups(() => db, path, () => {})
 
-    const { backup, report } = await openLibraryBackedUp(db, backups)
+    const { backup, report } = await open_library_backed_up(db, backups)
 
     expect(backup).not.toBeNull()
     expect(report).toEqual({ nulled: [], reused: [] })
@@ -78,11 +78,11 @@ describe('opening the library', () => {
   })
 
   it('takes no backup of a library that is already current or new', async () => {
-    const db = bareDb(path)
-    const backups = libraryBackups(() => db, path, () => {})
+    const db = bare_db(path)
+    const backups = library_backups(() => db, path, () => {})
 
-    expect(await openLibraryBackedUp(db, backups)).toEqual({ backup: null, report: null })
-    expect(await openLibraryBackedUp(db, backups)).toEqual({ backup: null, report: null })
+    expect(await open_library_backed_up(db, backups)).toEqual({ backup: null, report: null })
+    expect(await open_library_backed_up(db, backups)).toEqual({ backup: null, report: null })
     expect(existsSync(join(folder, 'backups')) ? readdirSync(join(folder, 'backups')) : []).toEqual([])
     db.close()
   })

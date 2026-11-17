@@ -3,7 +3,7 @@
 
 import type { IndexedTrack } from '@shared/query/evaluate'
 
-export type CorpusTrack = IndexedTrack & { albumName: string | null }
+export type CorpusTrack = IndexedTrack & { album_name: string | null }
 
 export interface Corpus {
   tracks: CorpusTrack[]
@@ -29,23 +29,23 @@ export function rng(seed: number): () => number {
 
 export const FIXED_NOW = 1_750_000_000_000
 
-export function makeCorpus(n: number, seed = 42): Corpus {
+export function make_corpus(n: number, seed = 42): Corpus {
   const r = rng(seed)
   const pick = <T>(xs: readonly T[]): T => xs[Math.floor(r() * xs.length)]!
   const maybe = <T>(v: T, p = 0.15): T | null => (r() < p ? null : v)
 
   const tracks: CorpusTrack[] = []
   for (let i = 1; i <= n; i++) {
-    const albumName = maybe(pick(ALBUMS))
-    const genreCount = Math.floor(r() * 3)
-    const moodCount = Math.floor(r() * 2)
+    const album_name = maybe(pick(ALBUMS))
+    const genre_count = Math.floor(r() * 3)
+    const mood_count = Math.floor(r() * 2)
 
     tracks.push({
       // Zero-padded, so ids sort as the tracks were made and ties in top and bottom stay readable.
       id: `track-${String(i).padStart(5, '0')}`,
       scalars: {
         title: maybe(`Track ${i}`, 0.05),
-        album: albumName,
+        album: album_name,
         year: maybe(1950 + Math.floor(r() * 75)),
         track_number: maybe(1 + Math.floor(r() * 20), 0.05),
         disc_number: maybe(1 + Math.floor(r() * 2), 0.4),
@@ -77,16 +77,16 @@ export function makeCorpus(n: number, seed = 42): Corpus {
       sets: {
         1: [pick(ARTISTS)],                                        // artist
         2: r() < 0.7 ? [pick(ARTISTS)] : [],                       // album_artist
-        4: Array.from({ length: genreCount }, () => pick(GENRES)) // genre
+        4: Array.from({ length: genre_count }, () => pick(GENRES)) // genre
              .filter((v, j, a) => a.indexOf(v) === j),
-        6: Array.from({ length: moodCount }, () => pick(MOODS))    // mood
+        6: Array.from({ length: mood_count }, () => pick(MOODS))    // mood
              .filter((v, j, a) => a.indexOf(v) === j),
         7: r() < 0.2 ? ['essential'] : []                          // tags
       },
       extras: {
         20: r() < 0.3 ? `comment ${i}` : null                      // comment
       },
-      albumName
+      album_name
     })
   }
 

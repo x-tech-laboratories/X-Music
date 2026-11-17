@@ -8,9 +8,9 @@
 import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import type { ImportReport } from '../ipc.ts'
-import { regroupAlbums } from '../library/albums.ts'
+import { regroup_albums } from '../library/albums.ts'
 import { first_row, new_id, run } from '../library/database.ts'
-import { createUpserter, type TrackCandidate } from '../library/identity.ts'
+import { create_upserter, type TrackCandidate } from '../library/identity.ts'
 import type { GmbrcData } from './gmbrc.ts'
 
 export type { ImportReport }
@@ -25,7 +25,7 @@ export interface ImportOptions {
 }
 
 /** gmusicbrowser timestamps are unix seconds; X-Music stores milliseconds. */
-const toMs = (secs: number | undefined): number | null =>
+const to_ms = (secs: number | undefined): number | null =>
   secs === undefined || secs <= 0 ? null : secs * 1000
 
 // A file's path from gmusicbrowser's folder and file name, exactly as Node's POSIX join gives it, so re-imports match.
@@ -45,10 +45,10 @@ export function join_path(folder: string, file: string): string {
   return `${rooted ? '/' : ''}${parts.join('/')}${trailing ? '/' : ''}`
 }
 
-export function importGmbrc(database: SqlDatabase, data: GmbrcData, opts: ImportOptions = {}): ImportReport {
-  const withStats = opts.statistics ?? true
-  const withLabels = opts.labels ?? true
-  const withPlaylists = opts.playlists ?? true
+export function import_gmbrc(database: SqlDatabase, data: GmbrcData, opts: ImportOptions = {}): ImportReport {
+  const with_stats = opts.statistics ?? true
+  const with_labels = opts.labels ?? true
+  const with_playlists = opts.playlists ?? true
 
   const report: ImportReport = {
     songsRead: data.songs.length,
@@ -59,16 +59,16 @@ export function importGmbrc(database: SqlDatabase, data: GmbrcData, opts: Import
     missingFlagged: 0,
     playHistoryRows: 0,
     playlistsCreated: 0,
-    savedFiltersFound: data.savedFilters.length,
-    unmappedColumns: data.unmappedColumns,
+    savedFiltersFound: data.saved_filters.length,
+    unmappedColumns: data.unmapped_columns,
     notes: []
   }
 
   const now = Date.now()
-  const upsert = createUpserter(database)
+  const upsert = create_upserter(database)
 
   /** gmusicbrowser song id to X-Music track id, so SavedLists can be resolved afterwards. */
-  const trackByGmbId = new Map<number, string>()
+  const track_by_gmb_id = new Map<number, string>()
 
   in_transaction(database, () => {
     for (const song of data.songs) {
@@ -76,26 +76,26 @@ export function importGmbrc(database: SqlDatabase, data: GmbrcData, opts: Import
         title: song.title ?? null,
         album: song.album ?? null,
         artist: song.artist ?? null,
-        albumArtist: song.albumArtist ?? null,
+        album_artist: song.album_artist ?? null,
         year: song.year ?? null,
-        trackNumber: song.track ?? null,
-        discNumber: song.disc ?? null,
-        lengthMs: song.length !== undefined ? song.length * 1000 : null,
+        track_number: song.track ?? null,
+        disc_number: song.disc ?? null,
+        length_ms: song.length !== undefined ? song.length * 1000 : null,
         compilation: song.compilation ?? false,
         bpm: null,
-        rating: withStats ? song.rating ?? null : null,
-        playCount: withStats ? song.playCount ?? 0 : 0,
-        skipCount: withStats ? song.skipCount ?? 0 : 0,
-        lastPlayed: withStats ? toMs(song.lastPlay) : null,
-        lastSkipped: withStats ? toMs(song.lastSkip) : null,
-        rgTrackGain: song.rgTrackGain ?? null,
-        rgAlbumGain: song.rgAlbumGain ?? null,
-        added: toMs(song.added) ?? now,
+        rating: with_stats ? song.rating ?? null : null,
+        play_count: with_stats ? song.play_count ?? 0 : 0,
+        skip_count: with_stats ? song.skip_count ?? 0 : 0,
+        last_played: with_stats ? to_ms(song.last_play) : null,
+        last_skipped: with_stats ? to_ms(song.last_skip) : null,
+        rg_track_gain: song.rg_track_gain ?? null,
+        rg_album_gain: song.rg_album_gain ?? null,
+        added: to_ms(song.added) ?? now,
         comment: song.comment ?? null,
         sets: {
           artist: song.artist ? [song.artist] : [],
-          album_artist: song.albumArtist ? [song.albumArtist] : [],
-          ...(withLabels
+          album_artist: song.album_artist ? [song.album_artist] : [],
+          ...(with_labels
             ? { genre: song.genre, grouping: song.grouping, tags: song.label }
             : {})
         }
@@ -103,7 +103,7 @@ export function importGmbrc(database: SqlDatabase, data: GmbrcData, opts: Import
 
       // A gmusicbrowser entry always names a file; without one there is nothing to attach to.
       if (!song.path || !song.file) {
-        report.notes.push(`Skipped song ${song.gmbId}: no file path recorded.`)
+        report.notes.push(`Skipped song ${song.gmb_id}: no file path recorded.`)
         continue
       }
 
@@ -111,57 +111,57 @@ export function importGmbrc(database: SqlDatabase, data: GmbrcData, opts: Import
         uri: join_path(song.path, song.file),
         codec: song.filetype?.split(/\s+/)[0] ?? null,
         bitrate: song.bitrate ?? null,
-        samplerate: song.sampleRate ?? null,
+        samplerate: song.sample_rate ?? null,
         channels: song.channels ?? null,
         filesize: song.size ?? null,
-        mtime: toMs(song.modif),
+        mtime: to_ms(song.modif),
         present: !song.missing
-      }, { statistics: withStats, metadata: true })
+      }, { statistics: with_stats, metadata: true })
 
       if (result.created) report.tracksCreated++
       else report.tracksUpdated++
-      if (result.matchedBy === 'uri' || result.matchedBy === 'audio_hash') report.mediaMatched++
+      if (result.matched_by === 'uri' || result.matched_by === 'audio_hash') report.mediaMatched++
       else report.mediaCreated++
       if (song.missing) report.missingFlagged++
 
-      trackByGmbId.set(song.gmbId, result.trackId)
+      track_by_gmb_id.set(song.gmb_id, result.track_id)
 
-      if (withStats) {
-        for (const at of song.playHistory) {
-          run(database, 'INSERT OR IGNORE INTO play_history (id, track_id, at, kind) VALUES (?, ?, ?, 0)', new_id(), result.trackId, at * 1000)
+      if (with_stats) {
+        for (const at of song.play_history) {
+          run(database, 'INSERT OR IGNORE INTO play_history (id, track_id, at, kind) VALUES (?, ?, ?, 0)', new_id(), result.track_id, at * 1000)
           report.playHistoryRows++
         }
       }
     }
 
-    if (withPlaylists) {
-      for (const list of data.savedLists) {
+    if (with_playlists) {
+      for (const list of data.saved_lists) {
         const existing = first_row<{ id: string }>(database, "SELECT id FROM playlists WHERE name = ? AND kind = 'static'", list.name)
-        let playlistId: string
+        let playlist_id: string
         if (existing) {
-          playlistId = existing.id
-          run(database, 'DELETE FROM playlist_tracks WHERE playlist_id = ?', playlistId)
+          playlist_id = existing.id
+          run(database, 'DELETE FROM playlist_tracks WHERE playlist_id = ?', playlist_id)
         } else {
-          playlistId = new_id()
-          run(database, "INSERT INTO playlists (id, name, kind, created, modified) VALUES (?, ?, 'static', ?, ?)", playlistId, list.name, now, now)
+          playlist_id = new_id()
+          run(database, "INSERT INTO playlists (id, name, kind, created, modified) VALUES (?, ?, 'static', ?, ?)", playlist_id, list.name, now, now)
         }
         let position = 0
-        for (const gmbId of list.gmbIds) {
-          const trackId = trackByGmbId.get(gmbId)
-          if (trackId !== undefined) {
-            run(database, 'INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)', playlistId, trackId, position++)
+        for (const gmb_id of list.gmb_ids) {
+          const track_id = track_by_gmb_id.get(gmb_id)
+          if (track_id !== undefined) {
+            run(database, 'INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)', playlist_id, track_id, position++)
           }
         }
         report.playlistsCreated++
       }
     }
 
-    regroupAlbums(database)
+    regroup_albums(database)
   })
 
-  if (data.savedFilters.length > 0) {
+  if (data.saved_filters.length > 0) {
     report.notes.push(
-      `${data.savedFilters.length} saved filters found but not translated. gmusicbrowser filter ` +
+      `${data.saved_filters.length} saved filters found but not translated. gmusicbrowser filter ` +
       'strings map onto the X-Music filter AST, which is a separate import step (DESIGN-SPEC 9.3).'
     )
   }
@@ -171,8 +171,8 @@ export function importGmbrc(database: SqlDatabase, data: GmbrcData, opts: Import
       'imported with the media marked not present, so ratings and history are preserved.'
     )
   }
-  if (data.unmappedColumns.length > 0) {
-    report.notes.push(`Unmapped gmbrc columns ignored: ${data.unmappedColumns.join(', ')}`)
+  if (data.unmapped_columns.length > 0) {
+    report.notes.push(`Unmapped gmbrc columns ignored: ${data.unmapped_columns.join(', ')}`)
   }
 
   return report

@@ -14,7 +14,7 @@ import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { MergeEntry, TrackSnapshot, TrackState, Version, VersionKind } from '@shared/ipc'
-import { BUILTIN_FIELDS, ratingToStars } from '@shared/fields'
+import { BUILTIN_FIELDS, rating_to_stars } from '@shared/fields'
 import { library } from '../stores/library.ts'
 import { undo_merge } from '../widgets/MergeView.tsx'
 
@@ -41,9 +41,9 @@ const when = (milliseconds: number): string => new Date(milliseconds).toLocaleSt
 
 const failure = (error: unknown): string => clean_error_message(describe_error(error))
 
-const ARTIST_FIELD = BUILTIN_FIELDS.find((field) => field.id === 'artist')!.fieldId!
+const ARTIST_FIELD = BUILTIN_FIELDS.find((field) => field.id === 'artist')!.field_id!
 
-const field_names = new Map(BUILTIN_FIELDS.filter((field) => field.fieldId !== undefined).map((field) => [field.fieldId!, field.name]))
+const field_names = new Map(BUILTIN_FIELDS.filter((field) => field.field_id !== undefined).map((field) => [field.field_id!, field.name]))
 
 export function track_name(snapshot: TrackSnapshot): string {
   return snapshot.track.title ?? 'Untitled track'
@@ -73,7 +73,7 @@ const shown_columns: [column: keyof TrackState, name: string, text: (value: neve
   ['track_number', 'Track number', (value: number | null) => (value === null ? '' : String(value))],
   ['disc_number', 'Disc number', (value: number | null) => (value === null ? '' : String(value))],
   ['length_ms', 'Length', (value: number | null) => format_clock(value, '')],
-  ['rating', 'Rating', (value: number | null) => (value === null ? '' : plural(ratingToStars(value)!, 'star'))],
+  ['rating', 'Rating', (value: number | null) => (value === null ? '' : plural(rating_to_stars(value)!, 'star'))],
   ['loved', 'Loved', yes_no],
   ['compilation', 'Compilation', yes_no],
   ['bpm', 'BPM', (value: number | null) => (value === null ? '' : String(value))],

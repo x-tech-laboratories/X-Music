@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
-import { legacyLibrary } from './legacy.ts'
+import { legacy_library } from './legacy.ts'
 
 const script = join(process.cwd(), 'scripts/dry_run_upgrade.ts')
 const digest = (path: string): string => createHash('sha256').update(readFileSync(path)).digest('hex')
@@ -18,7 +18,7 @@ describe('upgrade dry run', () => {
   it('upgrades a copy, reports on it and leaves the library it was given untouched', () => {
     const folder = mkdtempSync(join(tmpdir(), 'x-music-dry-run-'))
     const library = join(folder, 'library.db')
-    const db = legacyLibrary(library)
+    const db = legacy_library(library)
     db.exec('PRAGMA foreign_keys = OFF')
     db.exec(`UPDATE tracks SET album_id = 99 WHERE id = 2;
              INSERT INTO tracks (id, title, added, modified) VALUES (9, 'Unrelated new song', 20000, 20000);`)
@@ -46,7 +46,7 @@ describe('upgrade dry run', () => {
   it('says why it cannot upgrade, and stops, when a row names nothing', () => {
     const folder = mkdtempSync(join(tmpdir(), 'x-music-dry-run-'))
     const library = join(folder, 'library.db')
-    const db = legacyLibrary(library)
+    const db = legacy_library(library)
     db.exec('PRAGMA foreign_keys = OFF')
     db.exec("INSERT INTO media (id, track_id, kind, uri, added) VALUES (99, 999, 'file', '/music/orphan.flac', 0)")
     db.close()

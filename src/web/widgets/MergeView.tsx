@@ -17,7 +17,7 @@ import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge'
-import { ratingToStars } from '@shared/fields'
+import { rating_to_stars } from '@shared/fields'
 import { ipc } from '../lib/ipc.ts'
 import { library } from '../stores/library.ts'
 
@@ -82,7 +82,7 @@ export async function undo_merge(batch_id: string, on_undone?: () => void): Prom
 interface MergeViewProps {
   ids: TrackId[]
   // Closes the view, saying whether the tracks were merged.
-  onclose?: (merged: boolean) => void
+  on_close?: (merged: boolean) => void
   // Called after the merge toast's Undo has taken the merge back.
   on_undone?: () => void
 }
@@ -129,7 +129,7 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
         <Tiles>
           <Tile label="Plays" value={preview.statistics.playCount} value_first />
           <Tile label="Skips" value={preview.statistics.skipCount} value_first />
-          <Tile label="Rating" value={<Rating value={ratingToStars(preview.statistics.rating)} />} value_first />
+          <Tile label="Rating" value={<Rating value={rating_to_stars(preview.statistics.rating)} />} value_first />
         </Tiles>
       </Section>
 
@@ -151,7 +151,7 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
   )
 }
 
-export function MergeView({ ids, onclose, on_undone }: MergeViewProps) {
+export function MergeView({ ids, on_close, on_undone }: MergeViewProps) {
   const loaded = use_resource(() => ipc('get_merge_preview', ids), [])
   const preview = loaded.data
   // The source that survives, the preview's proposal until one is picked.
@@ -176,7 +176,7 @@ export function MergeView({ ids, onclose, on_undone }: MergeViewProps) {
         duration_in_milliseconds: 10_000,
         action: { text: 'Undo', run: () => void undo_merge(result.batchId, on_undone) }
       })
-      onclose?.(true)
+      on_close?.(true)
     } catch (error) {
       toast(`Could not merge: ${failure(error)}`, { tone: 'bad' })
       set_busy(false)
@@ -200,7 +200,7 @@ export function MergeView({ ids, onclose, on_undone }: MergeViewProps) {
       subtitle={preview && (conflicts > 0
         ? `${plural(conflicts, 'field')} disagree; pick which value to keep`
         : 'Every field agrees; merging keeps all files under one track')}
-      on_close={() => onclose?.(false)}
+      on_close={() => on_close?.(false)}
       actions={actions}
     >
       <Loaded resource={loaded} lines={6}>

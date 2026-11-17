@@ -2,31 +2,31 @@
 // two genuinely different recordings in the same proposal.
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { findDuplicates } from '@shared/library/duplicates'
+import { find_duplicates } from '@shared/library/duplicates'
 import { field } from '@shared/fields'
 import { new_id } from '@shared/library/database'
-import { freshDb, type TestDb } from './sqlite.ts'
+import { fresh_db, type TestDb } from './sqlite.ts'
 
 let db: TestDb
 
-function makeTrack(o: {
-  title?: string; artist?: string; lengthMs?: number | null
-  identityKey?: string; mbid?: string; album?: string
+function make_track(o: {
+  title?: string; artist?: string; length_ms?: number | null
+  identity_key?: string; mbid?: string; album?: string
 } = {}): string {
-  let albumId: string | null = null
+  let album_id: string | null = null
   if (o.album) {
     db.prepare('INSERT OR IGNORE INTO albums (id, match_key, name, added) VALUES (?, ?, ?, 0)')
       .run(new_id(), o.album, o.album)
-    albumId = (db.prepare('SELECT id FROM albums WHERE match_key = ?').get(o.album) as { id: string }).id
+    album_id = (db.prepare('SELECT id FROM albums WHERE match_key = ?').get(o.album) as { id: string }).id
   }
 
   const id = new_id()
   db.prepare(`INSERT INTO tracks (id, title, album_id, length_ms, identity_key, mb_recording_id,
                                   added, modified) VALUES (?, ?, ?, ?, ?, ?, 0, 0)`)
-    .run(id, o.title ?? 'Song', albumId, o.lengthMs ?? 200_000, o.identityKey ?? null, o.mbid ?? null)
+    .run(id, o.title ?? 'Song', album_id, o.length_ms ?? 200_000, o.identity_key ?? null, o.mbid ?? null)
 
   if (o.artist) {
-    const fid = field('artist').fieldId!
+    const fid = field('artist').field_id!
     db.prepare('INSERT OR IGNORE INTO values_ (id, field_id, value) VALUES (?, ?, ?)').run(new_id(), fid, o.artist)
     const vid = (db.prepare('SELECT id FROM values_ WHERE field_id = ? AND value = ?')
       .get(fid, o.artist) as { id: string }).id
@@ -36,29 +36,29 @@ function makeTrack(o: {
   return id
 }
 
-const addMedia = (trackId: string, uri: string, hash?: string): void => {
+const add_media = (track_id: string, uri: string, hash?: string): void => {
   db.prepare(`INSERT INTO media (id, track_id, kind, uri, audio_hash, present, added)
               VALUES (?, ?, 'file', ?, ?, 1, 0)`)
-    .run(new_id(), trackId, uri, hash ? Buffer.from(hash, 'hex') : null)
+    .run(new_id(), track_id, uri, hash ? Buffer.from(hash, 'hex') : null)
 }
 
-beforeEach(() => { db = freshDb() })
+beforeEach(() => { db = fresh_db() })
 afterEach(() => db.close())
 
 describe('duplicate detection', () => {
   it('finds nothing in a clean library', () => {
-    makeTrack({ title: 'A', artist: 'X' })
-    makeTrack({ title: 'B', artist: 'Y' })
-    expect(findDuplicates(db)).toEqual([])
+    make_track({ title: 'A', artist: 'X' })
+    make_track({ title: 'B', artist: 'Y' })
+    expect(find_duplicates(db)).toEqual([])
   })
 
   it('treats identical audio as certain', () => {
-    const a = makeTrack({ title: 'One' })
-    const b = makeTrack({ title: 'Uno' })
-    addMedia(a, '/a.flac', 'aa'.repeat(16))
-    addMedia(b, '/b.flac', 'aa'.repeat(16))
+    const a = make_track({ title: 'One' })
+    const b = make_track({ title: 'Uno' })
+    add_media(a, '/a.flac', 'aa'.repeat(16))
+    add_media(b, '/b.flac', 'aa'.repeat(16))
 
-    const groups = findDuplicates(db)
+    const groups = find_duplicates(db)
     expect(groups).toHaveLength(1)
     expect(groups[0]!.reason).toBe('audio_hash')
     expect(groups[0]!.confidence).toBe('certain')
@@ -66,27 +66,27 @@ describe('duplicate detection', () => {
   })
 
   it('treats a shared MusicBrainz recording id as certain', () => {
-    const a = makeTrack({ mbid: 'rec-1' })
-    const b = makeTrack({ mbid: 'rec-1' })
-    const groups = findDuplicates(db, { reasons: ['mb_recording_id'] })
+    const a = make_track({ mbid: 'rec-1' })
+    const b = make_track({ mbid: 'rec-1' })
+    const groups = find_duplicates(db, { reasons: ['mb_recording_id'] })
     expect(groups[0]!.confidence).toBe('certain')
     expect(groups[0]!.members).toHaveLength(2)
     expect([a, b]).toHaveLength(2)
   })
 
   it('treats matching normalised tags as likely', () => {
-    makeTrack({ identityKey: 'k1' })
-    makeTrack({ identityKey: 'k1' })
-    const groups = findDuplicates(db, { reasons: ['tags'] })
+    make_track({ identity_key: 'k1' })
+    make_track({ identity_key: 'k1' })
+    const groups = find_duplicates(db, { reasons: ['tags'] })
     expect(groups[0]!.reason).toBe('tags')
     expect(groups[0]!.confidence).toBe('likely')
   })
 
   it('matches on artist and title across albums, as only possible', () => {
-    makeTrack({ title: 'So What', artist: 'Miles Davis', album: 'Kind of Blue', lengthMs: 560_000 })
-    makeTrack({ title: 'so what', artist: 'miles davis', album: 'Greatest Hits', lengthMs: 561_000 })
+    make_track({ title: 'So What', artist: 'Miles Davis', album: 'Kind of Blue', length_ms: 560_000 })
+    make_track({ title: 'so what', artist: 'miles davis', album: 'Greatest Hits', length_ms: 561_000 })
 
-    const groups = findDuplicates(db, { reasons: ['fuzzy'] })
+    const groups = find_duplicates(db, { reasons: ['fuzzy'] })
     expect(groups).toHaveLength(1)
     expect(groups[0]!.confidence).toBe('possible')
     expect(groups[0]!.explanation).toMatch(/different albums/)
@@ -94,72 +94,72 @@ describe('duplicate detection', () => {
 
   it('keeps meaningfully different bracketed parts apart', () => {
     // Stripping all bracketed text would call these one recording, which is a wrong merge.
-    makeTrack({ title: 'District Dash [Act 1]', artist: 'Score', lengthMs: 3_648_000 })
-    makeTrack({ title: 'District Dash [Act 2]', artist: 'Score', lengthMs: 3_648_000 })
-    expect(findDuplicates(db, { reasons: ['fuzzy'] })).toEqual([])
+    make_track({ title: 'District Dash [Act 1]', artist: 'Score', length_ms: 3_648_000 })
+    make_track({ title: 'District Dash [Act 2]', artist: 'Score', length_ms: 3_648_000 })
+    expect(find_duplicates(db, { reasons: ['fuzzy'] })).toEqual([])
   })
 
   it('still ignores boilerplate suffixes that carry no meaning', () => {
-    makeTrack({ title: 'Runaways', artist: 'MegaEnx', lengthMs: 208_000 })
-    makeTrack({ title: 'Runaways [No Copyright Music]', artist: 'MegaEnx', lengthMs: 208_500 })
-    expect(findDuplicates(db, { reasons: ['fuzzy'] })).toHaveLength(1)
+    make_track({ title: 'Runaways', artist: 'MegaEnx', length_ms: 208_000 })
+    make_track({ title: 'Runaways [No Copyright Music]', artist: 'MegaEnx', length_ms: 208_500 })
+    expect(find_duplicates(db, { reasons: ['fuzzy'] })).toHaveLength(1)
   })
 
   it('leaves fuzzy matching out unless it is asked for', () => {
-    makeTrack({ title: 'Same', artist: 'A', lengthMs: 200_000 })
-    makeTrack({ title: 'Same', artist: 'A', lengthMs: 200_000 })
-    expect(findDuplicates(db)).toEqual([])
-    expect(findDuplicates(db, { reasons: ['fuzzy'] })).toHaveLength(1)
+    make_track({ title: 'Same', artist: 'A', length_ms: 200_000 })
+    make_track({ title: 'Same', artist: 'A', length_ms: 200_000 })
+    expect(find_duplicates(db)).toEqual([])
+    expect(find_duplicates(db, { reasons: ['fuzzy'] })).toHaveLength(1)
   })
 
   it('ignores diacritics and featured-artist suffixes', () => {
-    makeTrack({ title: 'Cafe (feat. Someone)', artist: 'Bjork', lengthMs: 200_000 })
-    makeTrack({ title: 'Café', artist: 'Björk', lengthMs: 200_500 })
-    expect(findDuplicates(db, { reasons: ['fuzzy'] })).toHaveLength(1)
+    make_track({ title: 'Cafe (feat. Someone)', artist: 'Bjork', length_ms: 200_000 })
+    make_track({ title: 'Café', artist: 'Björk', length_ms: 200_500 })
+    expect(find_duplicates(db, { reasons: ['fuzzy'] })).toHaveLength(1)
   })
 
   it('does not group two recordings whose durations differ materially', () => {
-    makeTrack({ title: 'Take Five', artist: 'Brubeck', lengthMs: 324_000 })
-    makeTrack({ title: 'Take Five', artist: 'Brubeck', lengthMs: 800_000 })
-    expect(findDuplicates(db, { reasons: ['fuzzy'] })).toEqual([])
+    make_track({ title: 'Take Five', artist: 'Brubeck', length_ms: 324_000 })
+    make_track({ title: 'Take Five', artist: 'Brubeck', length_ms: 800_000 })
+    expect(find_duplicates(db, { reasons: ['fuzzy'] })).toEqual([])
   })
 
   it('honours a wider duration tolerance when asked', () => {
-    makeTrack({ title: 'Drift', artist: 'A', lengthMs: 300_000 })
-    makeTrack({ title: 'Drift', artist: 'A', lengthMs: 308_000 })
+    make_track({ title: 'Drift', artist: 'A', length_ms: 300_000 })
+    make_track({ title: 'Drift', artist: 'A', length_ms: 308_000 })
 
-    expect(findDuplicates(db, { reasons: ['fuzzy'] })).toEqual([])
-    expect(findDuplicates(db, { reasons: ['fuzzy'], lengthToleranceMs: 10_000 }))
+    expect(find_duplicates(db, { reasons: ['fuzzy'] })).toEqual([])
+    expect(find_duplicates(db, { reasons: ['fuzzy'], lengthToleranceMs: 10_000 }))
       .toHaveLength(1)
   })
 
   it('puts a track in only one proposal, strongest evidence first', () => {
-    const a = makeTrack({ title: 'Same', artist: 'A', identityKey: 'k', lengthMs: 200_000 })
-    const b = makeTrack({ title: 'Same', artist: 'A', identityKey: 'k', lengthMs: 200_000 })
-    addMedia(a, '/a.flac', 'bb'.repeat(16))
-    addMedia(b, '/b.flac', 'bb'.repeat(16))
+    const a = make_track({ title: 'Same', artist: 'A', identity_key: 'k', length_ms: 200_000 })
+    const b = make_track({ title: 'Same', artist: 'A', identity_key: 'k', length_ms: 200_000 })
+    add_media(a, '/a.flac', 'bb'.repeat(16))
+    add_media(b, '/b.flac', 'bb'.repeat(16))
 
-    const groups = findDuplicates(db)
+    const groups = find_duplicates(db)
     expect(groups).toHaveLength(1)
     expect(groups[0]!.reason).toBe('audio_hash')
   })
 
   it('reports what each member brings to the decision', () => {
-    const a = makeTrack({ title: 'X', artist: 'A' })
-    addMedia(a, '/x.flac', 'cc'.repeat(16))
-    const b = makeTrack({ title: 'X', artist: 'A' })
-    addMedia(b, '/x.mp3', 'cc'.repeat(16))
+    const a = make_track({ title: 'X', artist: 'A' })
+    add_media(a, '/x.flac', 'cc'.repeat(16))
+    const b = make_track({ title: 'X', artist: 'A' })
+    add_media(b, '/x.mp3', 'cc'.repeat(16))
 
-    const m = findDuplicates(db)[0]!.members
+    const m = find_duplicates(db)[0]!.members
     expect(m.every((x) => x.mediaCount === 1)).toBe(true)
     expect(m.map((x) => x.artist)).toEqual(['A', 'A'])
   })
 
   it('caps the number of proposals when asked', () => {
     for (let i = 0; i < 6; i++) {
-      makeTrack({ identityKey: `k${i}` })
-      makeTrack({ identityKey: `k${i}` })
+      make_track({ identity_key: `k${i}` })
+      make_track({ identity_key: `k${i}` })
     }
-    expect(findDuplicates(db, { reasons: ['tags'], limit: 2 })).toHaveLength(2)
+    expect(find_duplicates(db, { reasons: ['tags'], limit: 2 })).toHaveLength(2)
   })
 })

@@ -5,7 +5,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { findMpv } from '@main/play/mpv'
+import { find_mpv } from '@main/play/mpv'
 
 let dir: string
 
@@ -30,7 +30,7 @@ describe('finding mpv', () => {
     vi.stubEnv('PATH', `${join(dir, 'broken')}:${join(dir, 'good')}`)
     vi.stubEnv('X_MUSIC_MPV', '')
 
-    expect(await findMpv()).toBe(good)
+    expect(await find_mpv()).toBe(good)
   })
 
   it('prefers an explicit path, then X_MUSIC_MPV, over the PATH', async () => {
@@ -40,10 +40,10 @@ describe('finding mpv', () => {
     vi.stubEnv('PATH', join(dir, 'path'))
     vi.stubEnv('X_MUSIC_MPV', configured)
 
-    expect(await findMpv(explicit)).toBe(explicit)
-    expect(await findMpv()).toBe(configured)
+    expect(await find_mpv(explicit)).toBe(explicit)
+    expect(await find_mpv()).toBe(configured)
     vi.stubEnv('X_MUSIC_MPV', join(dir, 'missing', 'mpv'))
-    expect(await findMpv()).toBe(on_path)
+    expect(await find_mpv()).toBe(on_path)
   })
 
   it('finds nothing when no mpv can run', async () => {
@@ -51,6 +51,6 @@ describe('finding mpv', () => {
     vi.stubEnv('PATH', join(dir, 'broken'))
     vi.stubEnv('X_MUSIC_MPV', '')
 
-    expect(await findMpv()).toBeNull()
+    expect(await find_mpv()).toBeNull()
   })
 })
