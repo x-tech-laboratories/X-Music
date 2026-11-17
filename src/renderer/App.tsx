@@ -1,7 +1,6 @@
 // The window: the player and its lists in the sidebar, the library browser beside them, after gmusicbrowser's "Lists, Library & Context".
 
 import { useEffect, useState } from 'react'
-import { Badge } from '@x-tech-laboratories/x-libs/web/react/badges'
 import { Tabs } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { Shell } from '@x-tech-laboratories/x-libs/web/react/shell'
 import { use_shortcuts } from '@x-tech-laboratories/x-libs/web/react/shortcuts'
@@ -11,7 +10,7 @@ import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
 import { one_of } from '@x-tech-laboratories/x-libs/web/prefs'
 import { format_duration } from '@x-tech-laboratories/x-libs/durations'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
-import type { AppInfo, SafetyStatus } from '@shared/ipc'
+import type { AppInfo } from '@shared/ipc'
 import { ipc } from './lib/ipc'
 import { configureLogging, log } from './lib/log'
 import { theme } from './lib/theme'
@@ -45,7 +44,6 @@ const focus_search = (): void => {
 
 export function App() {
   const [info, set_info] = useState<AppInfo | null>(null)
-  const [safety, set_safety] = useState<SafetyStatus | null>(null)
   const [density, set_density] = use_pref<Density>('x-music.pref.density', 'normal', one_of('compact', 'normal', 'comfortable'))
   const [right_tab, set_right_tab] = useState<'library' | 'context'>('library')
   const [settings_section, set_settings_section] = useState<Section | null>(null)
@@ -72,7 +70,6 @@ export function App() {
     configureLogging((await ipc('app:logConfig')).spec)
     log.debug('renderer booting')
     set_info(await ipc('app:info'))
-    set_safety(await ipc('app:safety'))
     await library.refresh()
 
     // Open settings on the Import tab when there is nothing to look at yet.
@@ -92,17 +89,6 @@ export function App() {
     { keys: 'mod+f', run: focus_search },
     { keys: '/', run: focus_search }
   ])
-
-  const tools = (
-    <>
-      <span className="topbar-spacer" />
-      {safety && (
-        <Badge tone={safety.pinned ? 'info' : safety.readOnly ? 'good' : 'warn'} title={safety.reason}>
-          {safety.readOnly ? 'Read-only' : 'Writes enabled'}
-        </Badge>
-      )}
-    </>
-  )
 
   const player_column = (
     <div className="player-column">
@@ -156,7 +142,6 @@ export function App() {
       theme={theme}
       user=""
       settings={{ href: '#settings', active: settings_section !== null, on_open: () => set_settings_section('library') }}
-      tools={tools}
       status_bar={status_bar}
     >
       <div className="library-view">
@@ -186,7 +171,6 @@ export function App() {
       {settings_section !== null && (
         <SettingsPage
           info={info}
-          safety={safety}
           density={density}
           initialSection={settings_section}
           onclose={() => set_settings_section(null)}

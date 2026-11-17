@@ -7,7 +7,7 @@
     "type": "split", "dir": "vertical", "sizes": ["auto", 1, "auto"],
     "children": [
       { "type": "toolbar", "id": "hbmenu",
-        "props": { "items": ["mainmenu", "layoutmenu", "spacer", "safety", "theme"] } },
+        "props": { "items": ["mainmenu", "layoutmenu", "spacer", "theme"] } },
       { "type": "split", "dir": "horizontal", "sizes": ["420px", 1],
         "children": [
           { "type": "split", "dir": "vertical", "sizes": ["auto", 1],

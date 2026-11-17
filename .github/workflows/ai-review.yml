@@ -35,7 +35,6 @@ jobs:
 
             Review this pull request against the rules in AGENTS.md. Focus on:
             - Bugs, and anything that breaks DESIGN-SPEC or the rules in AGENTS.md.
-            - Filesystem writes that bypass assertWritable().
             - Missing or weak tests for changed behaviour.
 
             Use inline comments for specific problems and one short summary comment.
