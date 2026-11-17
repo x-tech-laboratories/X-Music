@@ -214,7 +214,7 @@ describe('filter chips', () => {
   it('names the keys as X-Libs writes them, each in a key cap', () => {
     render(<SongList />)
 
-    expect(screen.getByText(/or a double-click plays, right-click for more/)).toBeTruthy()
+    expect(screen.getByText(/plays, right-click for more/)).toBeTruthy()
     expect(screen.getByText('Enter').tagName).toBe('KBD')
   })
 })

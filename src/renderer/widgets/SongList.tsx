@@ -227,7 +227,7 @@ export function SongList() {
         {chips.length > 1 && <button type="button" onClick={() => void library.clear_filters()}>Clear filters</button>}
         <span className="song-list-spacer" />
         <span className="muted small">
-          {keys('arrowup')} {keys('arrowdown')} move, {keys('shift+arrowdown')} picks, {keys('enter')} or a double-click plays, right-click for more
+          {keys('arrowup')} {keys('arrowdown')} move, {keys('shift+arrowdown')} picks, {keys('enter')} plays, right-click for more
         </span>
         <span className="muted small">
           {narrowed ? `${tracks.length.toLocaleString()} of ${plural(stats.tracks, 'track')}` : plural(tracks.length, 'track')}
