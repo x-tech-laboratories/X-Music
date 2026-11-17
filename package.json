@@ -10,9 +10,10 @@
   },
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "npm run typecheck && electron-vite build",
-    "start": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "build": "npm run build:desktop",
+    "build:desktop": "tsc -b && electron-vite build",
+    "start:desktop": "electron-vite preview",
+    "typecheck": "tsc -b",
     "postinstall": "electron-rebuild -f -w better-sqlite3 || echo 'electron-rebuild skipped; run npm run rebuild:electron before npm run dev'",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -21,11 +22,12 @@
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
     "check": "npm run typecheck && npm run test",
     "app": "bash scripts/run.sh",
-    "lint": "oxlint"
+    "lint": "oxlint",
+    "icons": "x-libs-icons"
   },
   "dependencies": {
-    "@x-tech-laboratories/halon": "^0.17.0",
-    "@x-tech-laboratories/x-libs": "^0.49.0",
+    "@x-tech-laboratories/halon": "^0.25.1",
+    "@x-tech-laboratories/x-libs": "^0.57.0",
     "better-sqlite3": "^13.0.3",
     "music-metadata": "^11.15.0",
     "react": "^19.3.1",
@@ -33,6 +35,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@types/better-sqlite3": "^7.6.12",
