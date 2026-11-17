@@ -6,6 +6,7 @@ import { field } from '@shared/fields'
 import { new_id } from '@shared/library/database'
 import { open_library } from '@shared/library/store'
 import { regexp_matches } from '@shared/query/compile'
+import type { SqlValue } from '@x-tech-laboratories/x-libs/sql'
 import type { Corpus } from './corpus'
 
 export type TestDb = InstanceType<typeof DatabaseSync>
@@ -80,7 +81,7 @@ export function loadCorpus(db: TestDb, corpus: Corpus): void {
   db.exec('COMMIT')
 }
 
-export function runQuery(db: TestDb, sql: string, params: readonly (string | number | null)[]): string[] {
+export function runQuery(db: TestDb, sql: string, params: readonly SqlValue[]): string[] {
   const rows = db.prepare(sql).all(...params) as { id: string }[]
   return rows.map((r) => r.id)
 }

@@ -16,12 +16,12 @@ import { install_bridge, type Call } from './bridge'
 const group: DuplicateGroup = {
   key: 'audio:1', reason: 'audio_hash', confidence: 'certain', explanation: 'Identical audio in 2 files',
   members: [
-    { trackId: 1, title: 'Blue in Green', artist: 'Miles Davis', album: 'Kind of Blue', year: 1959, lengthMs: 337_000, rating: 80, playCount: 12, mediaCount: 1, codecs: 'FLAC' },
-    { trackId: 2, title: 'Blue in Green', artist: 'Miles Davis', album: 'Kind of Blue', year: 1959, lengthMs: 337_000, rating: null, playCount: 3, mediaCount: 1, codecs: 'MP3' }
+    { trackId: '1', title: 'Blue in Green', artist: 'Miles Davis', album: 'Kind of Blue', year: 1959, lengthMs: 337_000, rating: 80, playCount: 12, mediaCount: 1, codecs: 'FLAC' },
+    { trackId: '2', title: 'Blue in Green', artist: 'Miles Davis', album: 'Kind of Blue', year: 1959, lengthMs: 337_000, rating: null, playCount: 3, mediaCount: 1, codecs: 'MP3' }
   ]
 }
 
-const merged: MergeResult = { batchId: 'batch-1', survivor: 1, absorbed: [2], mediaMoved: 1, historyMoved: 3, playlistEntriesRepointed: 0 }
+const merged: MergeResult = { batchId: 'batch-1', survivor: '1', absorbed: ['2'], mediaMoved: 1, historyMoved: 3, playlistEntriesRepointed: 0 }
 
 function show_page(): void {
   render(<><DuplicatesView /><Toasts /></>)
@@ -33,9 +33,9 @@ beforeEach(() => {
   localStorage.clear()
   calls = install_bridge({
     'list_duplicates': [group],
-    'get_merge_preview': { ids: [1, 2], survivor: 1, fields: [], media: [], statistics: { playCount: 15, skipCount: 0, rating: 80, firstPlayed: null, lastPlayed: null }, pinnedSources: [] },
+    'get_merge_preview': { ids: ['1', '2'], survivor: '1', fields: [], media: [], statistics: { playCount: 15, skipCount: 0, rating: 80, firstPlayed: null, lastPlayed: null }, pinnedSources: [] },
     'merge_tracks': merged,
-    'undo_merge': { batchId: 'batch-1', restored: [2], survivor: 1 }
+    'undo_merge': { batchId: 'batch-1', restored: ['2'], survivor: '1' }
   })
 })
 
@@ -117,7 +117,7 @@ describe('duplicates view', () => {
     expect(note.textContent).toContain('Merged 2 tracks into one')
     expect(within(panel).getByText('Merged')).toBeTruthy()
     expect(within(panel).queryByRole('button', { name: 'Quick merge' })).toBeNull()
-    expect(calls.find((call) => call.channel === 'merge_tracks')?.args).toEqual([[1, 2], 1])
+    expect(calls.find((call) => call.channel === 'merge_tracks')?.args).toEqual([['1', '2'], '1'])
 
     await act(async () => fireEvent.click(within(note).getByRole('button', { name: 'Undo' })))
 

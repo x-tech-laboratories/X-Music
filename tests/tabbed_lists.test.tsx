@@ -14,12 +14,12 @@ import { install_bridge } from './bridge'
 // Setup
 // ============================================================================
 
-const status = (queue: number[]): PlayerStatus => ({
+const status = (queue: string[]): PlayerStatus => ({
   state: 'idle', track: null, media: null, positionMs: 0, durationMs: null, volume: 80,
   repeat: 'off', shuffle: false, queue, contextLength: 0, contextIndex: -1
 })
 
-const details = { id: 99, title: 'Hidden by the filters', fields: [{ field: 'artist', name: 'Artist', value: 'Sample Trio', multi: true }] } as unknown as TrackDetails
+const details = { id: '99', title: 'Hidden by the filters', fields: [{ field: 'artist', name: 'Artist', value: 'Sample Trio', multi: true }] } as unknown as TrackDetails
 const dequeue = vi.fn(async () => status([]))
 
 beforeEach(() => {
@@ -39,7 +39,7 @@ afterEach(() => {
 
 describe('queue', () => {
   it('names a queued track the library\'s filters hide', async () => {
-    player_status.set(status([99]))
+    player_status.set(status(['99']))
     render(<TabbedLists />)
 
     expect(await screen.findByText('Hidden by the filters')).toBeTruthy()
@@ -48,7 +48,7 @@ describe('queue', () => {
   })
 
   it('takes a track out with its remove button, named after it', async () => {
-    player_status.set(status([99]))
+    player_status.set(status(['99']))
     render(<TabbedLists />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove Hidden by the filters from the queue' }))
@@ -57,7 +57,7 @@ describe('queue', () => {
   })
 
   it('takes the track under the keyboard out on Delete', async () => {
-    player_status.set(status([99]))
+    player_status.set(status(['99']))
     render(<TabbedLists />)
     const row = (await screen.findByText('Hidden by the filters')).closest('tr')!
 
@@ -84,7 +84,7 @@ describe('now playing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Now playing' }))
     expect(screen.getByText('Nothing is playing.')).toBeTruthy()
 
-    act(() => { player_status.set({ ...status([]), track: { id: 1, title: 'Song A', artist: 'Sample Trio', album: 'Album B', lengthMs: 1000, rating: null } }) })
+    act(() => { player_status.set({ ...status([]), track: { id: '1', title: 'Song A', artist: 'Sample Trio', album: 'Album B', lengthMs: 1000, rating: null } }) })
     expect(screen.getByText('Song A')).toBeTruthy()
   })
 })

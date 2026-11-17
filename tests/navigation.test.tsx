@@ -68,7 +68,7 @@ describe('navigation', () => {
   it('shows each view at its route and marks its row', async () => {
     render(<App />)
 
-    for (const [hash, name] of [['#/folders', 'Folders'], ['#/import', 'Import'], ['#/duplicates', 'Duplicates'], ['#/history', 'History']]) {
+    for (const [hash, name] of [['#/folders', 'Folders'], ['#/import', 'Import'], ['#/duplicates', 'Duplicates'], ['#/history', 'History']] as const) {
       go_to(hash)
       expect(await screen.findByRole('heading', { level: 1, name })).toBeTruthy()
       expect(within(views_nav()).getByRole('link', { name }).getAttribute('aria-current')).toBe('page')

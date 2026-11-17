@@ -20,7 +20,7 @@ const preview: GmbPreview = {
 }
 
 const report: ImportReport = {
-  songsRead: 1234, tracksCreated: 1200, mediaCreated: 1234, missingFlagged: 0, playHistoryRows: 5678,
+  songsRead: 1234, tracksCreated: 1200, tracksUpdated: 0, mediaCreated: 1234, mediaMatched: 0, missingFlagged: 0, playHistoryRows: 5678,
   playlistsCreated: 3, savedFiltersFound: 2, unmappedColumns: [], notes: ['34 songs were already in the library.']
 }
 

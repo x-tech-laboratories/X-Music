@@ -90,7 +90,7 @@ otherwise makes Electron run as bare node and die on the ESM entry point.
 | `npm test` | Full suite |
 | `npm run test:watch` | Watch mode |
 | `npm run bench` | Performance budget benchmarks |
-| `npm run typecheck` | `tsc -b` for main/preload and for the renderer |
+| `npm run typecheck` | `tsc -b` for main/preload, for the page and for the tests |
 | `npm run lint` | `oxlint` |
 | `npm run icons` | Generate `resources/icon.png` from `resources/icon.svg` |
 | `npm run app` | Build if needed and launch |

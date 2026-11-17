@@ -15,8 +15,8 @@ import { install_bridge } from './bridge'
 const now = new Date('2026-11-17T12:00:00Z').getTime()
 
 const roots: Root[] = [
-  { id: 1, path: '/tmp/x-music-fixture/music', enabled: true, slow: false, lastScan: now - 3 * 3600_000 },
-  { id: 2, path: '/tmp/x-music-fixture/more', enabled: true, slow: false, lastScan: null }
+  { id: '1', path: '/tmp/x-music-fixture/music', enabled: true, slow: false, lastScan: now - 3 * 3600_000 },
+  { id: '2', path: '/tmp/x-music-fixture/more', enabled: true, slow: false, lastScan: null }
 ]
 
 const report: ScanReport = {
@@ -90,7 +90,7 @@ describe('folders view', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
 
     const files: FileResult[] = [
-      { path: '/tmp/x-music-fixture/music/a.flac', outcome: 'new', trackId: 7 },
+      { path: '/tmp/x-music-fixture/music/a.flac', outcome: 'new', trackId: '7' },
       { path: '/tmp/x-music-fixture/music/b.flac', outcome: 'unchanged' },
       { path: '/tmp/x-music-fixture/music/broken.flac', outcome: 'error', detail: 'not an audio file' }
     ]
