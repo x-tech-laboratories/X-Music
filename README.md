@@ -12,8 +12,12 @@ run what exists.
 
 ## Status
 
-Early. The library core, query engine and testing harness are real; playback and tag I/O are not
+Early. The library core, query engine, playback and testing harness are real; tag writing is not
 implemented yet. See the roadmap in DESIGN-SPEC §15.
+
+Still to come, to meet the [Application Standard](https://x-tech-laboratories.github.io/standards/application/):
+the library store on X-Libs' `sql` and Drizzle with ids every device can make, a history of edits, and a
+description of the API offered to other programs through a local MCP server.
 
 | Area | State |
 |---|---|
@@ -39,6 +43,18 @@ implemented yet. See the roadmap in DESIGN-SPEC §15.
 | Daily backups of the library database, on X-Libs | working |
 | Picard hand-off for tagging | specified (DESIGN-SPEC §7.1.1) |
 
+## Deviations
+
+Where X-Music departs from the [Application Standard](https://x-tech-laboratories.github.io/standards/application/),
+and the limit that forces it:
+
+- **Desktop only.** The standard makes the web app the primary target. X-Music is an Electron app with no
+  server, web page or phone build, because it plays music through mpv on the computer it runs on and reads
+  the music files from that computer's disks, which neither a browser page nor a phone app can do. With no
+  server, nothing syncs between devices.
+- **Desktop scripts.** With no server or web page there is nothing for `dev:server`, `dev:web` or `start` to
+  run, so X-Music has none of them; `build` runs `build:desktop`, and `start:desktop` runs the built app.
+
 ## The one idea worth knowing
 
 **A track is a piece of music, not a file.** It survives renames, moves, format changes, retagging,
@@ -52,7 +68,8 @@ the track, never a key.
 
 ## Development
 
-The Nix flake pins everything, including the Electron the native module is built against.
+The Nix flake pins everything, including the Electron the native module is built against. `nix-shell`
+gives the same shell as `nix develop`, and `nix build` builds the app.
 
 ```sh
 nix develop
@@ -68,12 +85,15 @@ otherwise makes Electron run as bare node and die on the ESM entry point.
 | Command | Does |
 |---|---|
 | `npm run dev` | Run with hot reload |
-| `npm run build` | Typecheck and build to `out/` |
+| `npm run build` | Same as `build:desktop` |
+| `npm run build:desktop` | Typecheck and build to `out/` |
+| `npm run start:desktop` | Run the built app |
 | `npm test` | Full suite |
 | `npm run test:watch` | Watch mode |
 | `npm run bench` | Performance budget benchmarks |
-| `npm run typecheck` | `tsc` for main/preload and for the renderer |
+| `npm run typecheck` | `tsc -b` for main/preload and for the renderer |
 | `npm run lint` | `oxlint` |
+| `npm run icons` | Generate `resources/icon.png` from `resources/icon.svg` |
 | `npm run app` | Build if needed and launch |
 | `npm run rebuild:electron` | Rebuild `better-sqlite3` against Electron's ABI |
 
@@ -145,8 +165,7 @@ src/
 ├── main/        Electron main: db, query engine, library, (later) tags, playback, services
 ├── preload/     The typed IPC bridge, exposing only the declared contract
 ├── renderer/    UI. Deliberately thin — see below.
-├── shared/      Imported by BOTH sides: field descriptors, filter AST, format strings, view state
-└── workers/     (planned) scan, hash, index-build, replaygain
+└── shared/      Imported by BOTH sides: field descriptors, filter AST, format strings, view state
 ```
 
 `shared/` is where the leverage is. The filter AST, field descriptors, format-string engine and the
