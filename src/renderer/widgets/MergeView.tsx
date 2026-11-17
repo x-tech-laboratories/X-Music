@@ -1,139 +1,194 @@
-// Sources side by side, one column each, one row per field — so a disagreement reads as a diff
+// Sources side by side, one column each, one row per field, so a disagreement reads as a diff
 // rather than as a list of options. Resolution stays per field, following Thunderbird CardBook.
 
-import { Fragment, useState } from 'react'
-import type { MergeResult, Resolution } from '@shared/ipc'
+import { useState } from 'react'
+import type { MergePreview, Resolution } from '@shared/ipc'
 import { Badge } from '@x-tech-laboratories/x-libs/web/react/badges'
-import { Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { Switch } from '@x-tech-laboratories/x-libs/web/react/controls'
+import { Section, Stack, Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { MergeGrid, is_conflict, winner_of, type MergeChoices, type MergeField } from '@x-tech-laboratories/x-libs/web/react/merge_grid'
+import { PageView } from '@x-tech-laboratories/x-libs/web/react/page_view'
 import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
+import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
+import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { is_boolean } from '@x-tech-laboratories/x-libs/web/prefs'
+import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import { format_clock } from '@x-tech-laboratories/x-libs/durations'
+import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge'
+import { ratingToStars } from '@shared/fields'
 import { ipc } from '../lib/ipc'
-import { cx } from '@x-tech-laboratories/x-libs/web/dom'
 import { library } from '../stores/library'
-import { PageView } from '@x-tech-laboratories/x-libs/web/react/page_view'
-import s from './MergeView.module.css'
 
-function show(v: unknown): string {
-  if (v === null || v === undefined || v === '') return ''
-  if (Array.isArray(v)) return v.join(', ')
-  return String(v)
+type TrackId = MergePreview['ids'][number]
+
+// ============================================================================
+// Preview to grid
+// ============================================================================
+
+// The grid keys each source by text; this is the one place a track id becomes a key and back.
+const key_of = (id: TrackId): string => String(id)
+
+// A length reads as a clock time, so two rips a few milliseconds apart are easy to compare.
+const length_text = (value: unknown): string => (value === null || value === undefined || value === '' ? '' : format_clock(Number(value)))
+
+function grid_fields(preview: MergePreview): MergeField<TrackId>[] {
+  return preview.fields.map((field) => ({
+    id: field.field,
+    label: field.name,
+    value: (id) => (field.conflict ? field.options?.find((option) => option.from === id)?.value ?? null : field.value ?? null),
+    combine: field.multi ? () => field.union ?? [] : undefined,
+    text: field.field === 'length' ? length_text : undefined
+  }))
 }
 
-export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: boolean) => void }) {
+// What the main process is told for each field that disagrees: exactly the winner the grid shows.
+function resolutions_for(preview: MergePreview, survivor: string, choices: MergeChoices): Record<string, Resolution> {
+  const by_key = new Map(preview.ids.map((id) => [key_of(id), id]))
+  const fields = grid_fields(preview)
+  const resolutions: Record<string, Resolution> = {}
+  for (const field of preview.fields) {
+    if (!field.conflict) continue
+    const grid_field = fields.find((each) => each.id === field.field)!
+    const winner = winner_of(grid_field, preview.ids, key_of, survivor, choices)
+    const from = by_key.get(winner)
+    resolutions[field.field] = from === undefined ? { kind: 'union' } : { kind: 'value', from }
+  }
+  return resolutions
+}
+
+const failure = (error: unknown): string => clean_error_message(describe_error(error))
+
+// ============================================================================
+// Undo
+// ============================================================================
+
+async function undo_merge(batch_id: string, on_undone?: () => void): Promise<void> {
+  try {
+    await ipc('tracks:unmerge', batch_id)
+    await library.refresh()
+    on_undone?.()
+    toast('Merge undone', { tone: 'good' })
+  } catch (error) {
+    toast(`Could not undo the merge: ${failure(error)}`, { tone: 'bad' })
+  }
+}
+
+// ============================================================================
+// View
+// ============================================================================
+
+interface MergeViewProps {
+  ids: TrackId[]
+  // Closes the view, saying whether the tracks were merged.
+  onclose?: (merged: boolean) => void
+  // Called after the merge toast's Undo has taken the merge back.
+  on_undone?: () => void
+}
+
+function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only_differences }: {
+  preview: MergePreview
+  survivor: string
+  set_survivor: (key: string) => void
+  choices: MergeChoices
+  set_choices: (choices: MergeChoices) => void
+  only_differences: boolean
+}) {
+  const files_of = (id: TrackId): number => preview.media.filter((media) => media.from === id).length
+  const source_name = (id: TrackId): string => `Source ${preview.ids.indexOf(id) + 1}`
+
+  return (
+    <Stack>
+      {preview.pinnedSources.length > 0 && (
+        <p className="tone-warn">
+          {plural(preview.pinnedSources.length, 'source')} of these was merged or split by hand before. Merging replaces
+          that decision.
+        </p>
+      )}
+
+      <MergeGrid
+        label="Tracks to merge"
+        items={preview.ids}
+        item_key={key_of}
+        item_heading={(id) => source_name(id)}
+        item_detail={(id) => plural(files_of(id), 'file')}
+        fields={grid_fields(preview)}
+        survivor={survivor}
+        on_survivor_change={set_survivor}
+        choices={choices}
+        on_choices_change={set_choices}
+        only_differences={only_differences}
+      />
+
+      <Section title="Combined statistics">
+        <p className="muted small">
+          These are not a choice: plays and skips are summed, the highest rating wins, and play
+          history is merged and deduplicated.
+        </p>
+        <Tiles>
+          <Tile label="Plays" value={preview.statistics.playCount} value_first />
+          <Tile label="Skips" value={preview.statistics.skipCount} value_first />
+          <Tile label="Rating" value={<Rating value={ratingToStars(preview.statistics.rating)} />} value_first />
+        </Tiles>
+      </Section>
+
+      <Section title="Files the surviving track will hold">
+        <table>
+          <thead><tr><th scope="col">Format</th><th scope="col">File</th><th scope="col">From</th></tr></thead>
+          <tbody>
+            {preview.media.map((media) => (
+              <tr key={media.id}>
+                <td>{(media.codec ?? 'Unknown').toUpperCase()}</td>
+                <td><code title={media.uri}>{media.uri}</code> {!media.present && <Badge tone="bad">Missing</Badge>}</td>
+                <td>{source_name(media.from)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Section>
+    </Stack>
+  )
+}
+
+export function MergeView({ ids, onclose, on_undone }: MergeViewProps) {
   const loaded = use_resource(() => ipc('tracks:mergePreview', ids), [])
   const preview = loaded.data
   // The source that survives, the preview's proposal until one is picked.
-  const [chosen_survivor, setSurvivor] = useState<number | null>(null)
-  const survivor = chosen_survivor ?? preview?.survivor ?? null
-  const [choices, setChoices] = useState<Record<string, Resolution>>({})
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<MergeResult | null>(null)
-  const [undoing, setUndoing] = useState(false)
-  const [onlyDifferences, setOnlyDifferences] = use_pref('x-music.pref.merge.onlyDifferences', false, is_boolean)
+  const [chosen_survivor, set_survivor] = useState<string | null>(null)
+  const survivor = chosen_survivor ?? (preview ? key_of(preview.survivor) : null)
+  const [choices, set_choices] = useState<MergeChoices>({})
+  const [busy, set_busy] = useState(false)
+  const [only_differences, set_only_differences] = use_pref('x-music.pref.merge.onlyDifferences', false, is_boolean)
 
-  const sourceIndex = (id: number): number => (preview?.ids.indexOf(id) ?? -1) + 1
+  const conflicts = preview ? grid_fields(preview).filter((field) => is_conflict(field, preview.ids)).length : 0
 
-  const valueFor = (fieldId: string, from: number): unknown => {
-    const f = preview?.fields.find((x) => x.field === fieldId)
-    if (!f) return null
-    if (!f.conflict) return f.value
-    return f.options?.find((o) => o.from === from)?.value ?? null
-  }
-
-  /** What the survivor ends up with, given the current choices. */
-  function resultFor(fieldId: string): unknown {
-    const f = preview?.fields.find((x) => x.field === fieldId)
-    if (!f) return null
-    if (!f.conflict) return f.value
-
-    const res = choices[fieldId]
-    if (res?.kind === 'value') return valueFor(fieldId, res.from)
-    if (f.multi) return f.union
-    return valueFor(fieldId, survivor ?? preview!.ids[0]!)
-  }
-
-  const isChosen = (fieldId: string, from: number): boolean => {
-    const f = preview?.fields.find((x) => x.field === fieldId)
-    if (!f?.conflict) return false
-    const res = choices[fieldId]
-    if (res?.kind === 'value') return res.from === from
-    return !f.multi && from === survivor
-  }
-
-  const unionChosen = (fieldId: string): boolean => {
-    const f = preview?.fields.find((x) => x.field === fieldId)
-    if (!f?.multi || !f.conflict) return false
-    const res = choices[fieldId]
-    return !res || res.kind === 'union'
-  }
-
-  function pick(fieldId: string, from: number): void {
-    setChoices({ ...choices, [fieldId]: { kind: 'value', from } })
-  }
-
-  function pickUnion(fieldId: string): void {
-    setChoices({ ...choices, [fieldId]: { kind: 'union' } })
-  }
-
-  /** Take every field from one source at once — the "this record is simply better" shortcut. */
-  function takeAll(from: number): void {
-    const next: Record<string, Resolution> = { ...choices }
-    for (const f of preview?.fields ?? []) if (f.conflict) next[f.field] = { kind: 'value', from }
-    setChoices(next)
-    setSurvivor(from)
-  }
-
-  const visibleFields = (preview?.fields ?? []).filter((f) => !onlyDifferences || f.conflict)
-
-  const conflictCount = (preview?.fields ?? []).filter((f) => f.conflict).length
-
-  const mediaFor = (id: number): number =>
-    preview?.media.filter((m) => m.from === id).length ?? 0
-
-  const columns = preview
-    ? `170px repeat(${preview.ids.length}, minmax(180px, 1fr)) minmax(200px, 1fr)`
-    : '1fr'
-
-  async function apply(): Promise<void> {
+  async function merge(): Promise<void> {
     if (!preview || survivor === null) return
-    setBusy(true)
-    setError(null)
+    const survivor_id = preview.ids.find((id) => key_of(id) === survivor)
+    if (survivor_id === undefined) return
+    set_busy(true)
     try {
-      setResult(await ipc('tracks:merge', { ids: preview.ids, survivor, resolutions: choices }))
+      const result = await ipc('tracks:merge', { ids: preview.ids, survivor: survivor_id, resolutions: resolutions_for(preview, survivor, choices) })
       await library.refresh()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setBusy(false)
+      toast(`Merged ${plural(preview.ids.length, 'track')} into one holding ${plural(result.mediaMoved + 1, 'file')}`, {
+        tone: 'good',
+        duration_in_milliseconds: 10_000,
+        action: { text: 'Undo', run: () => void undo_merge(result.batchId, on_undone) }
+      })
+      onclose?.(true)
+    } catch (error) {
+      toast(`Could not merge: ${failure(error)}`, { tone: 'bad' })
+      set_busy(false)
     }
   }
 
-  async function undo(): Promise<void> {
-    if (!result) return
-    setUndoing(true)
-    try {
-      await ipc('tracks:unmerge', result.batchId)
-      await library.refresh()
-      onclose?.(false)
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setUndoing(false)
-    }
-  }
-
-  const actions = !result && preview && (
+  const actions = preview && (
     <>
       <label className="check">
-        <input
-          type="checkbox"
-          checked={onlyDifferences}
-          onChange={(e) => setOnlyDifferences(e.currentTarget.checked)}
-        /> Only differences
+        <Switch label="Only differences" checked={only_differences} on_change={set_only_differences} /> Only differences
       </label>
-      <button className="accent solid" onClick={apply} disabled={busy || survivor === null}>
+      <button className="accent solid" onClick={() => void merge()} disabled={busy || survivor === null}>
         {busy ? 'Merging…' : 'Merge'}
       </button>
     </>
@@ -141,118 +196,21 @@ export function MergeView({ ids, onclose }: { ids: number[]; onclose?: (merged: 
 
   return (
     <PageView
-      title={`Merge ${ids.length} tracks into one`}
-      subtitle={conflictCount > 0
-        ? `${conflictCount} field${conflictCount === 1 ? '' : 's'} disagree — pick which value to keep`
-        : 'Every field agrees; merging keeps all files under one track'}
+      title={`Merge ${plural(ids.length, 'track')} into one`}
+      subtitle={preview && (conflicts > 0
+        ? `${plural(conflicts, 'field')} disagree; pick which value to keep`
+        : 'Every field agrees; merging keeps all files under one track')}
       on_close={() => onclose?.(false)}
       actions={actions}
     >
-      {error && <p className={cx(s.note, s.err)}>{error}</p>}
-
-      {result ? (
-        <div className={s.done}>
-          <h3 className={s.h2}>Merged</h3>
-          <p className={s.doneText}>
-            One track now holds <strong>{result.mediaMoved + 1}</strong>
-            {' '}{result.mediaMoved + 1 === 1 ? 'file' : 'files'}.
-            {result.playlistEntriesRepointed > 0 && (
-              <> {result.playlistEntriesRepointed} playlist entries repointed.</>
-            )}
-          </p>
-          <div className={s.rowActions}>
-            <button onClick={undo} disabled={undoing}>{undoing ? 'Undoing…' : 'Undo this merge'}</button>
-            <button className="accent solid" onClick={() => onclose?.(true)}>Done</button>
-          </div>
-        </div>
-      ) : preview ? (
-        <>
-          {preview.pinnedSources.length > 0 && (
-            <p className={cx(s.note, s.warn)}>
-              {preview.pinnedSources.length} of these was merged or split by hand before. Merging replaces
-              that decision.
-            </p>
-          )}
-
-          <div className={s.grid} style={{ gridTemplateColumns: columns }}>
-            {/* header: one column per source, plus the result */}
-            <div className={cx(s.cell, s.head, s.corner)}>Field</div>
-            {preview.ids.map((id) => (
-              <div key={id} className={cx(s.cell, s.head, s.source, survivor === id && s.survivor)}>
-                <div className={s.shead}>
-                  <button className={cx(survivor === id && 'accent solid')} aria-pressed={survivor === id} onClick={() => setSurvivor(id)}>
-                    {survivor === id ? '● Survivor' : '○ Make survivor'}
-                  </button>
-                  <span className={s.sname}>Source {sourceIndex(id)}</span>
-                </div>
-                <div className={s.smeta}>
-                  {mediaFor(id)} file{mediaFor(id) === 1 ? '' : 's'}
-                </div>
-                <button onClick={() => takeAll(id)}>Take all from this</button>
-              </div>
-            ))}
-            <div className={cx(s.cell, s.head, s.result)}>Result</div>
-
-            {visibleFields.map((f) => (
-              <Fragment key={f.field}>
-                <div className={cx(s.cell, s.label, f.conflict && s.conflict)}>{f.name}</div>
-
-                {preview.ids.map((id) => {
-                  const text = show(valueFor(f.field, id))
-                  return f.conflict ? (
-                    <button
-                      key={id}
-                      className={cx(s.cell, s.value, s.clickable, isChosen(f.field, id) && s.chosen, text === '' && s.empty)}
-                      onClick={() => pick(f.field, id)}
-                      title={text || 'empty'}
-                    >{text || '—'}</button>
-                  ) : (
-                    <div key={id} className={cx(s.cell, s.value, s.same)} title={text}>{text || '—'}</div>
-                  )
-                })}
-
-                <div className={cx(s.cell, s.resultCell)}>
-                  {f.conflict && f.multi && (
-                    <button className={cx(unionChosen(f.field) && 'accent solid')} aria-pressed={unionChosen(f.field)} onClick={() => pickUnion(f.field)}>
-                      Keep all
-                    </button>
-                  )}
-                  <span className={s.rval}>{show(resultFor(f.field)) || '—'}</span>
-                </div>
-              </Fragment>
-            ))}
-          </div>
-
-          <section>
-            <h3 className={s.h2}>Combined statistics</h3>
-            <p className={s.hint}>
-              These are not a choice: plays and skips are summed, the highest rating wins, and play
-              history is merged and deduplicated.
-            </p>
-            <Tiles>
-              <Tile label="plays" value={preview.statistics.playCount} value_first />
-              <Tile label="skips" value={preview.statistics.skipCount} value_first />
-              <Tile label="rating" value={preview.statistics.rating ?? '—'} value_first />
-            </Tiles>
-          </section>
-
-          <section className={s.files}>
-            <h3 className={s.h2}>Files the surviving track will hold</h3>
-            <ul className={s.fileList}>
-              {preview.media.map((m) => (
-                <li key={m.id} className={s.file}>
-                  <span className={s.codec}>{m.codec ?? '?'}</span>
-                  <span className={s.uri} title={m.uri}>{m.uri}</span>
-                  <span className={s.src}>Source {sourceIndex(m.from)}</span>
-                  {!m.present && <Badge tone="bad">missing</Badge>}
-                </li>
-              ))}
-            </ul>
-          </section>
-        </>
-      ) : (
-        <Loaded resource={loaded} lines={6}>{() => null}</Loaded>
-      )}
+      <Loaded resource={loaded} lines={6}>
+        {(loaded_preview) => survivor !== null && (
+          <MergeBody
+            preview={loaded_preview} survivor={survivor} set_survivor={set_survivor}
+            choices={choices} set_choices={set_choices} only_differences={only_differences}
+          />
+        )}
+      </Loaded>
     </PageView>
   )
 }
