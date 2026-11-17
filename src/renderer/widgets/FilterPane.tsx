@@ -1,95 +1,68 @@
-import type { GroupRow } from '@shared/ipc'
-import { fieldsWith } from '@shared/fields'
-import { sanitizePaneField } from '@shared/viewstate'
-import { library } from '../stores/library'
+// A filter pane: the values of one field, chosen by the user, picked to narrow the library, on X-Libs' FacetPane.
+
+import { useEffect } from 'react'
+import { Select } from '@x-tech-laboratories/x-libs/web/react/controls'
+import { FacetPane, type FacetValue } from '@x-tech-laboratories/x-libs/web/react/facet_pane'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
+import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
-import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
-import { cx } from '@x-tech-laboratories/x-libs/web/dom'
-import s from './FilterPane.module.css'
+import { use_store } from '@x-tech-laboratories/x-libs/web/react/store'
+import type { GroupRow } from '@shared/ipc'
+import { field, fieldsWith, ratingToStars } from '@shared/fields'
+import { sanitizePaneField } from '@shared/viewstate'
+import { browse, library, results } from '../stores/library'
 
-// Every groupable field, per DESIGN-SPEC §3.2.1: no field is second class, so the list is
-// derived from the catalogue rather than being a hand-picked few.
-const groupable = fieldsWith('groupable')
-  .map((d) => ({ id: d.id, name: d.name }))
-  .sort((a, b) => a.name.localeCompare(b.name))
+const FALLBACK_ROW_HEIGHT = 28
 
-export function FilterPane({ field = 'genre', id = 'pane' }: { field?: string; id?: string }) {
-  // The prop is the default; what the user last chose wins, if it still names a real field.
-  const [remembered, remember] = use_pref<string>(`x-music.pref.pane.${id}.field`, field)
-  const current = sanitizePaneField(remembered, field)
-  use_watch(library.data)
-  // Every change to the library reloads the groups quietly, so the old rows stay until the new ones arrive.
-  const groups = use_resource(() => library.groupsFor(current), [current], { watch: library.data })
-  const rows = groups.data ?? []
+// Halon's row height for the density in force, which the pane's virtual rows are drawn at.
+function row_height(): number {
+  const height = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row-height'))
+  return Number.isFinite(height) && height > 0 ? height : FALLBACK_ROW_HEIGHT
+}
 
-  // Read the selection back from the filter stack so a chip removal updates the pane too.
-  const selectedCount = library.selectionFor(current).length
+// Every field that can group the library, by name, so no field is second class.
+const groupable: [string, string][] = fieldsWith('groupable')
+  .map((descriptor): [string, string] => [descriptor.id, descriptor.name])
+  .sort((first, second) => first[1].localeCompare(second[1]))
 
-  async function pick(row: GroupRow, index: number, e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): Promise<void> {
-    await library.setPaneFilter(current, row.label ?? null, {
-      shift: e.shiftKey,
-      ctrl: e.ctrlKey || e.metaKey,
-      index,
-      ordered: rows.map((r) => r.label)
-    })
-  }
+// The pane's rows: values the user can pick, a rating drawn as stars; tracks with no value have no row, since picking none is not a filter.
+export function facet_values(field_id: string, groups: readonly GroupRow[]): FacetValue[] {
+  return groups.flatMap((group): FacetValue[] => {
+    if (group.label === null || group.label === '') return []
+    const value = String(group.label)
+    if (field_id !== 'rating') return [{ value, count: group.n }]
+    return [{ value, count: group.n, label: <Rating value={ratingToStars(Number(value))} label={`${ratingToStars(Number(value))} stars`} /> }]
+  })
+}
 
-  async function clear(): Promise<void> {
-    await library.setPaneFilter(current, null)
-  }
+export function FilterPane({ field: default_field = 'genre', id = 'pane' }: { field?: string; id?: string }) {
+  // What the user last chose wins over the default, while it still names a real field.
+  const [remembered, remember] = use_pref<string>(`x-music.pref.pane.${id}.field`, default_field)
+  const current = sanitizePaneField(remembered, default_field)
+  const state = use_store(browse)
+  const groups = use_resource(() => library.groups_for(current), [current], { watch: results.watch })
+  const values = facet_values(current, groups.data ?? [])
+  const selected = state.panes[current] ?? []
 
-  const total = rows.reduce((n, r) => n + r.n, 0)
-
-  /** A rating is stored 0-100 but read as stars, so the pane shows what the user recognises. */
-  function display(label: string | null): string {
-    if (label === null || label === '') return '(none)'
-    if (current !== 'rating') return label
-    const n = Number(label)
-    if (!Number.isFinite(n)) return label
-    const stars = Math.round(n / 20)
-    return `${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}`
-  }
+  // A remembered pick the library no longer holds would hide every track with no row to undo it, so it is let go.
+  const offered = new Set(values.map((each) => each.value))
+  const gone = groups.status === 'loaded' && selected.some((value) => !offered.has(value))
+  useEffect(() => {
+    if (gone) void library.set_pane(current, selected.filter((value) => offered.has(value)))
+  }, [gone])
 
   return (
-    <section className={s.pane} aria-label="Filter pane">
-      <header className={s.header}>
-        <select
-          value={current}
-          aria-label="Field to browse by"
-          onChange={(e) => remember(e.currentTarget.value)}
-        >
-          {groupable.map((f) => (
-            <option key={f.id} value={f.id}>{f.name}</option>
-          ))}
-        </select>
-        <span className={s.count}>
-          {selectedCount > 1 ? `${selectedCount} of ${rows.length}` : rows.length}
-        </span>
-      </header>
-
-      <ul className={s.list}>
-        <li>
-          <button className={cx(s.row, s.all, selectedCount === 0 && s.sel)} aria-pressed={selectedCount === 0} onClick={clear}>
-            <span className={s.label}>All</span>
-            <span className={s.n}>{total.toLocaleString()}</span>
-          </button>
-        </li>
-        {groups.status === 'loaded' && rows.length === 0 ? (
-          <li className={s.empty}>No values</li>
-        ) : rows.map((g, i) => (
-          <li key={g.gid}>
-            <button
-              className={cx(s.row, library.isPaneSelected(current, g.label ?? null) && s.sel)}
-              aria-pressed={library.isPaneSelected(current, g.label ?? null)}
-              onClick={(e) => pick(g, i, e)}
-            >
-              <span className={s.label}>{display(g.label)}</span>
-              <span className={s.n}>{g.n}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <FacetPane
+      label={field(current).name}
+      heading={<Select bare label="Field to browse by" options={groupable} value={current} on_change={remember} />}
+      values={values}
+      total={(groups.data ?? []).reduce((sum, group) => sum + group.n, 0)}
+      selected={selected}
+      on_change={(values) => void library.set_pane(current, values)}
+      loading={groups.loading}
+      error={groups.error}
+      on_retry={() => void groups.reload()}
+      virtual={{ row_height: row_height() }}
+    />
   )
 }

@@ -276,10 +276,27 @@ export class Player {
       startMs: media.startMs, endMs: media.endMs, gainDb: media.gainDb
     }
 
-    await this.engine.load(media.uri, opts)
-    await this.engine.play()
+    const started = await this.drive(async () => {
+      await this.engine.load(media.uri, opts)
+      await this.engine.play()
+    })
+    if (!started) return
     this.publish()
-    void this.preloadNext()
+    // A failed hint only costs the gapless join, so it is dropped.
+    void this.preloadNext().catch(() => undefined)
+  }
+
+  /** Runs an engine call, turning its failure into the error state the listener sees rather than a rejection. */
+  private async drive(work: () => Promise<void>): Promise<boolean> {
+    try {
+      await work()
+      return true
+    } catch (err) {
+      this.state = 'error'
+      this.error = (err as Error).message
+      this.publish()
+      return false
+    }
   }
 
   /** Tells the engine what is coming, so it can make the transition gapless. */
@@ -356,10 +373,15 @@ export class Player {
       await this.next(false)
       return
     }
-    await this.engine.play()
+    // After a failure, play starts the track again rather than resuming nothing.
+    if (this.state === 'error') {
+      await this.playTrack(this.currentTrack.id)
+      return
+    }
+    await this.drive(() => this.engine.play())
   }
 
-  async pause(): Promise<void> { await this.engine.pause() }
+  async pause(): Promise<void> { await this.drive(() => this.engine.pause()) }
 
   async toggle(): Promise<void> {
     if (this.state === 'playing') await this.pause()
@@ -368,7 +390,7 @@ export class Player {
 
   async stop(): Promise<void> {
     this.recordSkip()
-    await this.engine.stop()
+    await this.drive(() => this.engine.stop())
     this.currentTrack = null
     this.currentMedia = null
     this.positionMs = 0
@@ -377,13 +399,13 @@ export class Player {
   }
 
   async seek(positionMs: number): Promise<void> {
-    await this.engine.seek(positionMs)
+    if (!(await this.drive(() => this.engine.seek(positionMs)))) return
     this.positionMs = positionMs
   }
 
   async setVolume(volume: number): Promise<void> {
     this.volume = Math.max(0, Math.min(100, volume))
-    await this.engine.setVolume(this.volume)
+    await this.drive(() => this.engine.setVolume(this.volume))
     this.publish()
   }
 

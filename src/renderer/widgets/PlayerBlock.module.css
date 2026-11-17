@@ -1,8 +1,8 @@
-.player { display: grid; gap: var(--space-2); padding: var(--space-4); align-content: start; }
+.player { display: grid; gap: var(--space-2); padding: var(--space-4); align-content: start; min-height: 0; overflow-y: auto; }
 
 .indicators { display: flex; align-items: center; gap: var(--space-2); }
 
-.main { display: grid; grid-template-columns: 1fr 88px; gap: var(--space-4); }
+.main { display: grid; grid-template-columns: 1fr 88px; gap: var(--space-4); align-items: start; }
 
 .text { display: grid; gap: var(--space-1); min-width: 0; }
 
@@ -15,6 +15,10 @@
 .artist { color: var(--text-secondary); }
 
 .album { color: var(--text-tertiary); font-size: var(--text-caption); }
+
+.error { display: flex; align-items: center; gap: var(--space-4); }
+
+.message { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: var(--text-caption); }
 
 .time { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-2); align-items: center; }
 

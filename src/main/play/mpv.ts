@@ -32,6 +32,9 @@ interface Pending {
 /** Unique per engine instance: two engines in one process must not share an IPC socket. */
 let instanceCounter = 0
 
+/** A Unix socket path holds about a hundred bytes, so a long temporary folder falls back to /tmp. */
+const SOCKET_PATH_LIMIT = 100
+
 const PROP_POSITION = 1
 const PROP_DURATION = 2
 const PROP_PAUSE = 3
@@ -43,6 +46,8 @@ export interface MpvOptions {
   onLog?: (line: string) => void
   /** How often mpv reports position, in seconds. The UI interpolates between ticks. */
   positionInterval?: number
+  /** How long mpv has to open its socket before start-up counts as failed. */
+  startTimeoutMs?: number
   extraArgs?: readonly string[]
 }
 
@@ -58,7 +63,10 @@ export class MpvEngine implements PlaybackEngine {
   private state: EngineState = 'idle'
   private positionMs = 0
   private durationMs: number | null = null
-  private ready: Promise<void>
+  /** Start-up under way or done; null before the first command and after mpv fails or exits. */
+  private ready: Promise<void> | null = null
+  /** mpv's last diagnostic line, which explains a failed start. */
+  private lastLog = ''
   /** Set while a load is in flight, so mpv going idle mid-swap is not read as the track ending. */
   private swapping = false
 
@@ -66,13 +74,9 @@ export class MpvEngine implements PlaybackEngine {
 
   constructor(opts: MpvOptions = {}) {
     this.opts = opts
-    this.socketPath = join(tmpdir(), `x-music-mpv-${process.pid}-${++instanceCounter}.sock`)
-    // A leftover socket file stops mpv binding, so clear it before starting.
-    rmSync(this.socketPath, { force: true })
-    this.ready = this.start().catch((err: Error) => {
-      this.setState('error', err.message)
-      throw err
-    })
+    const name = `x-music-mpv-${process.pid}-${++instanceCounter}.sock`
+    const folder = join(tmpdir(), name).length <= SOCKET_PATH_LIMIT ? tmpdir() : '/tmp'
+    this.socketPath = join(folder, name)
   }
 
   private emit: EngineListener = (event, payload) => {
@@ -85,11 +89,28 @@ export class MpvEngine implements PlaybackEngine {
     this.emit('state', error ? { state, error } : { state })
   }
 
+  /** Starts mpv on first use, and again after a failed start or an exit, so the next command is the retry. */
+  private started(): Promise<void> {
+    if (!this.ready) {
+      this.ready = this.start().catch((err: Error) => {
+        this.ready = null
+        this.halt()
+        this.setState('error', err.message)
+        throw err
+      })
+    }
+    return this.ready
+  }
+
   private async start(): Promise<void> {
     const binary = await findMpv(this.opts.binary)
     if (!binary) throw new Error('mpv was not found; set X_MUSIC_MPV or install mpv')
 
-    this.proc = spawn(binary, [
+    // A leftover socket file stops mpv binding, so clear it before starting.
+    rmSync(this.socketPath, { force: true })
+    this.lastLog = ''
+
+    const proc = spawn(binary, [
       '--idle=yes',
       '--no-video',
       '--gapless-audio=yes',
@@ -100,44 +121,90 @@ export class MpvEngine implements PlaybackEngine {
       `--input-ipc-server=${this.socketPath}`,
       ...(this.opts.extraArgs ?? [])
     ], { stdio: ['ignore', 'ignore', 'pipe'] })
+    this.proc = proc
+    let stopped: string | null = null
 
-    this.proc.stderr?.setEncoding('utf8')
-    this.proc.stderr?.on('data', (chunk: string) => {
+    proc.stderr?.setEncoding('utf8')
+    proc.stderr?.on('data', (chunk: string) => {
       for (const line of chunk.split('\n')) {
-        if (line.trim() !== '') this.opts.onLog?.(line.trim())
+        if (line.trim() === '') continue
+        this.lastLog = line.trim()
+        this.opts.onLog?.(this.lastLog)
       }
     })
 
-    this.proc.on('exit', (code) => {
-      this.socket = null
-      if (code !== 0 && code !== null) this.setState('error', `mpv exited with code ${code}`)
+    proc.on('error', (err) => { stopped = err.message })
+
+    proc.on('close', (code, signal) => {
+      stopped = signal ? `signal ${signal}` : `exit code ${code}`
+      if (this.proc !== proc) return
+      this.proc = null
+      // Once running, an exit means the next command starts mpv again.
+      if (this.socket) {
+        this.ready = null
+        this.socket.destroy()
+        this.socket = null
+        if (code !== 0) this.setState('error', `mpv stopped (${stopped})`)
+      }
     })
 
-    await this.connect()
+    await this.connect(() => stopped)
     await this.observe()
   }
 
-  /** mpv creates the socket a moment after starting, so connecting is a short retry loop. */
-  private connect(attempt = 0): Promise<void> {
+  /** mpv creates the socket a moment after starting, so connecting retries until mpv stops or time runs out. */
+  private connect(stopped: () => string | null): Promise<void> {
+    const timeoutMs = this.opts.startTimeoutMs ?? 10_000
+    const deadline = Date.now() + timeoutMs
+    const detail = (): string => (this.lastLog ? `: ${this.lastLog}` : '')
+
     return new Promise((resolve, reject) => {
-      const socket = createConnection(this.socketPath)
-
-      socket.on('connect', () => {
-        this.socket = socket
-        socket.setEncoding('utf8')
-        socket.on('data', (chunk: string) => this.onData(chunk))
-        socket.on('error', () => { this.socket = null })
-        resolve()
-      })
-
-      socket.on('error', () => {
-        if (attempt >= 50) {
-          reject(new Error('could not connect to mpv'))
+      const attempt = (): void => {
+        const reason = stopped()
+        if (reason !== null) {
+          reject(new Error(`mpv stopped while starting (${reason})${detail()}`))
           return
         }
-        setTimeout(() => this.connect(attempt + 1).then(resolve, reject), 40)
-      })
+
+        const socket = createConnection(this.socketPath)
+
+        socket.once('connect', () => {
+          this.socket = socket
+          socket.setEncoding('utf8')
+          socket.on('data', (chunk: string) => this.onData(chunk))
+          socket.on('error', () => socket.destroy())
+          socket.on('close', () => {
+            if (this.socket === socket) this.socket = null
+            this.failPending(new Error('mpv stopped answering'))
+          })
+          resolve()
+        })
+
+        socket.once('error', () => {
+          socket.destroy()
+          if (Date.now() < deadline) {
+            setTimeout(attempt, 40)
+            return
+          }
+          reject(new Error(`mpv did not answer within ${Math.round(timeoutMs / 1000)} seconds${detail()}`))
+        })
+      }
+      attempt()
     })
+  }
+
+  private failPending(err: Error): void {
+    for (const waiter of this.pending.values()) waiter.reject(err)
+    this.pending.clear()
+  }
+
+  /** Stops the process and closes the socket, after a failed start or on dispose. */
+  private halt(): void {
+    this.socket?.destroy()
+    this.socket = null
+    this.proc?.kill()
+    this.proc = null
+    rmSync(this.socketPath, { force: true })
   }
 
   private onData(chunk: string): void {
@@ -219,7 +286,7 @@ export class MpvEngine implements PlaybackEngine {
 
   /** Waits for start-up before sending, for everything after it. */
   private command(...args: unknown[]): Promise<unknown> {
-    return this.ready.then(() => this.send(...args))
+    return this.started().then(() => this.send(...args))
   }
 
   private async observe(): Promise<void> {
@@ -288,6 +355,10 @@ export class MpvEngine implements PlaybackEngine {
   }
 
   async stop(): Promise<void> {
+    if (!this.ready) {
+      this.setState('idle')
+      return
+    }
     this.swapping = true
     try {
       await this.command('stop')
@@ -313,15 +384,13 @@ export class MpvEngine implements PlaybackEngine {
 
   async dispose(): Promise<void> {
     this.listeners.clear()
-    try {
-      await this.command('quit')
-    } catch {
-      // Already gone; killing below is the fallback.
+    if (this.ready) {
+      try {
+        await this.command('quit')
+      } catch {
+        // Already gone; killing below is the fallback.
+      }
     }
-    this.socket?.destroy()
-    this.proc?.kill()
-    this.proc = null
-    this.socket = null
-    rmSync(this.socketPath, { force: true })
+    this.halt()
   }
 }

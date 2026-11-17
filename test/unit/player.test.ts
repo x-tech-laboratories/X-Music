@@ -333,6 +333,31 @@ describe('engine hand-off', () => {
     expect(player.status().error).toBe('decoder exploded')
   })
 
+  it('turns an engine that cannot start into the error state instead of a rejection', async () => {
+    const id = makeTrack()
+    engine.load = async () => { throw new Error('mpv did not answer') }
+
+    await player.playTrack(id)
+
+    expect(player.status().state).toBe('error')
+    expect(player.status().error).toBe('mpv did not answer')
+    expect(player.status().track?.id).toBe(id)
+  })
+
+  it('starts the failed track again on play, so play is the retry', async () => {
+    const id = makeTrack()
+    const load = engine.load.bind(engine)
+    engine.load = async () => { throw new Error('mpv did not answer') }
+    await player.playTrack(id)
+
+    engine.load = load
+    await player.toggle()
+
+    expect(player.status().state).toBe('playing')
+    expect(player.status().error).toBeUndefined()
+    expect(engine.loaded).toHaveLength(1)
+  })
+
   it('notifies subscribers when the status changes', async () => {
     const seen: string[] = []
     player.subscribe((e, p) => { if (e === 'status') seen.push((p as { state: string }).state) })

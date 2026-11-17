@@ -3,8 +3,8 @@
 import { Split } from '@x-tech-laboratories/x-libs/web/react/split'
 import { PageHeading } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { Empty, Failure, Skeleton } from '@x-tech-laboratories/x-libs/web/react/states'
-import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
-import { library } from '../stores/library'
+import { use_store } from '@x-tech-laboratories/x-libs/web/react/store'
+import { library, results } from '../stores/library'
 import { FilterPane } from '../widgets/FilterPane'
 import { SongList } from '../widgets/SongList'
 import { view_href } from './Navigation'
@@ -17,7 +17,8 @@ function Browser() {
   const panes_row = (
     <Split
       storage_key="x-music.split.hpfp"
-      specs={[{ min: 90 }, { min: 90 }, { min: 90, grow: true }]}
+      specs={[{ min: 140 }, { min: 140 }, { min: 140, grow: true }]}
+      preferred={[200, 200, undefined]}
       panes={[
         <FilterPane key="fp0" id="fp0" field="genre" />,
         <FilterPane key="fp1" id="fp1" field="album_artist" />,
@@ -42,12 +43,11 @@ function Browser() {
 // ============================================================================
 
 export function LibraryView() {
-  use_watch(library.data)
-  const stats = library.stats
+  const { stats, error } = use_store(results)
 
   let body
-  if (stats === null && library.error !== null) {
-    body = <Failure error={library.error} retry={() => void library.refresh()} />
+  if (stats === null && error !== null) {
+    body = <Failure error={error} retry={() => void library.refresh()} />
   } else if (stats === null) {
     body = <Skeleton lines={4} />
   } else if (stats.tracks === 0) {
