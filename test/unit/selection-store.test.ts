@@ -2,7 +2,7 @@
 // passing while the UI misbehaves is exactly the gap worth closing.
 
 import { describe, expect, it, beforeEach } from 'vitest'
-import { library } from '../../src/renderer/stores/library'
+import { library, results } from '../../src/renderer/stores/library'
 import type { TrackRow } from '@shared/ipc'
 
 const rows = (n: number): TrackRow[] =>
@@ -14,97 +14,98 @@ const rows = (n: number): TrackRow[] =>
   }))
 
 beforeEach(() => {
-  // The store owns its list; tests drive it directly rather than through IPC.
-  ;(library as unknown as { tracks: TrackRow[] }).tracks = rows(6)
-  library.clearSelection()
+  // The store owns its list; tests set it directly rather than through IPC.
+  const shown = rows(6)
+  results.set({ stats: null, tracks: shown, order: shown.map((track) => track.id), error: null })
+  library.clear_selection()
 })
 
 describe('song list selection', () => {
   it('selects one row on a plain click', () => {
-    library.clickRow(2, {})
-    expect(library.selectedIds()).toEqual([30])
-    expect(library.isSelected(30)).toBe(true)
-    expect(library.selectedCount()).toBe(1)
+    library.click_row(2, {})
+    expect(library.selected_ids()).toEqual([30])
+    expect(library.is_selected(30)).toBe(true)
+    expect(library.selected_count()).toBe(1)
   })
 
   it('replaces the selection on a second plain click', () => {
-    library.clickRow(1, {})
-    library.clickRow(4, {})
-    expect(library.selectedIds()).toEqual([50])
+    library.click_row(1, {})
+    library.click_row(4, {})
+    expect(library.selected_ids()).toEqual([50])
   })
 
   it('adds a row with ctrl, and removes it on a second ctrl click', () => {
-    library.clickRow(0, {})
-    library.clickRow(3, { ctrl: true })
-    expect(library.selectedIds().sort((a, b) => a - b)).toEqual([10, 40])
+    library.click_row(0, {})
+    library.click_row(3, { ctrl: true })
+    expect(library.selected_ids().sort((a, b) => a - b)).toEqual([10, 40])
 
-    library.clickRow(3, { ctrl: true })
-    expect(library.selectedIds()).toEqual([10])
+    library.click_row(3, { ctrl: true })
+    expect(library.selected_ids()).toEqual([10])
   })
 
   it('extends a range with shift, downwards', () => {
-    library.clickRow(1, {})
-    library.clickRow(4, { shift: true })
-    expect(library.selectedIds().sort((a, b) => a - b)).toEqual([20, 30, 40, 50])
+    library.click_row(1, {})
+    library.click_row(4, { shift: true })
+    expect(library.selected_ids().sort((a, b) => a - b)).toEqual([20, 30, 40, 50])
   })
 
   it('extends a range with shift, upwards', () => {
-    library.clickRow(4, {})
-    library.clickRow(1, { shift: true })
-    expect(library.selectedIds().sort((a, b) => a - b)).toEqual([20, 30, 40, 50])
+    library.click_row(4, {})
+    library.click_row(1, { shift: true })
+    expect(library.selected_ids().sort((a, b) => a - b)).toEqual([20, 30, 40, 50])
   })
 
   it('bumps a version on every change, which is what the list re-reads', () => {
     const before = library.selection_changes.version()
-    library.clickRow(0, {})
+    library.click_row(0, {})
     expect(library.selection_changes.version()).toBeGreaterThan(before)
   })
 
   it('reports selection through isSelected for every row in a shift range', () => {
-    library.clickRow(0, {})
-    library.clickRow(2, { shift: true })
-    expect([10, 20, 30].map((id) => library.isSelected(id))).toEqual([true, true, true])
-    expect(library.isSelected(40)).toBe(false)
+    library.click_row(0, {})
+    library.click_row(2, { shift: true })
+    expect([10, 20, 30].map((id) => library.is_selected(id))).toEqual([true, true, true])
+    expect(library.is_selected(40)).toBe(false)
   })
 
   it('selects all and inverts within the visible list', () => {
-    library.selectAll()
-    expect(library.selectedCount()).toBe(6)
-    library.clearSelection()
-    expect(library.selectedCount()).toBe(0)
+    library.select_all()
+    expect(library.selected_count()).toBe(6)
+    library.clear_selection()
+    expect(library.selected_count()).toBe(0)
   })
 })
 
 describe('keyboard range selection', () => {
   it('extends and then shrinks as the direction reverses', () => {
-    library.clickRow(1, {})
+    library.click_row(1, {})
 
     // shift+ArrowDown three times
-    library.clickRow(2, { shift: true })
-    library.clickRow(3, { shift: true })
-    library.clickRow(4, { shift: true })
-    expect(library.selectedIds().sort((a, b) => a - b)).toEqual([20, 30, 40, 50])
+    library.click_row(2, { shift: true })
+    library.click_row(3, { shift: true })
+    library.click_row(4, { shift: true })
+    expect(library.selected_ids().sort((a, b) => a - b)).toEqual([20, 30, 40, 50])
 
     // shift+ArrowUp gives the rows back rather than leaving a trail
-    library.clickRow(3, { shift: true })
-    library.clickRow(2, { shift: true })
-    expect(library.selectedIds().sort((a, b) => a - b)).toEqual([20, 30])
+    library.click_row(3, { shift: true })
+    library.click_row(2, { shift: true })
+    expect(library.selected_ids().sort((a, b) => a - b)).toEqual([20, 30])
   })
 
   it('crosses the anchor without stranding rows behind it', () => {
-    library.clickRow(3, {})
-    library.clickRow(1, { shift: true })
-    expect(library.selectedIds().sort((a, b) => a - b)).toEqual([20, 30, 40])
+    library.click_row(3, {})
+    library.click_row(1, { shift: true })
+    expect(library.selected_ids().sort((a, b) => a - b)).toEqual([20, 30, 40])
 
-    library.clickRow(5, { shift: true })
-    expect(library.selectedIds().sort((a, b) => a - b)).toEqual([40, 50, 60])
+    library.click_row(5, { shift: true })
+    expect(library.selected_ids().sort((a, b) => a - b)).toEqual([40, 50, 60])
   })
 
   it('keeps an existing selection with ctrl+shift', () => {
-    library.clickRow(0, {})            // {10}, anchor 0
-    library.clickRow(4, { ctrl: true }) // {10,50}, anchor moves to 4
-    library.clickRow(2, { ctrl: true, shift: true }) // adds 2..4 without dropping 10
+    library.click_row(0, {})            // {10}, anchor 0
+    library.click_row(4, { ctrl: true }) // {10,50}, anchor moves to 4
+    library.click_row(2, { ctrl: true, shift: true }) // adds 2..4 without dropping 10
 
-    expect(library.selectedIds().sort((a, b) => a - b)).toEqual([10, 30, 40, 50])
+    expect(library.selected_ids().sort((a, b) => a - b)).toEqual([10, 30, 40, 50])
   })
 })

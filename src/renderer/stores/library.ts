@@ -1,10 +1,9 @@
-// View-model state for the library.
-//
-// The filter stack comes from shared/view.ts and the selection from X-Libs, both framework-free; this
-// class only tells watching components when to re-read.
+// The library's browse state as X-Libs stores: the tracks the filters let through, how they are sorted and narrowed, and the picked rows.
 
 import { browser_storage, read_pref, write_pref } from '@x-tech-laboratories/x-libs/web/prefs'
+import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { intent_for, Selection } from '@x-tech-laboratories/x-libs/web/selection'
+import { create_store } from '@x-tech-laboratories/x-libs/web/store'
 import type { Sorting } from '@x-tech-laboratories/x-libs/web/tables'
 import { create_watch } from '@x-tech-laboratories/x-libs/web/watch'
 import type { FilterNode, SortKey } from '@shared/filter'
@@ -15,274 +14,220 @@ import { field } from '@shared/fields'
 import { sanitizePaneValues, sanitizeSortKeys } from '@shared/viewstate'
 import { ipc } from '../lib/ipc'
 
-const storage = browser_storage
+// A track's id as the main process hands it over, never read as a number.
+export type TrackId = TrackRow['id']
 
-const KEY_SORT = 'x-music.pref.library.sort'
-const KEY_PANES = 'x-music.pref.library.panes'
-const KEY_SEARCH = 'x-music.pref.library.search'
+// ============================================================================
+// Stores
+// ============================================================================
 
-const PAGE = 500
+export interface Results {
+  stats: LibraryStats | null
+  // Every track the filters let through, in the library's sort.
+  tracks: TrackRow[]
+  // The tracks' ids in the same order, which selection ranges and playing read.
+  order: TrackId[]
+  error: string | null
+}
 
-class LibraryStore {
-  // Bumped when the results, stats, filters or error change.
-  readonly data = create_watch()
-  // Bumped when the selection changes, so a click does not re-render what only reads the results.
-  readonly selection_changes = create_watch()
+export interface Browse {
+  sort: SortKey[]
+  // Field id to the values picked in its pane; several values in one pane mean any of them.
+  panes: Record<string, string[]>
+  search: string
+}
 
-  private statsValue: LibraryStats | null = null
-  private tracksValue: TrackRow[] = []
-  private lastSqlValue = ''
-  private errorValue: string | null = null
-  private searchValue = ''
+const SORT_KEY = 'x-music.pref.library.sort'
+const PANES_KEY = 'x-music.pref.library.panes'
+const SEARCH_KEY = 'x-music.pref.library.search'
 
-  private readonly stack = new FilterStack()
-  private sort: SortKey[] = []
-  /** Field id → selected values. Several values in one pane mean OR, as gmusicbrowser does. */
-  private readonly paneValues = new Map<string, string[]>()
-  /** Last clicked row per pane, so shift can extend from it. */
-  private readonly paneAnchor = new Map<string, number>()
-  private readonly selection = new Selection<number>()
+const DEFAULT_SORT: SortKey[] = [{ field: 'album' }, { field: 'disc_number' }, { field: 'track_number' }]
 
-  get stats(): LibraryStats | null { return this.statsValue }
-  set stats(v: LibraryStats | null) { this.statsValue = v; this.data.bump() }
-  get tracks(): TrackRow[] { return this.tracksValue }
-  set tracks(v: TrackRow[]) { this.tracksValue = v; this.data.bump() }
-  get lastSql(): string { return this.lastSqlValue }
-  set lastSql(v: string) { this.lastSqlValue = v; this.data.bump() }
-  get error(): string | null { return this.errorValue }
-  set error(v: string | null) { this.errorValue = v; this.data.bump() }
-  get search(): string { return this.searchValue }
-  set search(v: string) { this.searchValue = v; this.data.bump() }
-
-  // Changes whenever the result set does, so panes can re-read without deep watching.
-  get version(): number { return this.data.version() }
-
-  constructor() {
-    const saved = sanitizeSortKeys(read_pref<unknown>(storage(), KEY_SORT, null))
-    this.sort = saved.length > 0
-      ? saved
-      : [{ field: 'album' }, { field: 'disc_number' }, { field: 'track_number' }]
-
-    // Pane selections and the search term are rebuilt into the filter stack, so the chips show up
-    // and the user can see why the library is narrowed rather than wondering.
-    for (const [fieldId, values] of Object.entries(
-      sanitizePaneValues(read_pref<unknown>(storage(), KEY_PANES, null))
-    )) {
-      this.applyPane(fieldId, values)
-    }
-
-    const search = read_pref(storage(), KEY_SEARCH, '')
-    if (typeof search === 'string' && search.trim() !== '') this.applySearch(search)
-  }
-
-  private persist(): void {
-    write_pref(storage(), KEY_SORT, this.sort)
-    write_pref(storage(), KEY_PANES, Object.fromEntries(this.paneValues))
-    write_pref(storage(), KEY_SEARCH, this.search)
-  }
-
-  private filter(): FilterNode {
-    return this.stack.toFilter()
-  }
-
-  chips(): readonly { id: string; label: string }[] {
-    return this.stack.list().filter((c) => c.removable).map((c) => ({ id: c.id, label: c.label }))
-  }
-
-  /**
-   * The stack is the single source of truth for what is filtered, so a pane reads its own selection
-   * back rather than keeping a private copy that could drift from the chips.
-   */
-  selectionFor(fieldId: string): readonly string[] {
-    return this.paneValues.get(fieldId) ?? []
-  }
-
-  isPaneSelected(fieldId: string, value: string | null): boolean {
-    const values = this.paneValues.get(fieldId)
-    if (!values || values.length === 0) return value === null
-    return value !== null && values.includes(value)
-  }
-
-  hasFilters(): boolean {
-    return this.stack.list().some((c) => c.removable)
-  }
-
-  async clearFilters(): Promise<void> {
-    this.stack.clear()
-    this.paneValues.clear()
-    this.paneAnchor.clear()
-    this.search = ''
-    this.persist()
-    await this.refresh()
-  }
-
-  // ── selection ──────────────────────────────────────────────────────────
-  isSelected(id: number): boolean {
-    return this.selection.has(id)
-  }
-
-  selectedIds(): number[] {
-    return this.selection.ids()
-  }
-
-  selectedCount(): number {
-    return this.selection.size
-  }
-
-  /** Selection internals, for diagnostics only. */
-  inspectSelection(): { size: number; anchor: number | null } {
-    return this.selection.inspect()
-  }
-
-  clickRow(index: number, modifiers: { shift?: boolean; ctrl?: boolean }): void {
-    const ordered = this.tracks.map((t) => t.id)
-    this.selection.apply(ordered, index, intent_for(modifiers))
-    this.selection_changes.bump()
-  }
-
-  selectAll(): void {
-    this.selection.select_all(this.tracks.map((t) => t.id))
-    this.selection_changes.bump()
-  }
-
-  clearSelection(): void {
-    this.selection.clear()
-    this.selection_changes.bump()
-  }
-
-  async refresh(): Promise<void> {
-    try {
-      this.error = null
-      this.stats = await ipc('library:stats')
-
-      const req = { filter: this.filter(), sort: [...this.sort], limit: { count: PAGE } }
-      this.tracks = await ipc('library:query', req)
-      this.lastSql = (await ipc('library:explain', req)).sql
-
-      // A narrowed result set must not leave selections pointing at rows nobody can see.
-      this.selection.retain(this.tracks.map((t) => t.id))
-      this.selection_changes.bump()
-      this.data.bump()
-    } catch (err) {
-      this.error = (err as Error).message
-    }
-  }
-
-  async groupsFor(fieldId: string): Promise<GroupRow[]> {
-    try {
-      return await ipc('library:groupBy', { filter: this.filter(), field: fieldId })
-    } catch (err) {
-      this.error = (err as Error).message
-      return []
-    }
-  }
-
-  /**
-   * A pane click narrows the query. Several values within one pane are OR'd together, which is what
-   * makes "Jazz and Blues" a single browse step rather than two.
-   */
-  async setPaneFilter(
-    fieldId: string,
-    value: string | null,
-    modifiers: { shift?: boolean; ctrl?: boolean; index?: number; ordered?: readonly (string | null)[] } = {}
-  ): Promise<void> {
-    const current = this.paneValues.get(fieldId) ?? []
-    let next: string[]
-
-    if (value === null) {
-      next = []
-    } else if (modifiers.shift && modifiers.ordered && modifiers.index !== undefined) {
-      const anchor = this.paneAnchor.get(fieldId) ?? modifiers.index
-      const [lo, hi] = anchor <= modifiers.index
-        ? [anchor, modifiers.index]
-        : [modifiers.index, anchor]
-      next = modifiers.ordered.slice(lo, hi + 1).filter((v): v is string => v !== null)
-    } else if (modifiers.ctrl) {
-      next = current.includes(value)
-        ? current.filter((v) => v !== value)
-        : [...current, value]
-      this.paneAnchor.set(fieldId, modifiers.index ?? 0)
-    } else {
-      // A plain click on the only selected value clears it, which is how a toggle should feel.
-      next = current.length === 1 && current[0] === value ? [] : [value]
-      this.paneAnchor.set(fieldId, modifiers.index ?? 0)
-    }
-
-    this.applyPane(fieldId, next)
-    this.persist()
-    await this.refresh()
-  }
-
-  private applyPane(fieldId: string, values: readonly string[]): void {
-    const id = `pane:${fieldId}`
-
-    if (values.length === 0) {
-      this.stack.remove(id)
-      this.paneValues.delete(fieldId)
-      return
-    }
-
-    this.paneValues.set(fieldId, [...values])
-    const d = field(fieldId)
-
-    const node = d.storage === 'multi'
-      ? leaf(fieldId, 'any', [...values])
-      : values.length === 1
-        ? leaf(fieldId, 'is', d.type === 'integer' ? Number(values[0]) : values[0]!)
-        : or(...values.map((v) => leaf(fieldId, 'is', d.type === 'integer' ? Number(v) : v)))
-
-    const label = values.length === 1
-      ? `${d.name}: ${values[0]}`
-      : `${d.name}: ${values.length} selected`
-
-    this.stack.push({ id, label, node, removable: true })
-  }
-
-  private applySearch(text: string): void {
-    this.search = text
-    const id = 'search'
-
-    if (text.trim() === '') this.stack.remove(id)
-    else {
-      this.stack.push({
-        id,
-        label: `"${text}"`,
-        node: leaf('title', 'contains', text.trim()),
-        removable: true
-      })
-    }
-  }
-
-  async setSearch(text: string): Promise<void> {
-    this.applySearch(text)
-    this.persist()
-    await this.refresh()
-  }
-
-  async removeChip(id: string): Promise<void> {
-    this.stack.remove(id)
-    if (id.startsWith('pane:')) {
-      const fieldId = id.slice('pane:'.length)
-      this.paneValues.delete(fieldId)
-      this.paneAnchor.delete(fieldId)
-    }
-    if (id === 'search') {
-      this.search = ''
-    }
-    this.persist()
-    await this.refresh()
-  }
-
-  // The sort keys as the table shows them, first deciding first.
-  sorting(): Sorting[] {
-    return this.sort.map((k) => ({ key: k.field, descending: k.dir === 'desc' }))
-  }
-
-  async setSorting(sorting: readonly Sorting[]): Promise<void> {
-    this.sort = sorting.map((k) => ({ field: k.key, dir: k.descending ? 'desc' : 'asc' }))
-    this.persist()
-    await this.refresh()
+function remembered(): Browse {
+  const storage = browser_storage()
+  const sort = sanitizeSortKeys(read_pref<unknown>(storage, SORT_KEY, null))
+  const search = read_pref<unknown>(storage, SEARCH_KEY, '')
+  return {
+    sort: sort.length > 0 ? sort : DEFAULT_SORT,
+    panes: sanitizePaneValues(read_pref<unknown>(storage, PANES_KEY, null)),
+    search: typeof search === 'string' ? search : ''
   }
 }
 
-export const library = new LibraryStore()
+export const results = create_store<Results>({ stats: null, tracks: [], order: [], error: null })
+export const browse = create_store<Browse>(remembered())
+// True while the tracks are being fetched again.
+export const loading = create_store(false)
+
+const selection = new Selection<TrackId>()
+const selection_changes = create_watch()
+
+browse.watch.subscribe(() => {
+  const storage = browser_storage()
+  const state = browse.get()
+  write_pref(storage, SORT_KEY, state.sort)
+  write_pref(storage, PANES_KEY, state.panes)
+  write_pref(storage, SEARCH_KEY, state.search)
+})
+
+// ============================================================================
+// Filters
+// ============================================================================
+
+function pane_node(field_id: string, values: readonly string[]): FilterNode {
+  const descriptor = field(field_id)
+  if (descriptor.storage === 'multi') return leaf(field_id, 'any', [...values])
+  const typed = (value: string) => (descriptor.type === 'integer' ? Number(value) : value)
+  return values.length === 1 ? leaf(field_id, 'is', typed(values[0]!)) : or(...values.map((value) => leaf(field_id, 'is', typed(value))))
+}
+
+// The filter stack the browse state stands for, leaving out one pane so that pane can still offer every value.
+function stack_of(state: Browse, leave_out?: string): FilterStack {
+  const stack = new FilterStack()
+  for (const [field_id, values] of Object.entries(state.panes)) {
+    if (field_id === leave_out || values.length === 0) continue
+    const name = field(field_id).name
+    const label = values.length === 1 ? `${name}: ${values[0]}` : `${name}: ${values.length} picked`
+    stack.push({ id: `pane:${field_id}`, label, node: pane_node(field_id, values), removable: true })
+  }
+  if (state.search.trim() !== '') {
+    stack.push({ id: 'search', label: `Title: ${state.search.trim()}`, node: leaf('title', 'contains', state.search.trim()), removable: true })
+  }
+  return stack
+}
+
+export const filter_of = (state: Browse, leave_out?: string): FilterNode => stack_of(state, leave_out).toFilter()
+
+// The chips that say why the list is narrowed, each one removable.
+export const chips_of = (state: Browse): { id: string; label: string }[] =>
+  stack_of(state).list().map((chip) => ({ id: chip.id, label: chip.label }))
+
+// ============================================================================
+// Loading
+// ============================================================================
+
+let latest_request = 0
+
+// Fetches the stats and every track the filters let through; a reply overtaken by a newer request is dropped.
+async function refresh(): Promise<void> {
+  const request = ++latest_request
+  loading.set(true)
+  try {
+    const state = browse.get()
+    const [stats, tracks] = await Promise.all([
+      ipc('library:stats'),
+      ipc('library:query', { filter: filter_of(state), sort: [...state.sort] })
+    ])
+    if (request !== latest_request) return
+    const order = tracks.map((track) => track.id)
+    // A narrowed list must not leave picks on rows nobody can see.
+    selection.retain(order)
+    selection_changes.bump()
+    results.set({ stats, tracks, order, error: null })
+  } catch (error) {
+    if (request === latest_request) results.update((before) => ({ ...before, error: describe_error(error) }))
+  } finally {
+    if (request === latest_request) loading.set(false)
+  }
+}
+
+function change_browse(make: (state: Browse) => Browse): Promise<void> {
+  browse.update(make)
+  return refresh()
+}
+
+// The values of a field under every filter but its own pane's, which throws so the pane can show why.
+function groups_for(field_id: string): Promise<GroupRow[]> {
+  return ipc('library:groupBy', { filter: filter_of(browse.get(), field_id), field: field_id })
+}
+
+// ============================================================================
+// Track names
+// ============================================================================
+
+export interface TrackName { title: string; artist: string }
+
+const names_fetched = new Map<TrackId, TrackName>()
+
+// The title and artist of each id, from the loaded list or else asked of the library once, for tracks the filters hide.
+async function names_of(ids: readonly TrackId[]): Promise<Map<TrackId, TrackName>> {
+  const loaded = new Map(results.get().tracks.map((track) => [track.id, track]))
+  const names = new Map<TrackId, TrackName>()
+  await Promise.all(ids.map(async (id) => {
+    const track = loaded.get(id)
+    if (track) return void names.set(id, { title: track.title ?? '', artist: track.artist ?? '' })
+    if (!names_fetched.has(id)) {
+      const details = await ipc('tracks:details', id)
+      const artist = details?.fields.find((each) => each.field === 'artist')?.value ?? ''
+      names_fetched.set(id, { title: details?.title ?? '', artist })
+    }
+    names.set(id, names_fetched.get(id)!)
+  }))
+  return names
+}
+
+// ============================================================================
+// Library
+// ============================================================================
+
+export const library = {
+  // Bumps when the results change; the status bar and Settings read it.
+  data: results.watch,
+  selection_changes,
+
+  get stats(): LibraryStats | null { return results.get().stats },
+  set stats(stats: LibraryStats | null) { results.update((before) => ({ ...before, stats })) },
+  get error(): string | null { return results.get().error },
+  set error(error: string | null) { results.update((before) => ({ ...before, error })) },
+  get tracks(): TrackRow[] { return results.get().tracks },
+
+  refresh,
+  groups_for,
+  names_of,
+
+  // ── Panes and search ──
+
+  set_pane: (field_id: string, values: readonly string[]): Promise<void> =>
+    change_browse((state) => ({ ...state, panes: { ...state.panes, [field_id]: [...values] } })),
+
+  set_search: (search: string): Promise<void> => change_browse((state) => ({ ...state, search })),
+
+  remove_chip: (id: string): Promise<void> => change_browse((state) => {
+    if (id === 'search') return { ...state, search: '' }
+    const panes = { ...state.panes }
+    delete panes[id.slice('pane:'.length)]
+    return { ...state, panes }
+  }),
+
+  clear_filters: (): Promise<void> => change_browse((state) => ({ ...state, panes: {}, search: '' })),
+
+  // ── Sorting ──
+
+  sorting: (): Sorting[] => browse.get().sort.map((key) => ({ key: key.field, descending: key.dir === 'desc' })),
+
+  set_sorting: (sorting: readonly Sorting[]): Promise<void> =>
+    change_browse((state) => ({ ...state, sort: sorting.map((key) => ({ field: key.key, dir: key.descending ? 'desc' : 'asc' })) })),
+
+  // ── Picked rows ──
+
+  is_selected: (id: TrackId): boolean => selection.has(id),
+  selected_ids: (): TrackId[] => selection.ids(),
+  selected_count: (): number => selection.size,
+  // The picks and the anchor, for finding why a range came out wrong.
+  inspect_selection: () => selection.inspect(),
+
+  click_row(index: number, modifiers: { shift?: boolean; ctrl?: boolean }): void {
+    selection.apply(results.get().order, index, intent_for(modifiers))
+    selection_changes.bump()
+  },
+
+  select_all(): void {
+    selection.select_all(results.get().order)
+    selection_changes.bump()
+  },
+
+  clear_selection(): void {
+    selection.clear()
+    selection_changes.bump()
+  }
+}

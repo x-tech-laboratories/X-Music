@@ -1,24 +1,7 @@
-.tabbed { display: grid; grid-template-rows: auto 1fr; height: 100%; min-height: 0; gap: var(--space-2); }
+.tabbed { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100%; min-height: 0; gap: var(--space-2); }
 
-.body { min-height: 0; overflow-y: auto; padding: var(--space-2); }
+.body { display: grid; min-height: 0; overflow-y: auto; padding: var(--space-2); }
 
-.queueHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2); }
+.queue { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--space-2); min-height: 0; }
 
-.queue { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--border-width); }
-
-.item {
-  display: grid;
-  grid-template-columns: 22px 1fr auto auto;
-  gap: var(--space-2);
-  align-items: center;
-  min-height: var(--row-height);
-  padding: 0 var(--space-2);
-  font-size: var(--text-caption);
-  border-radius: var(--radius-small);
-}
-
-.item:hover { background: var(--surface-navigation-hover); }
-
-.position { color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
-
-.title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue td { white-space: nowrap; }
