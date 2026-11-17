@@ -8,6 +8,9 @@ import { copyFileSync, existsSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { open_library } from '@shared/library/store'
+import { bareDb, type TestDb } from './sqlite'
+
 export const livePath = (): string => join(homedir(), '.config/x-music/library.db')
 
 export const hasLiveLibrary = (): boolean => existsSync(livePath())
@@ -23,4 +26,11 @@ export function copyLiveLibrary(name: string): string {
   }
 
   return target
+}
+
+/** Opens a copy as the app would, upgrading it to the current schema if it is older, so the live database is never touched. */
+export function openLiveCopy(name: string): TestDb {
+  const db = bareDb(copyLiveLibrary(name))
+  open_library(db)
+  return db
 }

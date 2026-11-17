@@ -31,12 +31,10 @@ function recorded_calls(): Call[] {
   const calls: Call[] = []
   const inner = window.xMusic as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>
   Object.assign(window, {
-    xMusic: new Proxy({}, {
-      get: (_target, channel: string) => (...args: unknown[]) => {
-        calls.push({ channel, args })
-        return inner[channel]!(...args)
-      }
-    })
+    xMusic: Object.fromEntries(Object.keys(inner).map((channel) => [channel, (...args: unknown[]) => {
+      calls.push({ channel, args })
+      return inner[channel]!(...args)
+    }]))
   })
   return calls
 }

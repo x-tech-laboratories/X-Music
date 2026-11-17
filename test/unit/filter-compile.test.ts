@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 
-import { compileFilter, compileGroupBy } from '@main/query/compile'
+import { compileFilter, compileGroupBy } from '@shared/query/compile'
 import { and, or, not, leaf } from '@shared/filter'
 import { makeCorpus, FIXED_NOW, type Corpus } from '../helpers/corpus'
 import { freshDb, loadCorpus, runQuery, type TestDb } from '../helpers/sqlite'
@@ -17,7 +17,7 @@ describe('filter compiler', () => {
 
   afterAll(() => db.close())
 
-  const ids = (node: Parameters<typeof compileFilter>[0]): number[] => {
+  const ids = (node: Parameters<typeof compileFilter>[0]): string[] => {
     const { sql, params } = compileFilter(node, { now: FIXED_NOW })
     return runQuery(db, sql, params)
   }
@@ -72,7 +72,7 @@ describe('filter compiler', () => {
       now: FIXED_NOW,
       sort: [{ field: 'year', dir: 'desc' }]
     })
-    const rows = db.prepare(sql.replace('t.id', 't.id, t.year')).all(...(params as never[])) as
+    const rows = db.prepare(sql.replace('t.id', 't.id, t.year')).all(...params) as
       { id: number; year: number | null }[]
 
     const firstNull = rows.findIndex((r) => r.year === null)
@@ -81,9 +81,18 @@ describe('filter compiler', () => {
     }
   })
 
+  it('breaks ties in a sort by id, so the same query always lists tracks in the same order', () => {
+    const { sql, params } = compileFilter(and(), { now: FIXED_NOW, sort: [{ field: 'compilation' }] })
+    const rows = db.prepare(sql.replace('t.id', 't.id, t.compilation')).all(...params) as { id: string; compilation: number }[]
+
+    const expected = [...rows].sort((a, b) => a.compilation - b.compilation || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    expect(rows.map((r) => r.id)).toEqual(expected.map((r) => r.id))
+    expect(sql).toMatch(/, t\.id$/)
+  })
+
   it('groups multi-value fields by interned value with counts and durations', () => {
     const { sql, params } = compileGroupBy(and(), 'genre', FIXED_NOW)
-    const rows = db.prepare(sql).all(...(params as never[])) as
+    const rows = db.prepare(sql).all(...params) as
       { label: string; n: number; total_ms: number }[]
 
     expect(rows.length).toBeGreaterThan(0)

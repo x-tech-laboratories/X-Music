@@ -14,20 +14,20 @@ describe('track cover', () => {
     let answer: (art: { url: string | null; source: string }) => void = () => undefined
     const calls = record_calls({ 'art:forTrack': () => new Promise((resolve) => { answer = resolve }) })
 
-    const { container } = render(<TrackCover track_id={7} size={88} />)
+    const { container } = render(<TrackCover track_id="track-7" size={88} />)
 
     const cover = container.querySelector('.cover')!
     expect(cover.getAttribute('aria-busy')).toBe('true')
     expect(cover.querySelector('svg')).toBeNull()
     answer({ url: 'x-music-art://7', source: 'embedded' })
     await waitFor(() => expect(cover.querySelector('img')?.getAttribute('src')).toBe('x-music-art://7'))
-    expect(calls.find((call) => call.channel === 'art:forTrack')?.args).toEqual([{ trackId: 7, size: 88 }])
+    expect(calls.find((call) => call.channel === 'art:forTrack')?.args).toEqual([{ trackId: 'track-7', size: 88 }])
   })
 
   it('shows the music placeholder for a track with no art', async () => {
     record_calls({ 'art:forTrack': { url: null, source: 'none' } })
 
-    const { container } = render(<TrackCover track_id={7} size={88} />)
+    const { container } = render(<TrackCover track_id="track-7" size={88} />)
 
     await waitFor(() => expect(container.querySelector('.cover svg.line-icon')).not.toBeNull())
     expect(container.querySelector('img')).toBeNull()

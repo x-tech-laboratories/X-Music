@@ -231,7 +231,7 @@ export function parseGmbrc(text: string): GmbrcData {
 }
 
 /** Where gmusicbrowser keeps its configuration by default. */
-export function defaultGmbrcPath(home: string, platform = process.platform): string {
+export function defaultGmbrcPath(home: string, platform: string): string {
   if (platform === 'win32') return `${home}/gmusicbrowser/gmbrc`
   if (platform === 'darwin') return `${home}/Library/Preferences/gmusicbrowser/gmbrc`
   return `${home}/.config/gmusicbrowser/gmbrc`

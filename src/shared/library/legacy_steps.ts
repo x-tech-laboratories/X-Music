@@ -1,9 +1,14 @@
--- X-Music initial schema.
+// The four schema steps X-Music took before its tables moved to Drizzle and ids every device can make, kept word
+// for word so a library left at any of them is first brought to the last before it is converted.
+
+// ── Steps ────────────────────────────────────────────────────────────────────
+
+const initial = `-- X-Music initial schema.
 --
--- The central idea: a `track` is a logical piece of music, not a file. It survives renames, moves,
+-- The central idea: a \`track\` is a logical piece of music, not a file. It survives renames, moves,
 -- format changes, retagging, and having no file at all. Anything that can actually render it — a
 -- local file, a second copy in another format, a CUE range inside a larger file, a streaming
--- provider URI — is a `media` row hanging off it. A track with zero media is still a track.
+-- provider URI — is a \`media\` row hanging off it. A track with zero media is still a track.
 
 -- ── identity and provenance ─────────────────────────────────────────────────
 
@@ -237,3 +242,59 @@ CREATE TABLE settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 ) STRICT;
+`
+
+const history_unique = `-- A play event is identified by its track, its instant and its kind. Without this, re-importing a
+-- gmusicbrowser library appends a second copy of every play in its history.
+DELETE FROM play_history
+WHERE id NOT IN (SELECT MIN(id) FROM play_history GROUP BY track_id, at, kind);
+
+CREATE UNIQUE INDEX play_history_unique ON play_history(track_id, at, kind);
+`
+
+const merge_journal = `-- A merge deletes track rows, which makes it the most destructive operation in X-Music that does not
+-- touch a file. Every merge records enough to put the library back exactly as it was, so the action
+-- is reversible rather than merely careful (DESIGN-SPEC §9.4.3).
+
+CREATE TABLE merge_journal (
+  id          INTEGER PRIMARY KEY,
+  batch_id    TEXT NOT NULL,
+  at          INTEGER NOT NULL,
+  survivor_id INTEGER NOT NULL,
+  -- Full pre-merge state of every participating track, including the survivor, as JSON.
+  snapshot    TEXT NOT NULL,
+  undone      INTEGER NOT NULL DEFAULT 0
+) STRICT;
+
+CREATE INDEX merge_journal_batch ON merge_journal(batch_id);
+CREATE INDEX merge_journal_at ON merge_journal(at);
+`
+
+const artwork = `-- Cached cover art, content-addressed.
+--
+-- A row is recorded even when nothing was found, with source 'none', so a track without a cover is
+-- not searched again on every play. Deleting the cache directory is safe: the rows point at files
+-- that are regenerated on demand.
+
+CREATE TABLE artwork (
+  id        INTEGER PRIMARY KEY,
+  album_id  INTEGER REFERENCES albums(id) ON DELETE CASCADE,
+  track_id  INTEGER REFERENCES tracks(id) ON DELETE CASCADE,
+  source    TEXT NOT NULL,          -- 'embedded' | 'folder' | 'none'
+  origin    TEXT,                   -- the file the image came from
+  hash      TEXT,                   -- content hash of the image bytes
+  path      TEXT,                   -- cached original
+  width     INTEGER,
+  height    INTEGER,
+  bytes     INTEGER,
+  found_at  INTEGER NOT NULL
+) STRICT;
+
+-- Art hangs off an album where there is one, and off the track otherwise, so a loose single still
+-- gets a cover. Two partial indexes rather than one constraint, since either column may be null.
+CREATE UNIQUE INDEX artwork_album ON artwork(album_id) WHERE album_id IS NOT NULL;
+CREATE UNIQUE INDEX artwork_track ON artwork(track_id) WHERE track_id IS NOT NULL;
+CREATE INDEX artwork_hash ON artwork(hash);
+`
+
+export const legacy_steps: readonly string[] = [initial, history_unique, merge_journal, artwork]

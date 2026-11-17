@@ -14,6 +14,11 @@ in `docs/DESIGN-SPEC.md`, and every feature should match it.
 
 - Code in `src/shared/` stays framework-free and DOM-free; it is imported by both main and renderer.
 - Tests reach SQLite through `node:sqlite`, never `better-sqlite3`.
+- The library store lives in `src/shared/library/` and imports nothing from `node:`. A schema change is made in
+  `schema.ts` and written with `npm run db:generate`; a released migration is never edited. Rows get ids from
+  `new_id()`, never an auto-incrementing number.
+- Never open the real library (`~/.config/x-music/library.db` or wherever `X_MUSIC_DB` points) from a test or a
+  check; use a scratch database.
 - Keep the SQL compiler and the native filter predicate in agreement; `test/property/ast-agreement.test.ts` must pass.
 - Add a test for every behaviour you change, and a failing test first for every bug fix.
 - Prefer settings and extension points over changing behaviour for everyone.

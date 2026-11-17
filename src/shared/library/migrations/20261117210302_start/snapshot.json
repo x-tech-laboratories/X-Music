@@ -1,0 +1,2228 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "id": "731c7dc3-bb1c-4a7c-869a-213708290066",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "ddl": [
+    {
+      "name": "albums",
+      "entityType": "tables"
+    },
+    {
+      "name": "artwork",
+      "entityType": "tables"
+    },
+    {
+      "name": "media",
+      "entityType": "tables"
+    },
+    {
+      "name": "media_tags",
+      "entityType": "tables"
+    },
+    {
+      "name": "merge_journal",
+      "entityType": "tables"
+    },
+    {
+      "name": "play_history",
+      "entityType": "tables"
+    },
+    {
+      "name": "playlist_tracks",
+      "entityType": "tables"
+    },
+    {
+      "name": "playlists",
+      "entityType": "tables"
+    },
+    {
+      "name": "roots",
+      "entityType": "tables"
+    },
+    {
+      "name": "settings",
+      "entityType": "tables"
+    },
+    {
+      "name": "tag_writes",
+      "entityType": "tables"
+    },
+    {
+      "name": "track_extras",
+      "entityType": "tables"
+    },
+    {
+      "name": "track_values",
+      "entityType": "tables"
+    },
+    {
+      "name": "tracks",
+      "entityType": "tables"
+    },
+    {
+      "name": "values_",
+      "entityType": "tables"
+    },
+    {
+      "table": "albums",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "match_key",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "pinned",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "name",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "edition",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "album_artist_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "year",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "disc_total",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "mb_release_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "mb_release_group_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "is_compilation",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "rg_album_gain",
+      "type": "real",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "added",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "artwork",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "artwork",
+      "name": "album_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "artwork",
+      "name": "track_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "artwork",
+      "name": "source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "artwork",
+      "name": "origin",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "artwork",
+      "name": "hash",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "artwork",
+      "name": "path",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "artwork",
+      "name": "width",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "artwork",
+      "name": "height",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "artwork",
+      "name": "bytes",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "artwork",
+      "name": "found_at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "track_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "uri",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "provider",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "subtrack_index",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "start_ms",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "end_ms",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "audio_hash",
+      "type": "blob",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "audio_hash_algo",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "codec",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "container",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "bitrate",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "bitrate_mode",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "samplerate",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "channels",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "bits_per_sample",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "filesize",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "mtime",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "present",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "last_seen",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "quality_rank",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media",
+      "name": "added",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media_tags",
+      "name": "media_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media_tags",
+      "name": "field_id",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media_tags",
+      "name": "ordinal",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "media_tags",
+      "name": "value",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "merge_journal",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "merge_journal",
+      "name": "batch_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "merge_journal",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "merge_journal",
+      "name": "survivor_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "merge_journal",
+      "name": "snapshot",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "merge_journal",
+      "name": "undone",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "play_history",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "play_history",
+      "name": "track_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "play_history",
+      "name": "media_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "play_history",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "play_history",
+      "name": "kind",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "play_history",
+      "name": "position_ms",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "playlist_tracks",
+      "name": "playlist_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "playlist_tracks",
+      "name": "track_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "playlist_tracks",
+      "name": "position",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "playlists",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "playlists",
+      "name": "name",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "playlists",
+      "name": "kind",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "playlists",
+      "name": "definition",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "playlists",
+      "name": "parent_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "playlists",
+      "name": "position",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "playlists",
+      "name": "created",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "playlists",
+      "name": "modified",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "roots",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "roots",
+      "name": "path",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "roots",
+      "name": "include",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "roots",
+      "name": "exclude",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "roots",
+      "name": "slow",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "roots",
+      "name": "enabled",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "roots",
+      "name": "last_scan",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "settings",
+      "name": "key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "settings",
+      "name": "value",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tag_writes",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tag_writes",
+      "name": "batch_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tag_writes",
+      "name": "media_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tag_writes",
+      "name": "field_id",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tag_writes",
+      "name": "old_value",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tag_writes",
+      "name": "new_value",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tag_writes",
+      "name": "at",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tag_writes",
+      "name": "applied",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "track_extras",
+      "name": "track_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "track_extras",
+      "name": "field_id",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "track_extras",
+      "name": "value",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "track_values",
+      "name": "track_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "track_values",
+      "name": "field_id",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "track_values",
+      "name": "value_id",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "track_values",
+      "name": "ordinal",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "title",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "album_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "year",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "track_number",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "disc_number",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "length_ms",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "compilation",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "bpm",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "mb_recording_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "acoustid",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "identity_source",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'heuristic'",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "identity_key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "pinned",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "rating",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "play_count",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "skip_count",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "first_played",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "last_played",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "last_skipped",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "bookmark_ms",
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "loved",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "rg_track_gain",
+      "type": "real",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "rg_album_gain",
+      "type": "real",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "added",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "modified",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "tracks",
+      "name": "primary_media_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "values_",
+      "name": "id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "values_",
+      "name": "field_id",
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "values_",
+      "name": "value",
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "values_",
+      "name": "sort_key",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "values_",
+      "name": "colour",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "values_",
+      "name": "mb_id",
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "entityType": "columns"
+    },
+    {
+      "table": "albums",
+      "name": "albums_artist",
+      "columns": [
+        {
+          "value": "album_artist_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "albums",
+      "name": "albums_mbid",
+      "columns": [
+        {
+          "value": "mb_release_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "\"albums\".\"mb_release_id\" IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "artwork",
+      "name": "artwork_album",
+      "columns": [
+        {
+          "value": "album_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"artwork\".\"album_id\" IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "artwork",
+      "name": "artwork_track",
+      "columns": [
+        {
+          "value": "track_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"artwork\".\"track_id\" IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "artwork",
+      "name": "artwork_hash",
+      "columns": [
+        {
+          "value": "hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "media",
+      "name": "media_uri_subtrack",
+      "columns": [
+        {
+          "value": "uri",
+          "isExpression": false
+        },
+        {
+          "value": "subtrack_index",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "media",
+      "name": "media_track",
+      "columns": [
+        {
+          "value": "track_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "media",
+      "name": "media_hash",
+      "columns": [
+        {
+          "value": "audio_hash",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "\"media\".\"audio_hash\" IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "media",
+      "name": "media_present",
+      "columns": [
+        {
+          "value": "present",
+          "isExpression": false
+        },
+        {
+          "value": "kind",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "media",
+      "name": "media_uri",
+      "columns": [
+        {
+          "value": "uri",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "merge_journal",
+      "name": "merge_journal_batch",
+      "columns": [
+        {
+          "value": "batch_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "merge_journal",
+      "name": "merge_journal_at",
+      "columns": [
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "play_history",
+      "name": "play_history_track",
+      "columns": [
+        {
+          "value": "track_id",
+          "isExpression": false
+        },
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "play_history",
+      "name": "play_history_at",
+      "columns": [
+        {
+          "value": "at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "play_history",
+      "name": "play_history_unique",
+      "columns": [
+        {
+          "value": "track_id",
+          "isExpression": false
+        },
+        {
+          "value": "at",
+          "isExpression": false
+        },
+        {
+          "value": "kind",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "tag_writes",
+      "name": "tag_writes_batch",
+      "columns": [
+        {
+          "value": "batch_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "track_values",
+      "name": "track_values_lookup",
+      "columns": [
+        {
+          "value": "field_id",
+          "isExpression": false
+        },
+        {
+          "value": "value_id",
+          "isExpression": false
+        },
+        {
+          "value": "track_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "tracks",
+      "name": "tracks_album",
+      "columns": [
+        {
+          "value": "album_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "tracks",
+      "name": "tracks_identity",
+      "columns": [
+        {
+          "value": "identity_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "tracks",
+      "name": "tracks_mbid",
+      "columns": [
+        {
+          "value": "mb_recording_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "\"tracks\".\"mb_recording_id\" IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "tracks",
+      "name": "tracks_acoustid",
+      "columns": [
+        {
+          "value": "acoustid",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": "\"tracks\".\"acoustid\" IS NOT NULL",
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "tracks",
+      "name": "tracks_rating",
+      "columns": [
+        {
+          "value": "rating",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "tracks",
+      "name": "tracks_last_played",
+      "columns": [
+        {
+          "value": "last_played",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "tracks",
+      "name": "tracks_added",
+      "columns": [
+        {
+          "value": "added",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "values_",
+      "name": "values_field_value",
+      "columns": [
+        {
+          "value": "field_id",
+          "isExpression": false
+        },
+        {
+          "value": "value",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "entityType": "indexes"
+    },
+    {
+      "table": "albums",
+      "name": "fk_albums_album_artist_id_values__id_fk",
+      "columns": [
+        "album_artist_id"
+      ],
+      "tableTo": "values_",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "artwork",
+      "name": "fk_artwork_album_id_albums_id_fk",
+      "columns": [
+        "album_id"
+      ],
+      "tableTo": "albums",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "artwork",
+      "name": "fk_artwork_track_id_tracks_id_fk",
+      "columns": [
+        "track_id"
+      ],
+      "tableTo": "tracks",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "media",
+      "name": "fk_media_track_id_tracks_id_fk",
+      "columns": [
+        "track_id"
+      ],
+      "tableTo": "tracks",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "media_tags",
+      "name": "fk_media_tags_media_id_media_id_fk",
+      "columns": [
+        "media_id"
+      ],
+      "tableTo": "media",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "play_history",
+      "name": "fk_play_history_track_id_tracks_id_fk",
+      "columns": [
+        "track_id"
+      ],
+      "tableTo": "tracks",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "play_history",
+      "name": "fk_play_history_media_id_media_id_fk",
+      "columns": [
+        "media_id"
+      ],
+      "tableTo": "media",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "playlist_tracks",
+      "name": "fk_playlist_tracks_playlist_id_playlists_id_fk",
+      "columns": [
+        "playlist_id"
+      ],
+      "tableTo": "playlists",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "playlist_tracks",
+      "name": "fk_playlist_tracks_track_id_tracks_id_fk",
+      "columns": [
+        "track_id"
+      ],
+      "tableTo": "tracks",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "playlists",
+      "name": "fk_playlists_parent_id_playlists_id_fk",
+      "columns": [
+        "parent_id"
+      ],
+      "tableTo": "playlists",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "tag_writes",
+      "name": "fk_tag_writes_media_id_media_id_fk",
+      "columns": [
+        "media_id"
+      ],
+      "tableTo": "media",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "track_extras",
+      "name": "fk_track_extras_track_id_tracks_id_fk",
+      "columns": [
+        "track_id"
+      ],
+      "tableTo": "tracks",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "track_values",
+      "name": "fk_track_values_track_id_tracks_id_fk",
+      "columns": [
+        "track_id"
+      ],
+      "tableTo": "tracks",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "track_values",
+      "name": "fk_track_values_value_id_values__id_fk",
+      "columns": [
+        "value_id"
+      ],
+      "tableTo": "values_",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "tracks",
+      "name": "fk_tracks_album_id_albums_id_fk",
+      "columns": [
+        "album_id"
+      ],
+      "tableTo": "albums",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "tracks",
+      "name": "fk_tracks_primary_media_id_media_id_fk",
+      "columns": [
+        "primary_media_id"
+      ],
+      "tableTo": "media",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "SET NULL",
+      "nameExplicit": false,
+      "entityType": "fks"
+    },
+    {
+      "table": "media_tags",
+      "name": "media_tags_pk",
+      "columns": [
+        "media_id",
+        "field_id",
+        "ordinal"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "playlist_tracks",
+      "name": "playlist_tracks_pk",
+      "columns": [
+        "playlist_id",
+        "position"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "track_extras",
+      "name": "track_extras_pk",
+      "columns": [
+        "track_id",
+        "field_id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "track_values",
+      "name": "track_values_pk",
+      "columns": [
+        "track_id",
+        "field_id",
+        "ordinal"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "albums",
+      "name": "albums_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "artwork",
+      "name": "artwork_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "media",
+      "name": "media_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "merge_journal",
+      "name": "merge_journal_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "play_history",
+      "name": "play_history_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "playlists",
+      "name": "playlists_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "roots",
+      "name": "roots_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "settings",
+      "name": "settings_pk",
+      "columns": [
+        "key"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "tag_writes",
+      "name": "tag_writes_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "tracks",
+      "name": "tracks_pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "values_",
+      "name": "values__pk",
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "entityType": "pks"
+    },
+    {
+      "table": "albums",
+      "name": "albums_match_key_unique",
+      "columns": [
+        "match_key"
+      ],
+      "nameExplicit": false,
+      "entityType": "uniques"
+    },
+    {
+      "table": "roots",
+      "name": "roots_path_unique",
+      "columns": [
+        "path"
+      ],
+      "nameExplicit": false,
+      "entityType": "uniques"
+    },
+    {
+      "table": "albums",
+      "name": "albums_has_key",
+      "value": "\"id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "artwork",
+      "name": "artwork_has_key",
+      "value": "\"id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "media",
+      "name": "media_has_key",
+      "value": "\"id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "merge_journal",
+      "name": "merge_journal_has_key",
+      "value": "\"id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "play_history",
+      "name": "play_history_has_key",
+      "value": "\"id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "playlists",
+      "name": "playlists_has_key",
+      "value": "\"id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "roots",
+      "name": "roots_has_key",
+      "value": "\"id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "settings",
+      "name": "settings_has_key",
+      "value": "\"key\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "tag_writes",
+      "name": "tag_writes_has_key",
+      "value": "\"id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "tracks",
+      "name": "tracks_has_key",
+      "value": "\"id\" IS NOT NULL",
+      "entityType": "checks"
+    },
+    {
+      "table": "values_",
+      "name": "values__has_key",
+      "value": "\"id\" IS NOT NULL",
+      "entityType": "checks"
+    }
+  ],
+  "renames": []
+}

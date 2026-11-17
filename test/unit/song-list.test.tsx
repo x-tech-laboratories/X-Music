@@ -4,7 +4,7 @@
 import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import type { TrackRow } from '@shared/ipc'
+import { CHANNELS, type TrackRow } from '@shared/ipc'
 import { browse, library, results } from '../../src/renderer/stores/library'
 import { player, player_status } from '../../src/renderer/stores/player'
 import { SongList } from '../../src/renderer/widgets/SongList'
@@ -16,7 +16,7 @@ import { install_bridge } from '../helpers/bridge'
 
 const tracks = (count: number): TrackRow[] =>
   Array.from({ length: count }, (_, index) => ({
-    id: (index + 1) * 10,
+    id: `track-${(index + 1) * 10}`,
     title: `Track ${index + 1}`,
     artist: 'A', album: 'B', year: 2000,
     track_number: index + 1, length_ms: 61_000, rating: null, play_count: 0
@@ -35,13 +35,9 @@ function bridge(listed: TrackRow[]): void {
     'library:groupBy': [],
     'player:status': { state: 'idle', track: null, media: null, positionMs: 0, durationMs: null, volume: 80, repeat: 'off', shuffle: false, queue: [], contextLength: 0, contextIndex: -1 }
   }
-  const proxy = new Proxy({}, {
-    get: (_target, channel: string) => {
-      if (!calls.has(channel)) calls.set(channel, vi.fn(async () => answers[channel] ?? answers['player:status']))
-      return calls.get(channel)
-    }
-  })
-  Object.assign(window, { xMusic: proxy, xMusicEvents: { on: () => () => {} } })
+  // A plain object of every channel, as the preload exposes it.
+  for (const channel of CHANNELS) calls.set(channel, vi.fn(async () => answers[channel] ?? answers['player:status']))
+  Object.assign(window, { xMusic: Object.fromEntries(calls), xMusicEvents: { on: () => () => {} } })
 }
 
 function show(listed: TrackRow[]): void {
@@ -116,7 +112,7 @@ describe('song list', () => {
 
     fireEvent.doubleClick(row('Track 2'))
 
-    expect(calls.get('player:playTrack')).toHaveBeenCalledWith({ trackId: 20, context: [10, 20, 30], index: 1 })
+    expect(calls.get('player:playTrack')).toHaveBeenCalledWith({ trackId: 'track-20', context: ['track-10', 'track-20', 'track-30'], index: 1 })
   })
 
   it('plays the row under the keyboard cursor on Enter', () => {
@@ -124,7 +120,7 @@ describe('song list', () => {
 
     fireEvent.keyDown(row('Track 3'), { key: 'Enter' })
 
-    expect(calls.get('player:playTrack')).toHaveBeenCalledWith({ trackId: 30, context: [10, 20, 30], index: 2 })
+    expect(calls.get('player:playTrack')).toHaveBeenCalledWith({ trackId: 'track-30', context: ['track-10', 'track-20', 'track-30'], index: 2 })
   })
 
   it('extends the selection with Shift and an arrow key', () => {
@@ -133,7 +129,7 @@ describe('song list', () => {
     fireEvent.click(row('Track 1'))
     fireEvent.keyDown(row('Track 1'), { key: 'ArrowDown', shiftKey: true })
 
-    expect(library.selected_ids()).toEqual([10, 20])
+    expect(library.selected_ids()).toEqual(['track-10', 'track-20'])
     expect(row('Track 2').getAttribute('aria-selected')).toBe('true')
   })
 
@@ -146,7 +142,7 @@ describe('song list', () => {
     expect(within(bar).getByText('2 selected')).toBeTruthy()
 
     fireEvent.click(within(bar).getByRole('button', { name: 'Add to queue' }))
-    expect(calls.get('player:enqueue')).toHaveBeenCalledWith({ trackIds: [10, 30], position: 'end' })
+    expect(calls.get('player:enqueue')).toHaveBeenCalledWith({ trackIds: ['track-10', 'track-30'], position: 'end' })
 
     fireEvent.click(within(bar).getByRole('button', { name: 'Clear selection' }))
     expect(screen.queryByRole('toolbar', { name: 'Selected rows' })).toBeNull()
@@ -161,7 +157,7 @@ describe('song list', () => {
   })
 
   it('marks the playing track with Halon\'s now-playing row', () => {
-    player_status.set({ state: 'playing', track: { id: 20 }, positionMs: 0, durationMs: 61_000 } as unknown as typeof player.status)
+    player_status.set({ state: 'playing', track: { id: 'track-20' }, positionMs: 0, durationMs: 61_000 } as unknown as typeof player.status)
     render(<SongList />)
 
     expect(row('Track 2').classList.contains('now-playing')).toBe(true)
@@ -205,7 +201,7 @@ describe('filter chips', () => {
   })
 
   it('says how many of the library\'s tracks the filters let through', () => {
-    results.set({ stats: stats(40), tracks: tracks(3), order: [10, 20, 30], error: null })
+    results.set({ stats: stats(40), tracks: tracks(3), order: ['track-10', 'track-20', 'track-30'], error: null })
     render(<SongList />)
 
     expect(screen.getByText('3 of 40 tracks')).toBeTruthy()

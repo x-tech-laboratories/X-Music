@@ -234,7 +234,7 @@ function History({ details }: { details: TrackDetails }) {
 // Page
 // ============================================================================
 
-export function SongProperties({ trackId, onclose }: { trackId: number; onclose: () => void }) {
+export function SongProperties({ trackId, onclose }: { trackId: string; onclose: () => void }) {
   const [section, set_section] = useState<SectionId>('overview')
   const resource = use_resource(() => ipc('tracks:details', trackId), [trackId])
   const details = resource.data

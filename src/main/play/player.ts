@@ -7,44 +7,15 @@
 
 import { existsSync } from 'node:fs'
 
+import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
+
+import type { PlayerMedia, PlayerStatus, PlayerTrack, RepeatMode } from '@shared/ipc'
+import {
+  count_play, count_skip, get_player_track, has_any_file, list_playable_files, set_file_present
+} from '@shared/library/plays'
 import type { LoadOptions, PlaybackEngine } from './engine'
-import type { Db } from '../library/identity'
 
-export type RepeatMode = 'off' | 'all' | 'one'
-
-export interface PlayerTrack {
-  id: number
-  title: string | null
-  artist: string | null
-  album: string | null
-  lengthMs: number | null
-  rating: number | null
-}
-
-export interface PlayerMedia {
-  id: number
-  uri: string
-  startMs: number | null
-  endMs: number | null
-  gainDb: number | null
-}
-
-export interface PlayerStatus {
-  state: 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error'
-  track: PlayerTrack | null
-  media: PlayerMedia | null
-  positionMs: number
-  durationMs: number | null
-  volume: number
-  repeat: RepeatMode
-  shuffle: boolean
-  /** Tracks explicitly queued, which drain before the standing context. */
-  queue: number[]
-  /** The list the player walks when the queue is empty. */
-  contextLength: number
-  contextIndex: number
-  error?: string
-}
+export type { PlayerMedia, PlayerStatus, PlayerTrack, RepeatMode }
 
 export interface PlayerEvents {
   status: PlayerStatus
@@ -84,26 +55,22 @@ export function shuffleOrder(length: number, seed: number): number[] {
   return order
 }
 
-const TRACK_SELECT = `
-  t.id, t.title, t.length_ms AS lengthMs, t.rating,
-  (SELECT a.name FROM albums a WHERE a.id = t.album_id) AS album,
-  (SELECT vv.value FROM track_values tv JOIN values_ vv ON vv.id = tv.value_id
-    WHERE tv.track_id = t.id AND tv.field_id = 1 ORDER BY tv.ordinal LIMIT 1) AS artist`
-
 export interface PlayerOptions {
   /** How ReplayGain is applied; 'off' leaves the file alone. */
   replayGain?: 'off' | 'track' | 'album'
   preampDb?: number
+  // Runs after the player writes to the library, such as a counted play, so the track history sees it.
+  afterWrite?: () => void
 }
 
 export class Player {
   private listeners = new Set<PlayerListener>()
   private unsubscribe: (() => void) | null = null
 
-  private context: number[] = []
+  private context: string[] = []
   private contextIndex = -1
   private order: number[] | null = null
-  private queue: number[] = []
+  private queue: string[] = []
 
   private currentTrack: PlayerTrack | null = null
   private currentMedia: PlayerMedia | null = null
@@ -122,11 +89,11 @@ export class Player {
   private settled = false
   private seed = 1
 
-  private readonly db: Db
+  private readonly db: SqlDatabase
   private readonly engine: PlaybackEngine
   private readonly opts: PlayerOptions
 
-  constructor(db: Db, engine: PlaybackEngine, opts: PlayerOptions = {}) {
+  constructor(db: SqlDatabase, engine: PlaybackEngine, opts: PlayerOptions = {}) {
     this.db = db
     this.engine = engine
     this.opts = opts
@@ -150,9 +117,8 @@ export class Player {
   }
 
   // ── data access ────────────────────────────────────────────────────────
-  private loadTrack(id: number): PlayerTrack | null {
-    return (this.db.prepare(`SELECT ${TRACK_SELECT} FROM tracks t WHERE t.id = ?`)
-      .get(id as never) ?? null) as PlayerTrack | null
+  private loadTrack(id: string): PlayerTrack | null {
+    return get_player_track(this.db, id)
   }
 
   /**
@@ -163,30 +129,19 @@ export class Player {
    * engine produces "loading failed", which tells the listener nothing. A row found to be absent is
    * marked so, which also means the library corrects itself as it is used.
    */
-  private loadMedia(trackId: number): PlayerMedia | null {
-    const rows = this.db.prepare(`
-      SELECT m.id, m.uri, m.present, m.start_ms AS startMs, m.end_ms AS endMs,
-             t.rg_track_gain AS trackGain, t.rg_album_gain AS albumGain
-      FROM media m JOIN tracks t ON t.id = m.track_id
-      WHERE m.track_id = ? AND m.kind = 'file'
-      ORDER BY m.present DESC, m.quality_rank DESC, m.id`).all(trackId as never) as
-      { id: number; uri: string; present: number; startMs: number | null; endMs: number | null
-        trackGain: number | null; albumGain: number | null }[]
+  private loadMedia(trackId: string): PlayerMedia | null {
+    const rows = list_playable_files(this.db, trackId)
 
     const mode = this.opts.replayGain ?? 'off'
 
     for (const row of rows) {
       if (!existsSync(row.uri)) {
-        if (row.present === 1) {
-          this.db.prepare('UPDATE media SET present = 0 WHERE id = ?').run(row.id as never)
-        }
+        if (row.present === 1) set_file_present(this.db, row.id, false)
         continue
       }
 
       // Found on disk after being marked absent: the drive came back, so record that.
-      if (row.present === 0) {
-        this.db.prepare('UPDATE media SET present = 1 WHERE id = ?').run(row.id as never)
-      }
+      if (row.present === 0) set_file_present(this.db, row.id, true)
 
       const gain = mode === 'track' ? row.trackGain : mode === 'album' ? row.albumGain : null
       return {
@@ -202,10 +157,8 @@ export class Player {
   }
 
   /** Whether a track has any file on disk, without loading it. */
-  private hasAnyMedia(trackId: number): boolean {
-    return ((this.db.prepare(
-      `SELECT COUNT(*) AS n FROM media WHERE track_id = ? AND kind = 'file'`)
-      .get(trackId as never) as { n: number }).n) > 0
+  private hasAnyMedia(trackId: string): boolean {
+    return has_any_file(this.db, trackId)
   }
 
   // ── statistics ─────────────────────────────────────────────────────────
@@ -214,13 +167,8 @@ export class Player {
     if (!countsAsPlay(this.furthestMs, this.durationMs ?? this.currentTrack.lengthMs)) return
 
     this.settled = true
-    const now = Date.now()
-    this.db.prepare(`
-      UPDATE tracks SET play_count = play_count + 1, last_played = ?,
-                        first_played = COALESCE(first_played, ?)
-      WHERE id = ?`).run(now as never, now as never, this.currentTrack.id as never)
-    this.db.prepare('INSERT OR IGNORE INTO play_history (track_id, at, kind) VALUES (?, ?, 0)')
-      .run(this.currentTrack.id as never, now as never)
+    count_play(this.db, this.currentTrack.id, Date.now())
+    this.opts.afterWrite?.()
   }
 
   /** Called when a track is abandoned before it counted as played. */
@@ -230,12 +178,8 @@ export class Player {
     if (this.furthestMs < 3000) return
 
     this.settled = true
-    const now = Date.now()
-    this.db.prepare(
-      'UPDATE tracks SET skip_count = skip_count + 1, last_skipped = ? WHERE id = ?')
-      .run(now as never, this.currentTrack.id as never)
-    this.db.prepare('INSERT OR IGNORE INTO play_history (track_id, at, kind) VALUES (?, ?, 1)')
-      .run(this.currentTrack.id as never, now as never)
+    count_skip(this.db, this.currentTrack.id, Date.now())
+    this.opts.afterWrite?.()
   }
 
   // ── ordering ───────────────────────────────────────────────────────────
@@ -249,13 +193,13 @@ export class Player {
     return this.order.indexOf(this.contextIndex)
   }
 
-  private contextAt(orderPos: number): number | null {
+  private contextAt(orderPos: number): string | null {
     if (orderPos < 0 || orderPos >= this.context.length) return null
     const idx = this.order ? this.order[orderPos]! : orderPos
     return this.context[idx] ?? null
   }
 
-  private nextFromContext(step: 1 | -1): { trackId: number; index: number } | null {
+  private nextFromContext(step: 1 | -1): { trackId: string; index: number } | null {
     if (this.context.length === 0) return null
 
     const pos = this.orderPosition()
@@ -276,14 +220,14 @@ export class Player {
   }
 
   // ── commands ───────────────────────────────────────────────────────────
-  setContext(trackIds: readonly number[], startIndex = -1): void {
+  setContext(trackIds: readonly string[], startIndex = -1): void {
     this.context = [...trackIds]
     this.contextIndex = startIndex
     this.rebuildOrder()
     this.publish()
   }
 
-  enqueue(trackIds: readonly number[], position: 'end' | 'next' = 'end'): void {
+  enqueue(trackIds: readonly string[], position: 'end' | 'next' = 'end'): void {
     this.queue = position === 'next'
       ? [...trackIds, ...this.queue]
       : [...this.queue, ...trackIds]
@@ -300,7 +244,7 @@ export class Player {
     this.publish()
   }
 
-  async playTrack(trackId: number, contextIndex = -1): Promise<void> {
+  async playTrack(trackId: string, contextIndex = -1): Promise<void> {
     this.recordSkip()
 
     const track = this.loadTrack(trackId)
@@ -368,7 +312,7 @@ export class Player {
     })
   }
 
-  peekNext(): number | null {
+  peekNext(): string | null {
     if (this.queue.length > 0) return this.queue[0]!
     if (this.repeat === 'one' && this.currentTrack) return this.currentTrack.id
     return this.nextFromContext(1)?.trackId ?? null

@@ -81,7 +81,7 @@ function refresh(): Promise<void> {
 export const player = {
   init,
   refresh,
-  playTrack: (trackId: number, context?: number[], index?: number) => act(() => ipc('player:playTrack', { trackId, context, index })),
+  playTrack: (trackId: string, context?: string[], index?: number) => act(() => ipc('player:playTrack', { trackId, context, index })),
   toggle: () => act(() => ipc('player:toggle')),
   next: () => act(() => ipc('player:next')),
   previous: () => act(() => ipc('player:previous')),
@@ -91,7 +91,7 @@ export const player = {
     return act(() => ipc('player:seek', milliseconds))
   },
   setVolume: (volume: number) => act(() => ipc('player:volume', volume)),
-  enqueue: (trackIds: number[], position: 'end' | 'next' = 'end') => act(() => ipc('player:enqueue', { trackIds, position })),
+  enqueue: (trackIds: string[], position: 'end' | 'next' = 'end') => act(() => ipc('player:enqueue', { trackIds, position })),
   dequeue: (index: number) => act(() => ipc('player:dequeue', index)),
   clearQueue: () => act(() => ipc('player:clearQueue')),
   setRepeat: (mode: RepeatMode) => act(() => ipc('player:repeat', mode)),
@@ -103,5 +103,5 @@ export const player = {
   get status(): PlayerStatus | null { return player_status.get() },
   get positionMs(): number { return player_position.get() },
   get playing(): boolean { return player_status.get()?.state === 'playing' },
-  get currentId(): number | null { return player_status.get()?.track?.id ?? null }
+  get currentId(): string | null { return player_status.get()?.track?.id ?? null }
 }

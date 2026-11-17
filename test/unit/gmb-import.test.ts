@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 
-import { parseGmbrc, defaultGmbrcPath } from '@main/import/gmbrc'
-import { importGmbrc } from '@main/import/gmb-import'
+import { parseGmbrc, defaultGmbrcPath } from '@shared/import/gmbrc'
+import { importGmbrc } from '@shared/import/gmb-import'
 import { freshDb } from '../helpers/sqlite'
 
 const HEADER = [
@@ -98,7 +98,7 @@ describe('gmbrc parser', () => {
 describe('gmbrc import', () => {
   it('creates a track and its media, preserving statistics', () => {
     const db = freshDb()
-    const report = importGmbrc(db as never, parseGmbrc(gmbrc([row(1)])))
+    const report = importGmbrc(db, parseGmbrc(gmbrc([row(1)])))
 
     expect(report.tracksCreated).toBe(1)
     expect(report.mediaCreated).toBe(1)
@@ -117,7 +117,7 @@ describe('gmbrc import', () => {
 
   it('converts unix seconds to milliseconds', () => {
     const db = freshDb()
-    importGmbrc(db as never, parseGmbrc(gmbrc([row(1)])))
+    importGmbrc(db, parseGmbrc(gmbrc([row(1)])))
     const t = db.prepare('SELECT last_played FROM tracks').get() as { last_played: number }
     expect(t.last_played).toBe(1783048616 * 1000)
     db.close()
@@ -125,7 +125,7 @@ describe('gmbrc import', () => {
 
   it('imports genre, grouping and labels as multi-value fields', () => {
     const db = freshDb()
-    importGmbrc(db as never, parseGmbrc(gmbrc([
+    importGmbrc(db, parseGmbrc(gmbrc([
       row(1, { genre: 'Jazz\\x00Blues', label: 'Sad', grouping: 'Games - Portal' })
     ])))
 
@@ -140,7 +140,7 @@ describe('gmbrc import', () => {
 
   it('keeps the track when gmusicbrowser flagged the file missing', () => {
     const db = freshDb()
-    const report = importGmbrc(db as never, parseGmbrc(gmbrc([row(1, { missing: '1' })])))
+    const report = importGmbrc(db, parseGmbrc(gmbrc([row(1, { missing: '1' })])))
 
     expect(report.missingFlagged).toBe(1)
     expect((db.prepare('SELECT COUNT(*) AS n FROM tracks').get() as { n: number }).n).toBe(1)
@@ -151,7 +151,7 @@ describe('gmbrc import', () => {
   it('imports saved lists as static playlists in order', () => {
     const extra = 'SavedLists:\n  Favourites: !SongArray::Named 2 1\n'
     const db = freshDb()
-    const report = importGmbrc(db as never, parseGmbrc(gmbrc([row(1), row(2)], extra)))
+    const report = importGmbrc(db, parseGmbrc(gmbrc([row(1), row(2)], extra)))
 
     expect(report.playlistsCreated).toBe(1)
     const rows = db.prepare(
@@ -163,7 +163,7 @@ describe('gmbrc import', () => {
 
   it('can import without statistics when asked', () => {
     const db = freshDb()
-    importGmbrc(db as never, parseGmbrc(gmbrc([row(1)])), { statistics: false })
+    importGmbrc(db, parseGmbrc(gmbrc([row(1)])), { statistics: false })
     const t = db.prepare('SELECT rating, play_count FROM tracks').get() as
       { rating: number | null; play_count: number }
     expect(t.rating).toBeNull()
@@ -174,23 +174,23 @@ describe('gmbrc import', () => {
   it('rolls back cleanly if a row is malformed', () => {
     const db = freshDb()
     const data = parseGmbrc(gmbrc([row(1)]))
-    // A year that STRICT will reject, to force the failure path.
-    ;(data.songs[0] as { year?: unknown }).year = 'not a number'
-    expect(() => importGmbrc(db as never, data)).toThrow()
+    // A title SQLite cannot store, to force the failure path.
+    ;(data.songs[0] as { title?: unknown }).title = { not: 'text' }
+    expect(() => importGmbrc(db, data)).toThrow()
     expect((db.prepare('SELECT COUNT(*) AS n FROM tracks').get() as { n: number }).n).toBe(0)
     db.close()
   })
 })
 
 // This runs only on a machine that actually has gmusicbrowser configured.
-const realGmbrc = defaultGmbrcPath(homedir())
+const realGmbrc = defaultGmbrcPath(homedir(), process.platform)
 describe.runIf(existsSync(realGmbrc))('against the real gmbrc on this machine', () => {
   it('parses and imports the whole library', () => {
     const data = parseGmbrc(readFileSync(realGmbrc, 'utf8'))
     expect(data.songs.length).toBeGreaterThan(0)
 
     const db = freshDb()
-    const report = importGmbrc(db as never, data)
+    const report = importGmbrc(db, data)
 
     expect(report.tracksCreated).toBe(data.songs.length)
     // Every imported track must be reachable by the query engine.

@@ -5,24 +5,23 @@ import { describe, expect, it } from 'vitest'
 import { existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 
 import { resolveArtwork } from '@main/library/artwork'
-import { copyLiveLibrary, hasLiveLibrary } from '../helpers/live'
+import { hasLiveLibrary, openLiveCopy } from '../helpers/live'
 
 describe.runIf(hasLiveLibrary())('artwork against the real library', () => {
   it('finds covers for real tracks', async () => {
     const cache = join(tmpdir(), 'x-music-art-real-cache')
     rmSync(cache, { recursive: true, force: true })
-    const db = new DatabaseSync(copyLiveLibrary('x-music-art-real.db'))
+    const db = openLiveCopy('x-music-art-real.db')
 
     const ids = (db.prepare(`
       SELECT t.id FROM tracks t JOIN media m ON m.track_id = t.id
-      WHERE m.present = 1 GROUP BY t.id LIMIT 25`).all() as { id: number }[]).map((r) => r.id)
+      WHERE m.present = 1 GROUP BY t.id LIMIT 25`).all() as { id: string }[]).map((r) => r.id)
 
     const tally: Record<string, number> = {}
     for (const id of ids) {
-      const art = await resolveArtwork(db as never, id, { cacheDir: cache })
+      const art = await resolveArtwork(db, id, { cacheDir: cache })
       tally[art.source] = (tally[art.source] ?? 0) + 1
       if (art.path) expect(existsSync(art.path)).toBe(true)
     }

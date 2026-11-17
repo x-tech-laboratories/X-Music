@@ -5,8 +5,8 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest'
 import fc from 'fast-check'
 
-import { compileFilter } from '@main/query/compile'
-import { selectIds } from '@main/query/evaluate'
+import { compileFilter } from '@shared/query/compile'
+import { selectIds } from '@shared/query/evaluate'
 import { filterArb } from '../helpers/arbitraries'
 import { makeCorpus, type Corpus } from '../helpers/corpus'
 import { freshDb, loadCorpus, runQuery, type TestDb } from '../helpers/sqlite'
@@ -27,8 +27,8 @@ describe('filter AST: SQL and native predicate agree', () => {
     fc.assert(
       fc.property(filterArb, (filter) => {
         const { sql, params } = compileFilter(filter, { now: corpus.now })
-        const viaSql = runQuery(db, sql, params).sort((a, b) => a - b)
-        const viaNative = selectIds(filter, corpus.tracks, { now: corpus.now }).sort((a, b) => a - b)
+        const viaSql = runQuery(db, sql, params).sort()
+        const viaNative = selectIds(filter, corpus.tracks, { now: corpus.now }).sort()
 
         expect(viaNative).toEqual(viaSql)
       }),

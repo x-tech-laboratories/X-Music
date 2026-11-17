@@ -8,25 +8,20 @@ import { readdir, stat } from 'node:fs/promises'
 import { extname, join } from 'node:path'
 import { parseFile } from 'music-metadata'
 
-import { regroupAlbums, splitValues } from './albums'
+import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
+
+import type { FileResult, ScanProgress, ScanReport } from '@shared/ipc'
+import { regroupAlbums, splitValues } from '@shared/library/albums'
+import { all_rows, first_row, run } from '@shared/library/database'
+import { createUpserter, type MediaCandidate, type TrackCandidate } from '@shared/library/identity'
 import { hashAudio, needsRehash } from './audio-hash'
-import { createUpserter, type Db, type MediaCandidate, type TrackCandidate } from './identity'
+
+export type { FileOutcome, FileResult, ScanProgress, ScanReport } from '@shared/ipc'
 
 export const AUDIO_EXTENSIONS = new Set([
   '.mp3', '.flac', '.ogg', '.oga', '.opus', '.m4a', '.m4b', '.mp4', '.aac', '.wav', '.aiff',
   '.aif', '.wv', '.ape', '.mpc', '.wma', '.dsf', '.tta', '.spx'
 ])
-
-/** What happened to one file, reported as the scan goes rather than only in the summary. */
-export type FileOutcome = 'new' | 'matched' | 'moved' | 'unchanged' | 'error' | 'missing'
-
-export interface FileResult {
-  path: string
-  outcome: FileOutcome
-  /** Why, for errors; the previous path, for moves. */
-  detail?: string
-  trackId?: number
-}
 
 export interface ScanOptions {
   /** Directory names skipped wholesale. */
@@ -36,25 +31,6 @@ export interface ScanOptions {
   onProgress?: (p: ScanProgress) => void
   onFile?: (r: FileResult) => void
   signal?: { aborted: boolean }
-}
-
-export interface ScanProgress {
-  phase: 'walking' | 'reading' | 'finishing'
-  found: number
-  processed: number
-  currentPath?: string
-}
-
-export interface ScanReport {
-  filesFound: number
-  filesRead: number
-  filesSkipped: number
-  tracksCreated: number
-  tracksMatched: number
-  movesDetected: number
-  markedMissing: number
-  errors: { path: string; message: string }[]
-  durationMs: number
 }
 
 const DEFAULT_EXCLUDES = ['.git', 'node_modules', '@eaDir', '.Trash-1000', 'lost+found']
@@ -88,8 +64,17 @@ async function* walk(
 
 const first = (v: readonly string[] | undefined): string | null => v?.[0] ?? null
 
+// Files are read a batch at a time and each batch is written in one transaction, since a transaction cannot wait on the disk.
+const BATCH = 200
+
+interface ReadFile {
+  path: string
+  track: TrackCandidate
+  media: MediaCandidate
+}
+
 export async function scanRoots(
-  db: Db,
+  db: SqlDatabase,
   roots: readonly string[],
   opts: ScanOptions = {}
 ): Promise<ScanReport> {
@@ -115,20 +100,45 @@ export async function scanRoots(
   report.filesFound = files.length
 
   const upsert = createUpserter(db)
-  const unchanged = db.prepare(
-    'SELECT id, audio_hash_algo AS algo FROM media ' +
-    'WHERE uri = ? AND subtrack_index = 0 AND mtime = ? AND filesize = ?')
-  const touch = db.prepare('UPDATE media SET present = 1, last_seen = ? WHERE id = ?')
+  const seen = new Set<string>()
+  let batch: ReadFile[] = []
+  let touched: string[] = []
 
-  const seen = new Set<number>()
-  const BATCH = 200
-  let batchOpen = false
-
-  const openBatch = (): void => {
-    if (!batchOpen) { db.exec('BEGIN'); batchOpen = true }
-  }
-  const closeBatch = (): void => {
-    if (batchOpen) { db.exec('COMMIT'); batchOpen = false }
+  // Writes what the batch read; a file that fails to write is reported and the rest still land.
+  const write = (): void => {
+    if (batch.length === 0 && touched.length === 0) return
+    const pending = batch
+    const seen_again = touched
+    batch = []
+    touched = []
+    in_transaction(db, () => {
+      const now = Date.now()
+      for (const id of seen_again) run(db, 'UPDATE media SET present = 1, last_seen = ? WHERE id = ?', now, id)
+      for (const { path, track, media } of pending) {
+        try {
+          // Tags are not authoritative for X-Music's own statistics.
+          const result = upsert(track, media, { statistics: false, metadata: true })
+          seen.add(result.mediaId)
+          report.filesRead++
+          const detail = `matched by ${result.matchedBy === 'audio_hash' ? 'audio content' : result.matchedBy}`
+          if (result.created) {
+            report.tracksCreated++
+            opts.onFile?.({ path, outcome: 'new', trackId: result.trackId })
+          } else if (result.moved) {
+            report.movesDetected++
+            report.tracksMatched++
+            opts.onFile?.({ path, outcome: 'moved', trackId: result.trackId, detail })
+          } else {
+            report.tracksMatched++
+            opts.onFile?.({ path, outcome: 'matched', trackId: result.trackId, detail })
+          }
+        } catch (err) {
+          const message = (err as Error).message
+          report.errors.push({ path, message })
+          opts.onFile?.({ path, outcome: 'error', detail: message })
+        }
+      }
+    })
   }
 
   for (let i = 0; i < files.length; i++) {
@@ -141,17 +151,17 @@ export async function scanRoots(
       })
     }
 
-    openBatch()
     try {
       const info = await stat(path)
       const mtime = Math.floor(info.mtimeMs)
 
       // Unchanged files are the common case on a rescan; skip the expensive part entirely, unless the
       // stored hash is missing or weaker than what hashing now produces.
-      const hit = unchanged.get(path as never, mtime as never, info.size as never) as
-        { id: number; algo: string | null } | undefined
+      const hit = first_row<{ id: string; algo: string | null }>(db,
+        'SELECT id, audio_hash_algo AS algo FROM media WHERE uri = ? AND subtrack_index = 0 AND mtime = ? AND filesize = ?',
+        path, mtime, info.size)
       if (hit && (opts.slow || !needsRehash(path, hit.algo))) {
-        touch.run(Date.now() as never, hit.id as never)
+        touched.push(hit.id)
         seen.add(hit.id)
         report.filesSkipped++
         opts.onFile?.({ path, outcome: 'unchanged' })
@@ -207,73 +217,37 @@ export async function scanRoots(
         }
       }
 
-      // Tags are not authoritative for X-Music's own statistics.
-      const result = upsert(track, media, { statistics: false, metadata: true })
-      seen.add(result.mediaId)
-      report.filesRead++
-
-      if (result.created) {
-        report.tracksCreated++
-        opts.onFile?.({ path, outcome: 'new', trackId: result.trackId })
-      } else if (result.moved) {
-        report.movesDetected++
-        report.tracksMatched++
-        opts.onFile?.({
-          path, outcome: 'moved', trackId: result.trackId,
-          detail: `matched by ${result.matchedBy === 'audio_hash' ? 'audio content' : result.matchedBy}`
-        })
-      } else {
-        report.tracksMatched++
-        opts.onFile?.({
-          path, outcome: 'matched', trackId: result.trackId,
-          detail: `matched by ${result.matchedBy === 'audio_hash' ? 'audio content' : result.matchedBy}`
-        })
-      }
+      batch.push({ path, track, media })
     } catch (err) {
       const message = (err as Error).message
       report.errors.push({ path, message })
       opts.onFile?.({ path, outcome: 'error', detail: message })
     } finally {
-      if ((i + 1) % BATCH === 0) closeBatch()
+      if (batch.length + touched.length >= BATCH) write()
     }
   }
 
-  closeBatch()
+  write()
 
   // Anything under a scanned root that was not seen is gone from disk. The media is flagged, never
   // deleted, so its track keeps its rating and history (DESIGN-SPEC §3.4).
   opts.onProgress?.({ phase: 'finishing', found: files.length, processed: files.length })
 
   if (!opts.signal?.aborted && roots.length > 0) {
-    db.exec('BEGIN')
-    try {
-      const candidates = db.prepare(
-        `SELECT id, uri FROM media WHERE kind = 'file' AND present = 1`
-      ).all() as { id: number; uri: string }[]
-
-      const markMissing = db.prepare('UPDATE media SET present = 0 WHERE id = ?')
+    in_transaction(db, () => {
+      const candidates = all_rows<{ id: string; uri: string }>(db, `SELECT id, uri FROM media WHERE kind = 'file' AND present = 1`)
       for (const m of candidates) {
         const underRoot = roots.some((r) => m.uri.startsWith(r.endsWith('/') ? r : `${r}/`))
         if (underRoot && !seen.has(m.id)) {
-          markMissing.run(m.id as never)
+          run(db, 'UPDATE media SET present = 0 WHERE id = ?', m.id)
           report.markedMissing++
           opts.onFile?.({ path: m.uri, outcome: 'missing', detail: 'no longer on disk' })
         }
       }
-      db.exec('COMMIT')
-    } catch {
-      db.exec('ROLLBACK')
-    }
+    })
   }
 
-  db.exec('BEGIN')
-  try {
-    regroupAlbums(db)
-    db.exec('COMMIT')
-  } catch (err) {
-    db.exec('ROLLBACK')
-    throw err
-  }
+  in_transaction(db, () => regroupAlbums(db))
 
   report.durationMs = Date.now() - started
   return report

@@ -16,12 +16,13 @@ Early. The library core, query engine, playback and testing harness are real; ta
 implemented yet. See the roadmap in DESIGN-SPEC §15.
 
 Still to come, to meet the [Application Standard](https://x-tech-laboratories.github.io/standards/application/):
-the library store on X-Libs' `sql` and Drizzle with ids every device can make, a history of edits, and a
-description of the API offered to other programs through a local MCP server.
+the History page over the track history, and a description of the API offered to other programs through
+a local MCP server.
 
 | Area | State |
 |---|---|
-| SQLite schema, migrations, entity model | working |
+| Library store on X-Libs' `sql` and Drizzle, with ids any device can make | working |
+| Upgrade of libraries from before the Drizzle store, backed up first | working |
 | Identity resolution (idempotent import and scan) | working |
 | Filesystem scanner (read-only, move detection) | working |
 | gmusicbrowser import | working |
@@ -37,6 +38,7 @@ description of the API offered to other programs through a local MCP server.
 | Tag writing | not started |
 | Filesystem watching | not started |
 | Merge tracks, with per-field resolution and undo | working |
+| Track history (every change a version, any version restorable, on X-Libs) | working; no History page yet |
 | Duplicate detection (hash, MBID, tags, fuzzy) | working |
 | Song properties (identity, sources, raw tags, history) | working |
 | Album art (embedded, folder image, cached) | working |
@@ -68,8 +70,8 @@ the track, never a key.
 
 ## Development
 
-The Nix flake pins everything, including the Electron the native module is built against. `nix-shell`
-gives the same shell as `nix develop`, and `nix build` builds the app.
+The Nix flake pins everything, including Electron. `nix-shell` gives the same shell as `nix develop`,
+and `nix build` builds the app. SQLite is Node's own `node:sqlite`, so nothing is rebuilt for Electron.
 
 ```sh
 nix develop
@@ -95,7 +97,8 @@ otherwise makes Electron run as bare node and die on the ESM entry point.
 | `npm run lint` | `oxlint` |
 | `npm run icons` | Generate `resources/icon.png` from `resources/icon.svg` |
 | `npm run app` | Build if needed and launch |
-| `npm run rebuild:electron` | Rebuild `better-sqlite3` against Electron's ABI |
+| `npm run upgrade:dry-run -- <library.db>` | Try the upgrade of an older library on a copy and report on it |
+| `npm run db:generate` | Write a migration for a change to `src/shared/library/schema.ts` and bundle the migrations |
 
 Benchmarks default to 50k synthetic tracks (the §12 target); `X_MUSIC_BENCH_SIZE=20000 npm run bench`
 for a quicker pass. Point the app at a scratch database with `X_MUSIC_DB=/tmp/x-music.db`.
@@ -139,8 +142,29 @@ Both are idempotent. Running either twice, or both in either order, will not dup
 The library database, `library.db` in X-Music's profile folder (`~/.config/x-music` on Linux), is
 backed up once a day into `backups` beside it, keeping the last 14. Settings → Backups backs up by
 hand, changes that, and restores a backup: the current database is backed up first, and X-Music
-restarts to take the restored one in. Only the database is backed up; your music files are never
-copied or touched. A database moved elsewhere with `X_MUSIC_DB` is backed up beside it.
+restarts to take the restored one in. A backup is also taken before anything replaces the data: before
+the database's schema is upgraded, and before Clear library empties it. Only the database is backed
+up; your music files are never copied or touched. A database moved elsewhere with `X_MUSIC_DB` is
+backed up beside it.
+
+A library made by an older X-Music opens as it always did: it is backed up first, then converted in
+place to the current tables, every track, file, rating, play, playlist and merge kept, each with a new
+id. The conversion is all or nothing, so a library it cannot convert whole is left as it was.
+
+To try the conversion first, run `npm run upgrade:dry-run -- ~/.config/x-music/library.db`. It copies the
+library (and its write-ahead log) into a scratch folder, upgrades only the copy, and prints the time
+taken, the file size and the rows in each table before and after, any references it emptied, any
+merge whose undo would have reached a row that later took its number, and the integrity and
+foreign-key checks. The library it is given is only read. Close X-Music before running it.
+
+### History
+
+Every change to a track is kept as a version, through X-Libs' history: a scan that retags it, an
+import, a merge (the survivor edited, the others deleted) and an undo. Any version can be restored,
+and a track a merge took away can be brought back with its files. Plays are counted, not edited, so
+they make no version and a restore leaves the counts as they are. Versions are kept for a year by
+default (`history.keep_days`), each track keeping its newest. The page reaches them through
+`window.xMusicHistory`; the History page that shows them is still to come.
 
 Playlists have no history of their own yet: X-Music does not edit them, they only arrive from a
 gmusicbrowser import, and a merge's changes to them come back with Undo this merge. They gain one when
@@ -155,23 +179,26 @@ library, the SQL compiler and the native predicate return identical id sets. The
 only because this test keeps it honest — it has already caught a three-valued-logic divergence where
 SQL silently dropped tracks with a NULL value from negated filters.
 
-Tests reach SQLite through Node's built-in `node:sqlite` rather than `better-sqlite3`, so the suite
-never depends on which ABI the native module was last rebuilt for.
+Tests reach SQLite through Node's built-in `node:sqlite`, as the app does, and open the library
+through the same store code. `test/unit/library-upgrade.test.ts` builds a library at the old schema
+with a row of every kind and checks that the upgrade keeps all of it.
 
 ## Layout
 
 ```
 src/
-├── main/        Electron main: db, query engine, library, (later) tags, playback, services
+├── main/        Electron main: opens the database, scanner, artwork, playback, backups, IPC
 ├── preload/     The typed IPC bridge, exposing only the declared contract
 ├── renderer/    UI. Deliberately thin — see below.
-└── shared/      Imported by BOTH sides: field descriptors, filter AST, format strings, view state
+└── shared/      Imported by BOTH sides: field descriptors, filter AST, format strings, view state,
+                 and the library store (Drizzle schema, migrations, query compiler, history) in library/
 ```
 
 `shared/` is where the leverage is. The filter AST, field descriptors, format-string engine and the
 filter stack are plain TypeScript with no framework primitives and no DOM access; the selection,
 sorting, table, panes, prefs and logging come from X-Libs. Replacing the UI framework touches
-`renderer/` only.
+`renderer/` only. The library store in `shared/library/` runs on X-Libs' `SqlDatabase`
+and imports nothing from Node, so the main process only opens the file and hands it over.
 
 ## Contributing
 

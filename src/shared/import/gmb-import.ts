@@ -5,10 +5,15 @@
 // try to merge two files that are the same recording. Deduplication is a separate, reviewable
 // operation, and silently merging someone's library on import would be the wrong default.
 
-import { join } from 'node:path'
-import { regroupAlbums } from '../library/albums'
-import { createUpserter, type Db, type TrackCandidate } from '../library/identity'
-import type { GmbrcData } from './gmbrc'
+import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
+
+import type { ImportReport } from '../ipc.ts'
+import { regroupAlbums } from '../library/albums.ts'
+import { first_row, new_id, run } from '../library/database.ts'
+import { createUpserter, type TrackCandidate } from '../library/identity.ts'
+import type { GmbrcData } from './gmbrc.ts'
+
+export type { ImportReport }
 
 export interface ImportOptions {
   /** Import ratings, play counts and history. */
@@ -19,25 +24,28 @@ export interface ImportOptions {
   playlists?: boolean
 }
 
-export interface ImportReport {
-  songsRead: number
-  tracksCreated: number
-  tracksUpdated: number
-  mediaMatched: number
-  mediaCreated: number
-  missingFlagged: number
-  playHistoryRows: number
-  playlistsCreated: number
-  savedFiltersFound: number
-  unmappedColumns: string[]
-  notes: string[]
-}
-
 /** gmusicbrowser timestamps are unix seconds; X-Music stores milliseconds. */
 const toMs = (secs: number | undefined): number | null =>
   secs === undefined || secs <= 0 ? null : secs * 1000
 
-export function importGmbrc(db: Db, data: GmbrcData, opts: ImportOptions = {}): ImportReport {
+// A file's path from gmusicbrowser's folder and file name, exactly as Node's POSIX join gives it, so re-imports match.
+export function join_path(folder: string, file: string): string {
+  const joined = [folder, file].filter((part) => part !== '').join('/')
+  if (joined === '') return '.'
+  const rooted = joined.startsWith('/')
+  const parts: string[] = []
+  for (const part of joined.split('/')) {
+    if (part === '' || part === '.') continue
+    if (part !== '..') parts.push(part)
+    else if (parts.length > 0 && parts.at(-1) !== '..') parts.pop()
+    else if (!rooted) parts.push('..')
+  }
+  const trailing = joined.endsWith('/')
+  if (parts.length === 0) return rooted ? '/' : trailing ? './' : '.'
+  return `${rooted ? '/' : ''}${parts.join('/')}${trailing ? '/' : ''}`
+}
+
+export function importGmbrc(database: SqlDatabase, data: GmbrcData, opts: ImportOptions = {}): ImportReport {
   const withStats = opts.statistics ?? true
   const withLabels = opts.labels ?? true
   const withPlaylists = opts.playlists ?? true
@@ -57,23 +65,12 @@ export function importGmbrc(db: Db, data: GmbrcData, opts: ImportOptions = {}): 
   }
 
   const now = Date.now()
-  const upsert = createUpserter(db)
-
-  const insertHistory = db.prepare(
-    'INSERT OR IGNORE INTO play_history (track_id, at, kind) VALUES (?, ?, ?)')
-  const insertPlaylist = db.prepare(
-    "INSERT INTO playlists (name, kind, created, modified) VALUES (?, 'static', ?, ?)")
-  const selectPlaylist = db.prepare("SELECT id FROM playlists WHERE name = ? AND kind = 'static'")
-  const clearPlaylist = db.prepare('DELETE FROM playlist_tracks WHERE playlist_id = ?')
-  const insertPlaylistTrack = db.prepare(
-    'INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)')
-  const lastId = db.prepare('SELECT last_insert_rowid() AS id')
+  const upsert = createUpserter(database)
 
   /** gmusicbrowser song id to X-Music track id, so SavedLists can be resolved afterwards. */
-  const trackByGmbId = new Map<number, number>()
+  const trackByGmbId = new Map<number, string>()
 
-  db.exec('BEGIN')
-  try {
+  in_transaction(database, () => {
     for (const song of data.songs) {
       const candidate: TrackCandidate = {
         title: song.title ?? null,
@@ -111,7 +108,7 @@ export function importGmbrc(db: Db, data: GmbrcData, opts: ImportOptions = {}): 
       }
 
       const result = upsert(candidate, {
-        uri: join(song.path, song.file),
+        uri: join_path(song.path, song.file),
         codec: song.filetype?.split(/\s+/)[0] ?? null,
         bitrate: song.bitrate ?? null,
         samplerate: song.sampleRate ?? null,
@@ -131,7 +128,7 @@ export function importGmbrc(db: Db, data: GmbrcData, opts: ImportOptions = {}): 
 
       if (withStats) {
         for (const at of song.playHistory) {
-          insertHistory.run(result.trackId as never, (at * 1000) as never, 0 as never)
+          run(database, 'INSERT OR IGNORE INTO play_history (id, track_id, at, kind) VALUES (?, ?, ?, 0)', new_id(), result.trackId, at * 1000)
           report.playHistoryRows++
         }
       }
@@ -139,32 +136,28 @@ export function importGmbrc(db: Db, data: GmbrcData, opts: ImportOptions = {}): 
 
     if (withPlaylists) {
       for (const list of data.savedLists) {
-        const existing = selectPlaylist.get(list.name as never) as { id: number } | undefined
-        let playlistId: number
+        const existing = first_row<{ id: string }>(database, "SELECT id FROM playlists WHERE name = ? AND kind = 'static'", list.name)
+        let playlistId: string
         if (existing) {
           playlistId = existing.id
-          clearPlaylist.run(playlistId as never)
+          run(database, 'DELETE FROM playlist_tracks WHERE playlist_id = ?', playlistId)
         } else {
-          insertPlaylist.run(list.name as never, now as never, now as never)
-          playlistId = (lastId.get() as { id: number }).id
+          playlistId = new_id()
+          run(database, "INSERT INTO playlists (id, name, kind, created, modified) VALUES (?, ?, 'static', ?, ?)", playlistId, list.name, now, now)
         }
         let position = 0
         for (const gmbId of list.gmbIds) {
           const trackId = trackByGmbId.get(gmbId)
           if (trackId !== undefined) {
-            insertPlaylistTrack.run(playlistId as never, trackId as never, position++ as never)
+            run(database, 'INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)', playlistId, trackId, position++)
           }
         }
         report.playlistsCreated++
       }
     }
 
-    regroupAlbums(db)
-    db.exec('COMMIT')
-  } catch (err) {
-    db.exec('ROLLBACK')
-    throw err
-  }
+    regroupAlbums(database)
+  })
 
   if (data.savedFilters.length > 0) {
     report.notes.push(

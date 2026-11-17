@@ -1,6 +1,6 @@
 // A stand-in for the preload bridge, so a rendered test can mount the whole window without a main process.
 
-import type { LibraryStats, PlayerStatus } from '@shared/ipc'
+import { CHANNELS, type LibraryStats, type PlayerStatus } from '@shared/ipc'
 
 export const empty_stats: LibraryStats = { tracks: 0, media: 0, albums: 0, missing: 0, totalMs: 0, schemaVersion: 1, path: '/tmp/x-music-test.db' }
 
@@ -30,7 +30,8 @@ export function install_bridge(answers: Record<string, unknown> = {}): void {
     return typeof answer === 'function' ? (answer as () => unknown)() : answer
   }
   Object.assign(window, {
-    xMusic: new Proxy({}, { get: (_target, channel: string) => call(channel) }),
+    // A plain object of every channel, as the preload exposes it.
+    xMusic: Object.fromEntries(CHANNELS.map((channel) => [channel, call(channel)])),
     xMusicEvents: { on: () => () => undefined },
     xMusicBackups: {
       list_backups: async () => [],

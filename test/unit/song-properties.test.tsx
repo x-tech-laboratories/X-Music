@@ -9,7 +9,7 @@ import { SongProperties } from '../../src/renderer/widgets/SongProperties'
 import { record_calls } from '../helpers/calls'
 
 const media: DetailMedia = {
-  id: 1, kind: 'file', uri: '/music/Example Band/First Light/01 Morning Tone.flac', provider: null, present: true, preferred: true,
+  id: 'file-1', kind: 'file', uri: '/music/Example Band/First Light/01 Morning Tone.flac', provider: null, present: true, preferred: true,
   codec: 'flac', container: 'flac', bitrate: 900, bitrateMode: null, samplerate: 44_100, channels: 2, bitsPerSample: 16,
   filesize: 3_200_000, mtime: 1_700_000_000_000, lastSeen: 1_700_000_000_000, qualityRank: 90, audioHashHex: 'ab'.repeat(16),
   audioHashAlgo: 'flac-streaminfo-md5', subtrackIndex: 0, startMs: null, endMs: null,
@@ -17,7 +17,7 @@ const media: DetailMedia = {
 }
 
 const details: TrackDetails = {
-  id: 7, title: 'Morning Tone', album: 'First Light', albumId: 3,
+  id: 'track-7', title: 'Morning Tone', album: 'First Light', albumId: 'album-3',
   identity: { source: 'audio_hash', key: 'hash:abab', pinned: false, mbRecordingId: null, acoustid: null },
   fields: [
     { field: 'title', name: 'Title', value: 'Morning Tone', multi: false },
@@ -39,7 +39,7 @@ describe('song properties', () => {
   it('lays the overview out as facts under section headings', async () => {
     record_calls({ 'tracks:details': details, 'art:forTrack': { url: null, source: 'none' } })
 
-    render(<SongProperties trackId={7} onclose={() => undefined} />)
+    render(<SongProperties trackId="track-7" onclose={() => undefined} />)
 
     await screen.findByRole('heading', { level: 2, name: 'All metadata' })
     expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Morning Tone', 'All metadata', 'Identity', 'Statistics', 'Merge history'])
@@ -52,7 +52,7 @@ describe('song properties', () => {
   it('shows each source with its facts and reveals it in its folder', async () => {
     const calls = record_calls({ 'tracks:details': details })
 
-    render(<SongProperties trackId={7} onclose={() => undefined} />)
+    render(<SongProperties trackId="track-7" onclose={() => undefined} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Sources (1)' }))
 
     expect(screen.getByText('44100 Hz')).toBeTruthy()
@@ -64,7 +64,7 @@ describe('song properties', () => {
   it('joins repeated raw tags and says when a track was never played', async () => {
     record_calls({ 'tracks:details': details })
 
-    render(<SongProperties trackId={7} onclose={() => undefined} />)
+    render(<SongProperties trackId="track-7" onclose={() => undefined} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Raw tags' }))
     expect(screen.getByText('Example Band, Guest')).toBeTruthy()
 
@@ -76,7 +76,7 @@ describe('song properties', () => {
     record_calls({ 'tracks:details': null })
     const onclose = vi.fn()
 
-    render(<SongProperties trackId={7} onclose={onclose} />)
+    render(<SongProperties trackId="track-7" onclose={onclose} />)
 
     expect(await screen.findByText('This track no longer exists')).toBeTruthy()
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' }))

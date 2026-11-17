@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { scanRoots } from '@main/library/scan'
-import { freshDb, type TestDb } from '../helpers/sqlite'
+import { new_id } from '@shared/library/database'
+import { addTrack, freshDb, type TestDb } from '../helpers/sqlite'
 
 let dir: string
 let db: TestDb
@@ -46,7 +47,7 @@ describe('scanning', () => {
     await writeFile(join(dir, 'notes.txt'), 'not music')
     await writeFile(join(dir, 'cover.jpg'), Buffer.alloc(64))
 
-    const report = await scanRoots(db as never, [dir])
+    const report = await scanRoots(db, [dir])
     expect(report.filesFound).toBe(1)
     expect(tracks()).toBe(1)
     expect(media()).toBe(1)
@@ -55,16 +56,16 @@ describe('scanning', () => {
   it('descends into subdirectories', async () => {
     await mkdir(join(dir, 'album'), { recursive: true })
     await writeFile(join(dir, 'album', 'one.flac'), flac('0'.repeat(31) + '2', Buffer.alloc(512, 2)))
-    const report = await scanRoots(db as never, [dir])
+    const report = await scanRoots(db, [dir])
     expect(report.filesFound).toBe(1)
   })
 
   it('is idempotent: a second scan creates nothing', async () => {
     await writeFile(join(dir, 'a.flac'), flac('0'.repeat(31) + '3', Buffer.alloc(512, 3)))
-    await scanRoots(db as never, [dir])
+    await scanRoots(db, [dir])
     const before = { t: tracks(), m: media() }
 
-    const second = await scanRoots(db as never, [dir])
+    const second = await scanRoots(db, [dir])
     expect({ t: tracks(), m: media() }).toEqual(before)
     // The unchanged file takes the cheap path rather than being re-read.
     expect(second.filesSkipped).toBe(1)
@@ -73,26 +74,26 @@ describe('scanning', () => {
 
   it('rehashes an unchanged file that has no hash yet, as imported rows do', async () => {
     await writeFile(join(dir, 'a.flac'), flac('0'.repeat(31) + '4', Buffer.alloc(512, 4)))
-    await scanRoots(db as never, [dir])
+    await scanRoots(db, [dir])
     db.exec('UPDATE media SET audio_hash = NULL, audio_hash_algo = NULL')
 
-    const second = await scanRoots(db as never, [dir])
+    const second = await scanRoots(db, [dir])
     expect(second.filesRead).toBe(1)
     expect(count('SELECT COUNT(*) AS n FROM media WHERE audio_hash IS NOT NULL')).toBe(1)
 
-    const third = await scanRoots(db as never, [dir])
+    const third = await scanRoots(db, [dir])
     expect(third.filesSkipped).toBe(1)
   })
 
   it('recognises a renamed file as the same track, keeping its rating', async () => {
     const md5 = 'a'.repeat(32)
     await writeFile(join(dir, 'before.flac'), flac(md5, Buffer.alloc(512, 4)))
-    await scanRoots(db as never, [dir])
+    await scanRoots(db, [dir])
 
     db.prepare('UPDATE tracks SET rating = 100, play_count = 7').run()
     await rename(join(dir, 'before.flac'), join(dir, 'after.flac'))
 
-    const report = await scanRoots(db as never, [dir])
+    const report = await scanRoots(db, [dir])
     expect(report.movesDetected).toBe(1)
     expect(tracks()).toBe(1)
     expect(media()).toBe(1)
@@ -109,11 +110,11 @@ describe('scanning', () => {
 
   it('flags a deleted file as missing without losing the track', async () => {
     await writeFile(join(dir, 'gone.flac'), flac('b'.repeat(32), Buffer.alloc(512, 5)))
-    await scanRoots(db as never, [dir])
+    await scanRoots(db, [dir])
     db.prepare('UPDATE tracks SET rating = 60').run()
 
     await rm(join(dir, 'gone.flac'))
-    const report = await scanRoots(db as never, [dir])
+    const report = await scanRoots(db, [dir])
 
     expect(report.markedMissing).toBe(1)
     expect(tracks()).toBe(1)
@@ -124,23 +125,23 @@ describe('scanning', () => {
   it('re-reads a file whose contents changed', async () => {
     const p = join(dir, 'edited.flac')
     await writeFile(p, flac('c'.repeat(32), Buffer.alloc(512, 6)))
-    await scanRoots(db as never, [dir])
+    await scanRoots(db, [dir])
 
     await writeFile(p, flac('d'.repeat(32), Buffer.alloc(1024, 7)))
     await utimes(p, new Date(), new Date(Date.now() + 5000))
 
-    const report = await scanRoots(db as never, [dir])
+    const report = await scanRoots(db, [dir])
     expect(report.filesRead).toBe(1)
     expect(media()).toBe(1)
   })
 
   it('never overwrites X-Music statistics from a tag', async () => {
     await writeFile(join(dir, 'x.flac'), flac('e'.repeat(32), Buffer.alloc(512, 8)))
-    await scanRoots(db as never, [dir])
+    await scanRoots(db, [dir])
     db.prepare('UPDATE tracks SET rating = 80, play_count = 42').run()
 
     await utimes(join(dir, 'x.flac'), new Date(), new Date(Date.now() + 9000))
-    await scanRoots(db as never, [dir])
+    await scanRoots(db, [dir])
 
     const t = db.prepare('SELECT rating, play_count FROM tracks').get() as
       { rating: number; play_count: number }
@@ -151,7 +152,7 @@ describe('scanning', () => {
     await writeFile(join(dir, 'broken.flac'), Buffer.from('this is definitely not audio at all'))
     await writeFile(join(dir, 'fine.flac'), flac('f'.repeat(32), Buffer.alloc(512, 9)))
 
-    const report = await scanRoots(db as never, [dir])
+    const report = await scanRoots(db, [dir])
     expect(report.filesFound).toBe(2)
     expect(report.errors.length + report.filesRead).toBe(2)
   })
@@ -163,7 +164,7 @@ describe('scanning', () => {
     await writeFile(join(dir, 'bad.flac'), Buffer.from('this is definitely not audio at all'))
 
     const seen: { path: string; outcome: string }[] = []
-    const first = await scanRoots(db as never, [dir], { onFile: (r) => seen.push(r) })
+    const first = await scanRoots(db, [dir], { onFile: (r) => seen.push(r) })
 
     expect(seen).toHaveLength(first.filesFound)
     expect(seen.map((s) => s.outcome).sort()).toEqual(['error', 'new'])
@@ -172,40 +173,39 @@ describe('scanning', () => {
   it('labels a rescan unchanged, a move moved, and a deletion missing', async () => {
     const md5 = '4'.repeat(32)
     await writeFile(join(dir, 'one.flac'), flac(md5, Buffer.alloc(512, 21)))
-    await scanRoots(db as never, [dir])
+    await scanRoots(db, [dir])
 
     let seen: { path: string; outcome: string }[] = []
-    await scanRoots(db as never, [dir], { onFile: (r) => seen.push(r) })
+    await scanRoots(db, [dir], { onFile: (r) => seen.push(r) })
     expect(seen.map((s) => s.outcome)).toEqual(['unchanged'])
 
     await rename(join(dir, 'one.flac'), join(dir, 'two.flac'))
     seen = []
-    await scanRoots(db as never, [dir], { onFile: (r) => seen.push(r) })
+    await scanRoots(db, [dir], { onFile: (r) => seen.push(r) })
     expect(seen.find((s) => s.outcome === 'moved')).toBeDefined()
 
     await rm(join(dir, 'two.flac'))
     seen = []
-    await scanRoots(db as never, [dir], { onFile: (r) => seen.push(r) })
+    await scanRoots(db, [dir], { onFile: (r) => seen.push(r) })
     expect(seen.map((s) => s.outcome)).toContain('missing')
   })
 
   it('reports progress as it goes', async () => {
     await writeFile(join(dir, 'p.flac'), flac('1'.repeat(32), Buffer.alloc(512, 10)))
     const phases: string[] = []
-    await scanRoots(db as never, [dir], { onProgress: (p) => phases.push(p.phase) })
+    await scanRoots(db, [dir], { onProgress: (p) => phases.push(p.phase) })
     expect(phases).toContain('reading')
     expect(phases).toContain('finishing')
   })
 
   it('leaves media outside the scanned roots alone', async () => {
-    db.prepare("INSERT INTO tracks (title, added, modified) VALUES ('elsewhere', 0, 0)").run()
-    const id = (db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id
+    const id = addTrack(db, { title: 'elsewhere' })
     db.prepare(
-      `INSERT INTO media (track_id, kind, uri, present, added) VALUES (?, 'file', '/other/x.flac', 1, 0)`
-    ).run(id)
+      `INSERT INTO media (id, track_id, kind, uri, present, added) VALUES (?, ?, 'file', '/other/x.flac', 1, 0)`
+    ).run(new_id(), id)
 
     await writeFile(join(dir, 'here.flac'), flac('2'.repeat(32), Buffer.alloc(512, 11)))
-    const report = await scanRoots(db as never, [dir])
+    const report = await scanRoots(db, [dir])
 
     expect(report.markedMissing).toBe(0)
     expect((db.prepare("SELECT present FROM media WHERE uri = '/other/x.flac'")

@@ -8,7 +8,7 @@ import { ipc } from '../lib/ipc'
 import s from './Cover.module.css'
 
 // Fills the width it is given; size is the picture's resolution in pixels.
-export function TrackCover({ track_id, size }: { track_id: number | null; size: number }) {
+export function TrackCover({ track_id, size }: { track_id: string | null; size: number }) {
   const art = use_resource(
     async () => (track_id === null ? null : (await ipc('art:forTrack', { trackId: track_id, size })).url),
     [track_id, size],

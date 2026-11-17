@@ -4,12 +4,12 @@
 // including SQLite's quirks, which is why the string helpers below fold only ASCII case and why
 // every comparison against a NULL yields false rather than throwing.
 
-import { field, type FieldDescriptor } from '@shared/fields'
-import { isGroup, type FilterNode, type LeafNode, type RelativeDate } from '@shared/filter'
+import { field, type FieldDescriptor } from '../fields.ts'
+import { isGroup, type FilterNode, type LeafNode, type RelativeDate } from '../filter.ts'
 
 /** One track as held by the in-memory index. */
 export interface IndexedTrack {
-  id: number
+  id: string
   scalars: Record<string, string | number | null>
   /** field_id → interned values, mirroring track_values. */
   sets: Record<number, readonly string[]>
@@ -22,7 +22,7 @@ export interface IndexedTrack {
 export interface EvalContext {
   now: number
   /** Precomputed id sets for `top` / `bottom`, keyed `${field}:${op}:${n}`. */
-  ranked?: Map<string, ReadonlySet<number>>
+  ranked?: Map<string, ReadonlySet<string>>
 }
 
 const MS: Record<RelativeDate['unit'], number> = {
@@ -170,7 +170,7 @@ export function evaluate(node: FilterNode, t: IndexedTrack, ctx: EvalContext): b
   }
 }
 
-export function selectIds(node: FilterNode, tracks: readonly IndexedTrack[], ctx: EvalContext): number[] {
+export function selectIds(node: FilterNode, tracks: readonly IndexedTrack[], ctx: EvalContext): string[] {
   return tracks.filter((t) => evaluate(node, t, ctx)).map((t) => t.id)
 }
 
@@ -179,14 +179,16 @@ export function rankFor(
   tracks: readonly IndexedTrack[],
   fieldId: string,
   n: number
-): { top: Set<number>; bottom: Set<number> } {
+): { top: Set<string>; bottom: Set<string> } {
   const d = field(fieldId)
   const withValue = tracks
     .map((t) => ({ id: t.id, v: scalarOf(t, d) }))
-    .filter((r): r is { id: number; v: string | number } => r.v !== null)
+    .filter((r): r is { id: string; v: string | number } => r.v !== null)
 
-  const asc = [...withValue].sort((a, b) => (cmp(a.v, b.v) ?? 0) || a.id - b.id)
-  const desc = [...withValue].sort((a, b) => -(cmp(a.v, b.v) ?? 0) || a.id - b.id)
+  // Ties go by id, as the SQL subquery orders them.
+  const by_id = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  const asc = [...withValue].sort((a, b) => (cmp(a.v, b.v) ?? 0) || by_id(a, b))
+  const desc = [...withValue].sort((a, b) => -(cmp(a.v, b.v) ?? 0) || by_id(a, b))
 
   return {
     top: new Set(desc.slice(0, n).map((r) => r.id)),

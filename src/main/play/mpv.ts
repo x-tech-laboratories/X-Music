@@ -7,23 +7,21 @@
 
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createConnection, type Socket } from 'node:net'
-import { existsSync, rmSync } from 'node:fs'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
+import { on_path } from '@x-tech-laboratories/x-libs/agent/programs'
+
 import type { EngineListener, EngineState, LoadOptions, PlaybackEngine } from './engine'
 
-/** Finds an mpv binary: an explicit setting, then PATH, then a Nix store path. */
-export function findMpv(explicit?: string): string | null {
-  if (explicit && existsSync(explicit)) return explicit
-  if (process.env.X_MUSIC_MPV && existsSync(process.env.X_MUSIC_MPV)) return process.env.X_MUSIC_MPV
-
-  for (const dir of (process.env.PATH ?? '').split(':')) {
-    if (!dir) continue
-    const candidate = join(dir, 'mpv')
-    if (existsSync(candidate)) return candidate
+// Finds an mpv that can run: an explicit setting, then X_MUSIC_MPV, then the PATH.
+export async function findMpv(explicit?: string): Promise<string | null> {
+  for (const candidate of [explicit, process.env.X_MUSIC_MPV]) {
+    const found = candidate ? await on_path(candidate) : null
+    if (found) return found
   }
-  return null
+  return on_path('mpv')
 }
 
 interface Pending {
@@ -105,7 +103,7 @@ export class MpvEngine implements PlaybackEngine {
   }
 
   private async start(): Promise<void> {
-    const binary = findMpv(this.opts.binary)
+    const binary = await findMpv(this.opts.binary)
     if (!binary) throw new Error('mpv was not found; set X_MUSIC_MPV or install mpv')
 
     // A leftover socket file stops mpv binding, so clear it before starting.

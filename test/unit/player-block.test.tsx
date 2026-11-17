@@ -15,7 +15,7 @@ const idle: PlayerStatus = {
   repeat: 'off', shuffle: false, queue: [], contextLength: 0, contextIndex: -1
 }
 
-const track = { id: 7, title: 'Morning Tone', artist: 'Example Band', album: 'First Light', lengthMs: 30_000, rating: null }
+const track = { id: 'track-7', title: 'Morning Tone', artist: 'Example Band', album: 'First Light', lengthMs: 30_000, rating: null }
 
 afterEach(() => {
   cleanup()
@@ -99,6 +99,6 @@ describe('player block', () => {
     player_status.set({ ...idle, state: 'playing', track })
 
     expect(player.playing).toBe(true)
-    expect(player.currentId).toBe(7)
+    expect(player.currentId).toBe('track-7')
   })
 })

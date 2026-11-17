@@ -6,18 +6,23 @@
 // one file has the better title, another has the year, a third has the genre.
 //
 // Every merge is journaled in full and can be undone. That is a prerequisite, not a nicety: a merge
-// deletes rows holding ratings and play history that cannot be reconstructed from the files.
+// deletes rows holding ratings and play history that cannot be reconstructed from the files. The
+// track history records each merge as well, but only this journal holds the plays and playlist
+// places that an exact undo needs, all tracks at once.
 
-import { BUILTIN_FIELDS, field, type FieldDescriptor } from '@shared/fields'
-import type { Db } from './identity'
+import { in_transaction, type SqlDatabase, type SqlValue } from '@x-tech-laboratories/x-libs/sql'
+
+import { BUILTIN_FIELDS, field, type FieldDescriptor } from '../fields.ts'
+import { all_rows, first_row, new_id, placeholders, run } from './database.ts'
+import { intern_value, set_extra } from './values.ts'
 
 export type Resolution =
-  | { kind: 'value'; from: number }
+  | { kind: 'value'; from: string }
   | { kind: 'union' }
 
 export interface MergeRequest {
-  ids: readonly number[]
-  survivor: number
+  ids: readonly string[]
+  survivor: string
   /** Field id → how to resolve it. Fields left out take the survivor's value. */
   resolutions?: Record<string, Resolution>
   /** Field id → an explicit value, for a field the user typed rather than chose. */
@@ -25,7 +30,7 @@ export interface MergeRequest {
 }
 
 export interface FieldOption {
-  from: number
+  from: string
   value: string | number | null | string[]
 }
 
@@ -42,8 +47,8 @@ export interface PreviewField {
 }
 
 export interface PreviewMedia {
-  id: number
-  from: number
+  id: string
+  from: string
   uri: string
   codec: string | null
   bitrate: number | null
@@ -51,8 +56,8 @@ export interface PreviewMedia {
 }
 
 export interface MergePreview {
-  ids: number[]
-  survivor: number
+  ids: string[]
+  survivor: string
   fields: PreviewField[]
   media: PreviewMedia[]
   statistics: {
@@ -63,13 +68,13 @@ export interface MergePreview {
     lastPlayed: number | null
   }
   /** True when at least one source is pinned; merging overrides a human decision. */
-  pinnedSources: number[]
+  pinnedSources: string[]
 }
 
 export interface MergeResult {
   batchId: string
-  survivor: number
-  absorbed: number[]
+  survivor: string
+  absorbed: string[]
   mediaMoved: number
   historyMoved: number
   playlistEntriesRepointed: number
@@ -89,9 +94,9 @@ const COLUMN: Record<string, string> = {
 }
 
 interface TrackRow {
-  id: number
+  id: string
   title: string | null
-  album_id: number | null
+  album_id: string | null
   album: string | null
   year: number | null
   track_number: number | null
@@ -116,24 +121,27 @@ const TRACK_SELECT = `
   t.added, t.pinned, t.mb_recording_id,
   (SELECT a.name FROM albums a WHERE a.id = t.album_id) AS album`
 
-function loadTracks(db: Db, ids: readonly number[]): TrackRow[] {
-  const placeholders = ids.map(() => '?').join(', ')
-  return db.prepare(`SELECT ${TRACK_SELECT} FROM tracks t WHERE t.id IN (${placeholders})`)
-    .all(...(ids as never[])) as TrackRow[]
+const compare_ids = (first: string, second: string): number => (first < second ? -1 : first > second ? 1 : 0)
+
+function loadTracks(database: SqlDatabase, ids: readonly string[]): TrackRow[] {
+  return all_rows<TrackRow>(database, `SELECT ${TRACK_SELECT} FROM tracks t WHERE t.id IN (${placeholders(ids)})`, ...ids)
+    .map((row) => ({ ...row }))
 }
 
-function loadSets(db: Db, ids: readonly number[]): Map<number, Map<string, string[]>> {
-  const placeholders = ids.map(() => '?').join(', ')
-  const rows = db.prepare(`
-    SELECT tv.track_id, tv.field_id, vv.value, tv.ordinal
-    FROM track_values tv JOIN values_ vv ON vv.id = tv.value_id
-    WHERE tv.track_id IN (${placeholders}) ORDER BY tv.ordinal`
-  ).all(...(ids as never[])) as { track_id: number; field_id: number; value: string }[]
-
+const fieldsByNumber = (): Map<number, string> => {
   const byFieldId = new Map<number, string>()
   for (const d of BUILTIN_FIELDS) if (d.fieldId !== undefined) byFieldId.set(d.fieldId, d.id)
+  return byFieldId
+}
 
-  const out = new Map<number, Map<string, string[]>>()
+function loadSets(database: SqlDatabase, ids: readonly string[]): Map<string, Map<string, string[]>> {
+  const rows = all_rows<{ track_id: string; field_id: number; value: string }>(database, `
+    SELECT tv.track_id, tv.field_id, vv.value, tv.ordinal
+    FROM track_values tv JOIN values_ vv ON vv.id = tv.value_id
+    WHERE tv.track_id IN (${placeholders(ids)}) ORDER BY tv.ordinal`, ...ids)
+
+  const byFieldId = fieldsByNumber()
+  const out = new Map<string, Map<string, string[]>>()
   for (const r of rows) {
     const fieldId = byFieldId.get(r.field_id)
     if (!fieldId) continue
@@ -146,16 +154,12 @@ function loadSets(db: Db, ids: readonly number[]): Map<number, Map<string, strin
   return out
 }
 
-function loadExtras(db: Db, ids: readonly number[]): Map<number, Map<string, string>> {
-  const placeholders = ids.map(() => '?').join(', ')
-  const rows = db.prepare(
-    `SELECT track_id, field_id, value FROM track_extras WHERE track_id IN (${placeholders})`
-  ).all(...(ids as never[])) as { track_id: number; field_id: number; value: string }[]
+function loadExtras(database: SqlDatabase, ids: readonly string[]): Map<string, Map<string, string>> {
+  const rows = all_rows<{ track_id: string; field_id: number; value: string }>(
+    database, `SELECT track_id, field_id, value FROM track_extras WHERE track_id IN (${placeholders(ids)})`, ...ids)
 
-  const byFieldId = new Map<number, string>()
-  for (const d of BUILTIN_FIELDS) if (d.fieldId !== undefined) byFieldId.set(d.fieldId, d.id)
-
-  const out = new Map<number, Map<string, string>>()
+  const byFieldId = fieldsByNumber()
+  const out = new Map<string, Map<string, string>>()
   for (const r of rows) {
     const fieldId = byFieldId.get(r.field_id)
     if (!fieldId) continue
@@ -183,20 +187,19 @@ const sameSet = (a: readonly string[], b: readonly string[]): boolean =>
  * Describes what a merge would do, without doing it. The dialog is a rendering of this structure,
  * which keeps the resolution rules testable without a DOM.
  */
-export function mergePreview(db: Db, ids: readonly number[]): MergePreview {
+export function mergePreview(database: SqlDatabase, ids: readonly string[]): MergePreview {
   if (ids.length < 2) throw new Error('a merge needs at least two tracks')
 
-  const rows = loadTracks(db, ids)
+  const rows = loadTracks(database, ids)
   if (rows.length !== ids.length) throw new Error('one or more tracks no longer exist')
 
-  const sets = loadSets(db, ids)
-  const extras = loadExtras(db, ids)
+  const sets = loadSets(database, ids)
+  const extras = loadExtras(database, ids)
 
   // The richest source is the best default survivor: most media, then most plays, then oldest.
-  const mediaCounts = new Map<number, number>()
-  for (const r of db.prepare(
-    `SELECT track_id, COUNT(*) AS n FROM media WHERE track_id IN (${ids.map(() => '?').join(',')})
-     GROUP BY track_id`).all(...(ids as never[])) as { track_id: number; n: number }[]) {
+  const mediaCounts = new Map<string, number>()
+  for (const r of all_rows<{ track_id: string; n: number }>(database,
+    `SELECT track_id, COUNT(*) AS n FROM media WHERE track_id IN (${placeholders(ids)}) GROUP BY track_id`, ...ids)) {
     mediaCounts.set(r.track_id, r.n)
   }
 
@@ -204,7 +207,7 @@ export function mergePreview(db: Db, ids: readonly number[]): MergePreview {
     (mediaCounts.get(b.id) ?? 0) - (mediaCounts.get(a.id) ?? 0) ||
     b.play_count - a.play_count ||
     a.added - b.added ||
-    a.id - b.id
+    compare_ids(a.id, b.id)
   )[0]!.id
 
   const fields: PreviewField[] = []
@@ -249,11 +252,10 @@ export function mergePreview(db: Db, ids: readonly number[]): MergePreview {
       : { field: fieldId, name: d.name, multi: false, conflict: false, value: first })
   }
 
-  const media = db.prepare(
+  const media = all_rows<{ id: string; track_id: string; uri: string; codec: string | null; bitrate: number | null; present: number }>(
+    database,
     `SELECT id, track_id, uri, codec, bitrate, present FROM media
-     WHERE track_id IN (${ids.map(() => '?').join(',')}) ORDER BY quality_rank DESC, id`
-  ).all(...(ids as never[])) as
-    { id: number; track_id: number; uri: string; codec: string | null; bitrate: number | null; present: number }[]
+     WHERE track_id IN (${placeholders(ids)}) ORDER BY quality_rank DESC, added, id`, ...ids)
 
   const ratings = rows.map((r) => r.rating).filter((r): r is number => r !== null)
   const firstPlayed = rows.map((r) => r.first_played).filter((v): v is number => v !== null)
@@ -281,56 +283,49 @@ export function mergePreview(db: Db, ids: readonly number[]): MergePreview {
 
 interface Snapshot {
   tracks: TrackRow[]
-  sets: { track_id: number; field_id: number; value: string; ordinal: number }[]
-  extras: { track_id: number; field_id: number; value: string }[]
-  media: { id: number; track_id: number }[]
-  history: { id: number; track_id: number }[]
-  historyDeleted: { track_id: number; at: number; kind: number; position_ms: number | null }[]
-  playlists: { playlist_id: number; track_id: number; position: number }[]
+  sets: { track_id: string; field_id: number; value: string; ordinal: number }[]
+  extras: { track_id: string; field_id: number; value: string }[]
+  media: { id: string; track_id: string }[]
+  history: { id: string; track_id: string }[]
+  historyDeleted: { track_id: string; at: number; kind: number; position_ms: number | null }[]
+  playlists: { playlist_id: string; track_id: string; position: number }[]
 }
 
-function snapshot(db: Db, ids: readonly number[]): Snapshot {
-  const ph = ids.map(() => '?').join(',')
+function snapshot(database: SqlDatabase, ids: readonly string[]): Snapshot {
+  const ph = placeholders(ids)
+  const plain = <Row>(rows: Row[]): Row[] => rows.map((row) => ({ ...row }))
   return {
-    tracks: loadTracks(db, ids),
-    sets: db.prepare(
+    tracks: loadTracks(database, ids),
+    sets: plain(all_rows<Snapshot['sets'][number]>(database,
       `SELECT tv.track_id, tv.field_id, vv.value, tv.ordinal FROM track_values tv
-       JOIN values_ vv ON vv.id = tv.value_id WHERE tv.track_id IN (${ph})`
-    ).all(...(ids as never[])) as Snapshot['sets'],
-    extras: db.prepare(
-      `SELECT track_id, field_id, value FROM track_extras WHERE track_id IN (${ph})`
-    ).all(...(ids as never[])) as Snapshot['extras'],
-    media: db.prepare(
-      `SELECT id, track_id FROM media WHERE track_id IN (${ph})`
-    ).all(...(ids as never[])) as Snapshot['media'],
-    history: db.prepare(
-      `SELECT id, track_id FROM play_history WHERE track_id IN (${ph})`
-    ).all(...(ids as never[])) as Snapshot['history'],
+       JOIN values_ vv ON vv.id = tv.value_id WHERE tv.track_id IN (${ph})`, ...ids)),
+    extras: plain(all_rows<Snapshot['extras'][number]>(database,
+      `SELECT track_id, field_id, value FROM track_extras WHERE track_id IN (${ph})`, ...ids)),
+    media: plain(all_rows<Snapshot['media'][number]>(database, `SELECT id, track_id FROM media WHERE track_id IN (${ph})`, ...ids)),
+    history: plain(all_rows<Snapshot['history'][number]>(database, `SELECT id, track_id FROM play_history WHERE track_id IN (${ph})`, ...ids)),
     historyDeleted: [],
-    playlists: db.prepare(
-      `SELECT playlist_id, track_id, position FROM playlist_tracks WHERE track_id IN (${ph})`
-    ).all(...(ids as never[])) as Snapshot['playlists']
+    playlists: plain(all_rows<Snapshot['playlists'][number]>(database,
+      `SELECT playlist_id, track_id, position FROM playlist_tracks WHERE track_id IN (${ph})`, ...ids))
   }
 }
 
-export function mergeTracks(db: Db, req: MergeRequest): MergeResult {
+export function mergeTracks(database: SqlDatabase, req: MergeRequest): MergeResult {
   const ids = [...new Set(req.ids)]
   if (ids.length < 2) throw new Error('a merge needs at least two tracks')
   if (!ids.includes(req.survivor)) throw new Error('the survivor must be one of the merged tracks')
 
   const absorbed = ids.filter((id) => id !== req.survivor)
-  const absorbedPh = absorbed.map(() => '?').join(',')
+  const absorbedPh = placeholders(absorbed)
 
-  const preview = mergePreview(db, ids)
-  const before = snapshot(db, ids)
-  const batchId = `merge-${Date.now()}-${req.survivor}`
+  const preview = mergePreview(database, ids)
+  const before = snapshot(database, ids)
+  const batchId = `merge-${new_id()}`
   const now = Date.now()
 
-  const sets = loadSets(db, ids)
-  const extras = loadExtras(db, ids)
+  const sets = loadSets(database, ids)
+  const extras = loadExtras(database, ids)
 
-  db.exec('BEGIN')
-  try {
+  return in_transaction(database, () => {
     // ── scalar fields ────────────────────────────────────────────────────────
     for (const f of preview.fields.filter((x) => !x.multi)) {
       const override = req.overrides?.[f.field]
@@ -351,8 +346,7 @@ export function mergeTracks(db: Db, req: MergeRequest): MergeResult {
         const res = req.resolutions?.[f.field]
         const source = res?.kind === 'value' ? res.from : req.survivor
         const row = before.tracks.find((t) => t.id === source)
-        db.prepare('UPDATE tracks SET album_id = ? WHERE id = ?')
-          .run((row?.album_id ?? null) as never, req.survivor as never)
+        run(database, 'UPDATE tracks SET album_id = ? WHERE id = ?', row?.album_id ?? null, req.survivor)
         continue
       }
 
@@ -360,17 +354,10 @@ export function mergeTracks(db: Db, req: MergeRequest): MergeResult {
 
       const col = COLUMN[f.field]
       if (!col) continue
-      db.prepare(`UPDATE tracks SET ${col} = ? WHERE id = ?`)
-        .run(value as never, req.survivor as never)
+      run(database, `UPDATE tracks SET ${col} = ? WHERE id = ?`, value, req.survivor)
     }
 
     // ── multi-value fields ───────────────────────────────────────────────────
-    const insertValue = db.prepare('INSERT OR IGNORE INTO values_ (field_id, value) VALUES (?, ?)')
-    const selectValue = db.prepare('SELECT id FROM values_ WHERE field_id = ? AND value = ?')
-    const clearSet = db.prepare('DELETE FROM track_values WHERE track_id = ? AND field_id = ?')
-    const insertTv = db.prepare(
-      'INSERT OR IGNORE INTO track_values (track_id, field_id, value_id, ordinal) VALUES (?, ?, ?, ?)')
-
     for (const f of preview.fields.filter((x) => x.multi)) {
       const fid = field(f.field).fieldId!
       const res = req.resolutions?.[f.field]
@@ -380,11 +367,10 @@ export function mergeTracks(db: Db, req: MergeRequest): MergeResult {
       if (res?.kind === 'value') values = (sets.get(res.from)?.get(f.field) ?? []).slice()
       else values = f.union ?? []
 
-      clearSet.run(req.survivor as never, fid as never)
+      run(database, 'DELETE FROM track_values WHERE track_id = ? AND field_id = ?', req.survivor, fid)
       values.forEach((v, ordinal) => {
-        insertValue.run(fid as never, v as never)
-        const vid = (selectValue.get(fid as never, v as never) as { id: number }).id
-        insertTv.run(req.survivor as never, fid as never, vid as never, ordinal as never)
+        run(database, 'INSERT OR IGNORE INTO track_values (track_id, field_id, value_id, ordinal) VALUES (?, ?, ?, ?)',
+          req.survivor, fid, intern_value(database, fid, v), ordinal)
       })
     }
 
@@ -395,51 +381,34 @@ export function mergeTracks(db: Db, req: MergeRequest): MergeResult {
       const value = req.overrides?.[fieldId] ?? extras.get(source)?.get(fieldId) ?? null
 
       if (value === null) continue
-      db.prepare(
-        'INSERT INTO track_extras (track_id, field_id, value) VALUES (?, ?, ?) ' +
-        'ON CONFLICT(track_id, field_id) DO UPDATE SET value = excluded.value'
-      ).run(req.survivor as never, field(fieldId).fieldId as never, value as never)
+      set_extra(database, req.survivor, field(fieldId).fieldId!, String(value))
     }
 
     // ── media: the whole point of a merge ────────────────────────────────────
-    const mediaMoved = absorbed.length
-      ? (db.prepare(`UPDATE media SET track_id = ? WHERE track_id IN (${absorbedPh})`)
-          .run(req.survivor as never, ...(absorbed as never[])) as { changes?: number }).changes ?? 0
-      : 0
+    const mediaMoved = run(database, `UPDATE media SET track_id = ? WHERE track_id IN (${absorbedPh})`, req.survivor, ...absorbed)
 
-    // ── play history: union, deduplicated by the migration-002 constraint ────
-    const historyDeleted = db.prepare(
+    // ── play history: union, deduplicated by the unique play constraint ──────
+    const historyDeleted = all_rows<Snapshot['historyDeleted'][number]>(database,
       `SELECT track_id, at, kind, position_ms FROM play_history
        WHERE track_id IN (${absorbedPh})
          AND EXISTS (SELECT 1 FROM play_history p2
-                     WHERE p2.track_id = ? AND p2.at = play_history.at AND p2.kind = play_history.kind)`
-    ).all(...(absorbed as never[]), req.survivor as never) as Snapshot['historyDeleted']
+                     WHERE p2.track_id = ? AND p2.at = play_history.at AND p2.kind = play_history.kind)`,
+      ...absorbed, req.survivor).map((row) => ({ ...row }))
 
-    const historyMoved = absorbed.length
-      ? (db.prepare(`UPDATE OR IGNORE play_history SET track_id = ? WHERE track_id IN (${absorbedPh})`)
-          .run(req.survivor as never, ...(absorbed as never[])) as { changes?: number }).changes ?? 0
-      : 0
+    const historyMoved = run(database, `UPDATE OR IGNORE play_history SET track_id = ? WHERE track_id IN (${absorbedPh})`, req.survivor, ...absorbed)
 
     // Anything left could not move because the survivor already had that exact event.
-    if (absorbed.length) {
-      db.prepare(`DELETE FROM play_history WHERE track_id IN (${absorbedPh})`)
-        .run(...(absorbed as never[]))
-    }
+    run(database, `DELETE FROM play_history WHERE track_id IN (${absorbedPh})`, ...absorbed)
 
     // ── playlists ────────────────────────────────────────────────────────────
-    let playlistEntriesRepointed = 0
-    if (absorbed.length) {
-      playlistEntriesRepointed =
-        (db.prepare(`UPDATE playlist_tracks SET track_id = ? WHERE track_id IN (${absorbedPh})`)
-          .run(req.survivor as never, ...(absorbed as never[])) as { changes?: number }).changes ?? 0
+    const playlistEntriesRepointed = run(database, `UPDATE playlist_tracks SET track_id = ? WHERE track_id IN (${absorbedPh})`, req.survivor, ...absorbed)
 
-      // Repointing can put the survivor in one playlist twice; keep its earliest position.
-      db.prepare(`
-        DELETE FROM playlist_tracks
-        WHERE track_id = ? AND position NOT IN (
-          SELECT MIN(position) FROM playlist_tracks WHERE track_id = ? GROUP BY playlist_id
-        )`).run(req.survivor as never, req.survivor as never)
-    }
+    // Repointing can put the survivor in one playlist twice; keep its earliest position.
+    run(database, `
+      DELETE FROM playlist_tracks
+      WHERE track_id = ? AND position NOT IN (
+        SELECT MIN(position) FROM playlist_tracks WHERE track_id = ? GROUP BY playlist_id
+      )`, req.survivor, req.survivor)
 
     // ── statistics ───────────────────────────────────────────────────────────
     const stats = preview.statistics
@@ -447,49 +416,40 @@ export function mergeTracks(db: Db, req: MergeRequest): MergeResult {
     const lastSkipped = before.tracks
       .map((t) => t.last_skipped).filter((v): v is number => v !== null)
 
-    db.prepare(`
+    run(database, `
       UPDATE tracks SET rating = ?, play_count = ?, skip_count = ?, first_played = ?,
                         last_played = ?, last_skipped = ?, added = ?,
                         pinned = 1, identity_source = 'manual', modified = ?
-      WHERE id = ?`).run(
-      stats.rating as never, stats.playCount as never, stats.skipCount as never,
-      stats.firstPlayed as never, stats.lastPlayed as never,
-      (lastSkipped.length ? Math.max(...lastSkipped) : null) as never,
-      added as never, now as never, req.survivor as never
-    )
+      WHERE id = ?`,
+      stats.rating, stats.playCount, stats.skipCount, stats.firstPlayed, stats.lastPlayed,
+      lastSkipped.length ? Math.max(...lastSkipped) : null, added, now, req.survivor)
 
     // ── remove the absorbed tracks ───────────────────────────────────────────
-    if (absorbed.length) {
-      db.prepare(`DELETE FROM tracks WHERE id IN (${absorbedPh})`).run(...(absorbed as never[]))
-    }
+    run(database, `DELETE FROM tracks WHERE id IN (${absorbedPh})`, ...absorbed)
 
     before.historyDeleted = historyDeleted
-    db.prepare('INSERT INTO merge_journal (batch_id, at, survivor_id, snapshot) VALUES (?, ?, ?, ?)')
-      .run(batchId as never, now as never, req.survivor as never, JSON.stringify(before) as never)
+    run(database, 'INSERT INTO merge_journal (id, batch_id, at, survivor_id, snapshot) VALUES (?, ?, ?, ?, ?)',
+      new_id(), batchId, now, req.survivor, JSON.stringify(before))
 
-    db.exec('COMMIT')
-
-    return {
-      batchId, survivor: req.survivor, absorbed,
-      mediaMoved, historyMoved, playlistEntriesRepointed
-    }
-  } catch (err) {
-    db.exec('ROLLBACK')
-    throw err
-  }
+    return { batchId, survivor: req.survivor, absorbed, mediaMoved, historyMoved, playlistEntriesRepointed }
+  })
 }
 
 export interface UnmergeResult {
   batchId: string
-  restored: number[]
-  survivor: number
+  restored: string[]
+  survivor: string
 }
 
+const trackColumns = [
+  'title', 'album_id', 'year', 'track_number', 'disc_number', 'length_ms', 'compilation', 'bpm', 'rating', 'play_count',
+  'skip_count', 'first_played', 'last_played', 'last_skipped', 'added', 'pinned', 'mb_recording_id'
+] as const
+
 /** Puts the library back exactly as it was before a merge. */
-export function unmerge(db: Db, batchId: string): UnmergeResult {
-  const entry = db.prepare(
-    'SELECT survivor_id, snapshot, undone FROM merge_journal WHERE batch_id = ?'
-  ).get(batchId as never) as { survivor_id: number; snapshot: string; undone: number } | undefined
+export function unmerge(database: SqlDatabase, batchId: string): UnmergeResult {
+  const entry = first_row<{ survivor_id: string; snapshot: string; undone: number }>(database,
+    'SELECT survivor_id, snapshot, undone FROM merge_journal WHERE batch_id = ?', batchId)
 
   if (!entry) throw new Error(`no merge recorded under ${batchId}`)
   if (entry.undone) throw new Error(`${batchId} has already been undone`)
@@ -497,97 +457,63 @@ export function unmerge(db: Db, batchId: string): UnmergeResult {
   const before = JSON.parse(entry.snapshot) as Snapshot
   const survivor = entry.survivor_id
 
-  db.exec('BEGIN')
-  try {
-    // Recreate the absorbed tracks with their original ids, so media and history can point back.
-    const insert = db.prepare(`
-      INSERT INTO tracks (id, title, album_id, year, track_number, disc_number, length_ms,
-                          compilation, bpm, rating, play_count, skip_count, first_played,
-                          last_played, last_skipped, added, pinned, mb_recording_id,
-                          identity_source, modified)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'heuristic', ?)`)
-
-    const update = db.prepare(`
-      UPDATE tracks SET title = ?, album_id = ?, year = ?, track_number = ?, disc_number = ?,
-                        length_ms = ?, compilation = ?, bpm = ?, rating = ?, play_count = ?,
-                        skip_count = ?, first_played = ?, last_played = ?, last_skipped = ?,
-                        added = ?, pinned = ?, modified = ?
-      WHERE id = ?`)
-
+  return in_transaction(database, () => {
     const now = Date.now()
-    const restored: number[] = []
+    const restored: string[] = []
+    const albumOf = (id: string | null): string | null =>
+      id !== null && first_row(database, 'SELECT 1 FROM albums WHERE id = ?', id) !== undefined ? id : null
 
     for (const t of before.tracks) {
+      const values: SqlValue[] = trackColumns.map((column) => column === 'album_id' ? albumOf(t.album_id) : t[column])
       if (t.id === survivor) {
-        update.run(
-          t.title as never, t.album_id as never, t.year as never, t.track_number as never,
-          t.disc_number as never, t.length_ms as never, t.compilation as never, t.bpm as never,
-          t.rating as never, t.play_count as never, t.skip_count as never,
-          t.first_played as never, t.last_played as never, t.last_skipped as never,
-          t.added as never, t.pinned as never, now as never, t.id as never
-        )
+        run(database, `UPDATE tracks SET ${trackColumns.filter((c) => c !== 'mb_recording_id').map((c) => `${c} = ?`).join(', ')}, modified = ? WHERE id = ?`,
+          ...values.slice(0, -1), now, t.id)
       } else {
-        insert.run(
-          t.id as never, t.title as never, t.album_id as never, t.year as never,
-          t.track_number as never, t.disc_number as never, t.length_ms as never,
-          t.compilation as never, t.bpm as never, t.rating as never, t.play_count as never,
-          t.skip_count as never, t.first_played as never, t.last_played as never,
-          t.last_skipped as never, t.added as never, t.pinned as never,
-          t.mb_recording_id as never, now as never
-        )
+        // A track with this id that was added at another time is not the one this merge took, so the undo stops.
+        const existing = first_row<{ added: number }>(database, 'SELECT added FROM tracks WHERE id = ?', t.id)
+        if (existing && existing.added !== t.added) throw new Error(`undoing ${batchId} would overwrite a track this merge did not take`)
+        // Recreated with its own id, so media and history can point back; a history restore may have brought it back already.
+        const updated = run(database, `UPDATE tracks SET ${trackColumns.map((c) => `${c} = ?`).join(', ')}, modified = ? WHERE id = ?`,
+          ...values, now, t.id)
+        if (updated === 0) {
+          run(database, `INSERT INTO tracks (id, ${trackColumns.join(', ')}, identity_source, modified)
+                         VALUES (?, ${placeholders(trackColumns)}, 'heuristic', ?)`, t.id, ...values, now)
+        }
         restored.push(t.id)
       }
     }
 
     const ids = before.tracks.map((t) => t.id)
-    const ph = ids.map(() => '?').join(',')
+    const ph = placeholders(ids)
 
-    db.prepare(`DELETE FROM track_values WHERE track_id IN (${ph})`).run(...(ids as never[]))
-    db.prepare(`DELETE FROM track_extras WHERE track_id IN (${ph})`).run(...(ids as never[]))
-
-    const insertTv = db.prepare(
-      'INSERT OR IGNORE INTO track_values (track_id, field_id, value_id, ordinal) VALUES (?, ?, ?, ?)')
-    const insertValue = db.prepare('INSERT OR IGNORE INTO values_ (field_id, value) VALUES (?, ?)')
-    const selectValue = db.prepare('SELECT id FROM values_ WHERE field_id = ? AND value = ?')
+    run(database, `DELETE FROM track_values WHERE track_id IN (${ph})`, ...ids)
+    run(database, `DELETE FROM track_extras WHERE track_id IN (${ph})`, ...ids)
 
     for (const r of before.sets) {
-      insertValue.run(r.field_id as never, r.value as never)
-      const vid = (selectValue.get(r.field_id as never, r.value as never) as { id: number }).id
-      insertTv.run(r.track_id as never, r.field_id as never, vid as never, r.ordinal as never)
+      run(database, 'INSERT OR IGNORE INTO track_values (track_id, field_id, value_id, ordinal) VALUES (?, ?, ?, ?)',
+        r.track_id, r.field_id, intern_value(database, r.field_id, r.value), r.ordinal)
     }
 
-    const insertExtra = db.prepare(
-      'INSERT OR IGNORE INTO track_extras (track_id, field_id, value) VALUES (?, ?, ?)')
     for (const r of before.extras) {
-      insertExtra.run(r.track_id as never, r.field_id as never, r.value as never)
+      run(database, 'INSERT OR IGNORE INTO track_extras (track_id, field_id, value) VALUES (?, ?, ?)', r.track_id, r.field_id, r.value)
     }
 
-    const moveMedia = db.prepare('UPDATE media SET track_id = ? WHERE id = ?')
-    for (const m of before.media) moveMedia.run(m.track_id as never, m.id as never)
+    for (const m of before.media) run(database, 'UPDATE media SET track_id = ? WHERE id = ?', m.track_id, m.id)
 
-    const moveHistory = db.prepare('UPDATE OR IGNORE play_history SET track_id = ? WHERE id = ?')
-    for (const h of before.history) moveHistory.run(h.track_id as never, h.id as never)
+    for (const h of before.history) run(database, 'UPDATE OR IGNORE play_history SET track_id = ? WHERE id = ?', h.track_id, h.id)
 
-    const restoreHistory = db.prepare(
-      'INSERT OR IGNORE INTO play_history (track_id, at, kind, position_ms) VALUES (?, ?, ?, ?)')
     for (const h of before.historyDeleted) {
-      restoreHistory.run(
-        h.track_id as never, h.at as never, h.kind as never, (h.position_ms ?? null) as never)
+      run(database, 'INSERT OR IGNORE INTO play_history (id, track_id, at, kind, position_ms) VALUES (?, ?, ?, ?, ?)',
+        new_id(), h.track_id, h.at, h.kind, h.position_ms ?? null)
     }
 
-    db.prepare(`DELETE FROM playlist_tracks WHERE track_id IN (${ph})`).run(...(ids as never[]))
-    const insertPl = db.prepare(
-      'INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)')
+    run(database, `DELETE FROM playlist_tracks WHERE track_id IN (${ph})`, ...ids)
     for (const p of before.playlists) {
-      insertPl.run(p.playlist_id as never, p.track_id as never, p.position as never)
+      run(database, 'INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)', p.playlist_id, p.track_id, p.position)
     }
 
-    db.prepare('UPDATE merge_journal SET undone = 1 WHERE batch_id = ?').run(batchId as never)
-    db.exec('COMMIT')
+    run(database, 'UPDATE merge_journal SET undone = 1 WHERE batch_id = ?', batchId)
 
     return { batchId, restored, survivor }
-  } catch (err) {
-    db.exec('ROLLBACK')
-    throw err
-  }
+  })
 }
