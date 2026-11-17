@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { PlayerStatus, TrackDetails } from '@shared/ipc'
 import { results } from '../../src/renderer/stores/library'
-import { player } from '../../src/renderer/stores/player'
+import { player, player_status } from '../../src/renderer/stores/player'
 import { TabbedLists } from '../../src/renderer/widgets/TabbedLists'
 import { install_bridge } from '../helpers/bridge'
 
@@ -32,7 +32,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
-  player.status = null
+  player_status.set(null)
 })
 
 // ============================================================================
@@ -41,7 +41,7 @@ afterEach(() => {
 
 describe('queue', () => {
   it('names a queued track the library\'s filters hide', async () => {
-    player.status = status([99])
+    player_status.set(status([99]))
     render(<TabbedLists />)
 
     expect(await screen.findByText('Hidden by the filters')).toBeTruthy()
@@ -50,7 +50,7 @@ describe('queue', () => {
   })
 
   it('takes a track out with its remove button, named after it', async () => {
-    player.status = status([99])
+    player_status.set(status([99]))
     render(<TabbedLists />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Remove Hidden by the filters from the queue' }))
@@ -59,7 +59,7 @@ describe('queue', () => {
   })
 
   it('takes the track under the keyboard out on Delete', async () => {
-    player.status = status([99])
+    player_status.set(status([99]))
     render(<TabbedLists />)
     const row = (await screen.findByText('Hidden by the filters')).closest('tr')!
 
@@ -69,7 +69,7 @@ describe('queue', () => {
   })
 
   it('says so when nothing is queued', () => {
-    player.status = status([])
+    player_status.set(status([]))
     render(<TabbedLists />)
 
     expect(screen.getByText('The queue is empty.')).toBeTruthy()
@@ -86,7 +86,7 @@ describe('now playing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Now playing' }))
     expect(screen.getByText('Nothing is playing.')).toBeTruthy()
 
-    act(() => { player.status = { ...status([]), track: { id: 1, title: 'Song A', artist: 'Sample Trio', album: 'Album B', lengthMs: 1000, rating: null } } })
+    act(() => { player_status.set({ ...status([]), track: { id: 1, title: 'Song A', artist: 'Sample Trio', album: 'Album B', lengthMs: 1000, rating: null } }) })
     expect(screen.getByText('Song A')).toBeTruthy()
   })
 })
