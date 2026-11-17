@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { TrackRow } from '@shared/ipc'
 import { library } from '../../src/renderer/stores/library'
-import { player } from '../../src/renderer/stores/player'
+import { player, player_status } from '../../src/renderer/stores/player'
 import { SongList } from '../../src/renderer/widgets/SongList'
 
 // ============================================================================
@@ -42,7 +42,7 @@ beforeEach(() => {
   Object.assign(window, { xMusic: bridge, xMusicEvents: { on: () => () => {} } })
   ;(library as unknown as { tracks: TrackRow[] }).tracks = tracks(3)
   library.clearSelection()
-  player.status = null
+  player_status.set(null)
 })
 
 afterEach(cleanup)
@@ -89,7 +89,7 @@ describe('song list', () => {
   })
 
   it('marks the playing track with Halon\'s now-playing row', () => {
-    player.status = { state: 'playing', track: { id: 20 }, positionMs: 0, durationMs: 61_000 } as unknown as typeof player.status
+    player_status.set({ state: 'playing', track: { id: 20 }, positionMs: 0, durationMs: 61_000 } as unknown as typeof player.status)
     render(<SongList />)
 
     expect(row('Track 2').classList.contains('now-playing')).toBe(true)
