@@ -194,7 +194,8 @@ function orderBy(sort: readonly SortKey[] | undefined): string {
     // NULLs sort last in both directions, which is what a listener expects.
     return `${expr} IS NULL, ${expr} ${dir}`
   })
-  return ` ORDER BY ${keys.join(', ')}`
+  // Ties go by id, so a sorted list comes back in one order every time and can be read in pages.
+  return ` ORDER BY ${keys.join(', ')}, t.id`
 }
 
 export function compileFilter(
