@@ -92,6 +92,7 @@ export const player = {
   set_volume: (volume: number) => act(() => ipc('set_volume', volume)),
   enqueue: (track_ids: string[], position: 'end' | 'next' = 'end') => act(() => ipc('queue_tracks', track_ids, position)),
   dequeue: (index: number) => act(() => ipc('remove_from_queue', index)),
+  move_in_queue: (index: number, to_index: number) => act(() => ipc('move_in_queue', index, to_index)),
   clear_queue: () => act(() => ipc('clear_queue')),
   set_repeat: (mode: RepeatMode) => act(() => ipc('set_repeat', mode)),
   set_shuffle: (on: boolean) => act(() => ipc('set_shuffle', on)),
