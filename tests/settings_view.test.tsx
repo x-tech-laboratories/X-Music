@@ -62,6 +62,24 @@ describe('settings view', () => {
     await waitFor(() => expect(set_history_keep_days).toHaveBeenCalledWith(90))
   })
 
+  it('says why the days to keep changes could not load and loads them again on Retry', async () => {
+    let fails = true
+    const get_history_keep_days = vi.fn(async () => {
+      if (fails) throw new Error('database is locked')
+      return 30
+    })
+    Object.assign(window.xMusicHistory, { get_history_keep_days })
+    render(<SettingsView info={info} density="normal" on_density={() => undefined} />)
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('database is locked')
+    fails = false
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByDisplayValue('30')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('clears the library only once the dialog is confirmed', async () => {
     let cleared = 0
     install_bridge({ 'clear_library': () => { cleared += 1; return { cleared: true } } })

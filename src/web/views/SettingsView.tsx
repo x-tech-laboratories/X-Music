@@ -6,6 +6,7 @@ import { confirm_dialog } from '@x-tech-laboratories/x-libs/web/react/dialog'
 import { NumberField, Segmented } from '@x-tech-laboratories/x-libs/web/react/controls'
 import { LocalMcpSettings } from '@x-tech-laboratories/x-libs/web/react/local_mcp_settings'
 import { Facts, PageHeading, SettingRow, SettingsPage, type SettingsCategory } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
@@ -78,26 +79,29 @@ function LibraryDatabase() {
 // History
 // ============================================================================
 
-// How long track versions are kept, read once and saved on each change.
+// How long track versions are kept, read once, saved on each change, and offered again on Retry when it could not be read.
 function HistoryKeeping() {
-  const [days, set_days] = useState<number | null>(null)
-  useEffect(() => void window.xMusicHistory.get_history_keep_days().then(set_days, () => undefined), [])
+  const loaded = use_resource(() => window.xMusicHistory.get_history_keep_days(), [])
+  const [changed, set_changed] = useState<number | null>(null)
+  const days = changed ?? loaded.data ?? null
 
   async function change(next: number | null): Promise<void> {
     if (next === null || next < 1) return
-    const before = days
-    set_days(next)
+    const before = changed
+    set_changed(next)
     try {
       await window.xMusicHistory.set_history_keep_days(next)
     } catch (error) {
-      set_days(before)
+      set_changed(before)
       toast(`Could not change how long changes are kept: ${describe_call_error(error)}`, { tone: 'bad' })
     }
   }
 
   return (
     <SettingRow label="Keep changes for" hint="Older changes are pruned; each track always keeps its latest.">
-      <NumberField label="Keep changes for" bare unit="days" min={1} value={days} on_change={(next) => void change(next)} />
+      <Loaded resource={loaded} lines={1}>
+        {() => <NumberField label="Keep changes for" bare unit="days" min={1} value={days} on_change={(next) => void change(next)} />}
+      </Loaded>
     </SettingRow>
   )
 }
