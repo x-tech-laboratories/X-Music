@@ -38,6 +38,7 @@ export interface FindOptions {
   limit?: number
 }
 
+// Raw because each column past the track's own is a correlated subquery, which reads plainer as SQL.
 const MEMBER_SELECT = `
   t.id AS track_id, t.title, t.year, t.length_ms, t.rating, t.play_count,
   (SELECT a.name FROM albums a WHERE a.id = t.album_id) AS album,
@@ -46,12 +47,13 @@ const MEMBER_SELECT = `
   (SELECT COUNT(*) FROM media m WHERE m.track_id = t.id) AS media_count,
   (SELECT GROUP_CONCAT(DISTINCT m.codec) FROM media m WHERE m.track_id = t.id) AS codecs`
 
+// Raw for MEMBER_SELECT's subqueries.
 function members(database: SqlDatabase, ids: readonly string[]): DuplicateMember[] {
   return all_rows<DuplicateMember>(database, `SELECT ${MEMBER_SELECT} FROM tracks t WHERE t.id IN (${placeholders(ids)})`, ...ids)
     .map((member) => ({ ...member }))
 }
 
-// Groups of track ids sharing a key, only where the group has more than one member.
+// Groups of track ids sharing a key, only where the group has more than one member; raw, since GROUP_CONCAT and HAVING read plainer as SQL.
 function groups_by_key(database: SqlDatabase, sql: string): { key: string; ids: string[] }[] {
   return all_rows<{ key: string; ids: string }>(database, sql)
     .map((r) => ({ key: r.key, ids: r.ids.split(',') }))
@@ -142,6 +144,7 @@ export function find_duplicates(database: SqlDatabase, opts: FindOptions = {}): 
 
   // ── same artist and title, ignoring album, with similar duration ─────────
   if (reasons.has('fuzzy')) {
+    // Raw for MEMBER_SELECT's subqueries.
     const rows = all_rows<DuplicateMember>(database, `SELECT ${MEMBER_SELECT} FROM tracks t WHERE t.title IS NOT NULL`)
 
     const buckets = new Map<string, DuplicateMember[]>()

@@ -4,11 +4,13 @@
 // try to merge two files that are the same recording. Deduplication is a separate, reviewable
 // operation, and silently merging someone's library on import would be the wrong default.
 
+import { and, eq } from '@x-tech-laboratories/x-libs/drizzle'
 import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import type { ImportReport } from '../ipc.ts'
 import { regroup_albums } from '../library/albums.ts'
-import { first_row, new_id, run } from '../library/database.ts'
+import { drizzle_of, new_id } from '../library/database.ts'
+import { play_history, playlist_tracks, playlists } from '../library/schema.ts'
 import { create_upserter, type TrackCandidate } from '../library/identity.ts'
 import type { GmbrcData } from './gmbrc.ts'
 
@@ -127,7 +129,7 @@ export function import_gmbrc(database: SqlDatabase, data: GmbrcData, opts: Impor
 
       if (with_stats) {
         for (const at of song.play_history) {
-          run(database, 'INSERT OR IGNORE INTO play_history (id, track_id, at, kind) VALUES (?, ?, ?, 0)', new_id(), result.track_id, at * 1000)
+          drizzle_of(database).insert(play_history).values({ id: new_id(), track_id: result.track_id, at: at * 1000, kind: 0 }).onConflictDoNothing().run()
           report.play_history_rows++
         }
       }
@@ -135,20 +137,20 @@ export function import_gmbrc(database: SqlDatabase, data: GmbrcData, opts: Impor
 
     if (with_playlists) {
       for (const list of data.saved_lists) {
-        const existing = first_row<{ id: string }>(database, "SELECT id FROM playlists WHERE name = ? AND kind = 'static'", list.name)
+        const existing = drizzle_of(database).select({ id: playlists.id }).from(playlists).where(and(eq(playlists.name, list.name), eq(playlists.kind, 'static'))).get()
         let playlist_id: string
         if (existing) {
           playlist_id = existing.id
-          run(database, 'DELETE FROM playlist_tracks WHERE playlist_id = ?', playlist_id)
+          drizzle_of(database).delete(playlist_tracks).where(eq(playlist_tracks.playlist_id, playlist_id)).run()
         } else {
           playlist_id = new_id()
-          run(database, "INSERT INTO playlists (id, name, kind, created, modified) VALUES (?, ?, 'static', ?, ?)", playlist_id, list.name, now, now)
+          drizzle_of(database).insert(playlists).values({ id: playlist_id, name: list.name, kind: 'static', created: now, modified: now }).run()
         }
         let position = 0
         for (const gmb_id of list.gmb_ids) {
           const track_id = track_by_gmb_id.get(gmb_id)
           if (track_id !== undefined) {
-            run(database, 'INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)', playlist_id, track_id, position++)
+            drizzle_of(database).insert(playlist_tracks).values({ playlist_id, track_id, position: position++ }).onConflictDoNothing().run()
           }
         }
         report.playlists_created++

@@ -3,11 +3,11 @@
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { count, eq } from '@x-tech-laboratories/x-libs/drizzle'
+import { and, asc, count, desc, eq, or, sql } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
-import { all_rows, drizzle_of, first_row, new_id } from './database.ts'
-import { artwork, tracks } from './schema.ts'
+import { drizzle_of, new_id } from './database.ts'
+import { artwork, media, tracks } from './schema.ts'
 
 // ── Shapes ───────────────────────────────────────────────────────────────────
 
@@ -29,17 +29,15 @@ export const no_artwork: Artwork = { source: 'none', path: null, origin: null, w
 
 // The recorded answer for a track, the track's own before its album's, if one exists.
 export function lookup_artwork(database: SqlDatabase, track_id: string): Artwork | null {
-  const row = first_row<Artwork>(
-    database,
-    `SELECT a.source, a.path, a.origin, a.width, a.height, a.hash
-     FROM tracks t
-     JOIN artwork a ON a.album_id = t.album_id OR a.track_id = t.id
-     WHERE t.id = ?
-     ORDER BY a.track_id IS NULL
-     LIMIT 1`,
-    track_id
-  )
-  return row ? { ...row } : null
+  const row = drizzle_of(database)
+    .select({ source: artwork.source, path: artwork.path, origin: artwork.origin, width: artwork.width, height: artwork.height, hash: artwork.hash })
+    .from(tracks)
+    .innerJoin(artwork, or(eq(artwork.album_id, tracks.album_id), eq(artwork.track_id, tracks.id)))
+    .where(eq(tracks.id, track_id))
+    .orderBy(sql`${artwork.track_id} IS NULL`)
+    .limit(1)
+    .get()
+  return row ? { ...row, source: row.source as ArtSource } : null
 }
 
 export function album_of(database: SqlDatabase, track_id: string): { album_id: string | null } | undefined {
@@ -48,11 +46,13 @@ export function album_of(database: SqlDatabase, track_id: string): { album_id: s
 
 // The paths of a track's files that are there, best first.
 export function present_file_paths(database: SqlDatabase, track_id: string): string[] {
-  return all_rows<{ uri: string }>(
-    database,
-    "SELECT uri FROM media WHERE track_id = ? AND kind = 'file' AND present = 1 ORDER BY quality_rank DESC, added, id",
-    track_id
-  ).map((row) => row.uri)
+  return drizzle_of(database)
+    .select({ uri: media.uri })
+    .from(media)
+    .where(and(eq(media.track_id, track_id), eq(media.kind, 'file'), eq(media.present, 1)))
+    .orderBy(desc(media.quality_rank), asc(media.added), asc(media.id))
+    .all()
+    .map((row) => row.uri)
 }
 
 // ── Writing ──────────────────────────────────────────────────────────────────
