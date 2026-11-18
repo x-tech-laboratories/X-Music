@@ -20,7 +20,8 @@ Application Standard or the Design Guidelines (below), the standards win; fix th
   `new_id()`, never an auto-incrementing number.
 - Never open the real library (`~/.config/x-music/library.db` or wherever `X_MUSIC_DB` points) from a test or a
   check; use a scratch database.
-- Keep the SQL compiler and the native filter predicate in agreement; `tests/ast_agreement.test.ts` must pass.
+- Filters run through X-Libs `filter` and `filter_sql` over the catalogue in `src/shared/query/catalogue.ts`; keep
+  SQL and in-memory results in agreement there, as `tests/filter_compile.test.ts` checks.
 - Add a test for every behaviour you change, and a failing test first for every bug fix.
 - Prefer settings and extension points over changing behaviour for everyone.
 - Commit messages follow Conventional Commits and end with an `Assisted-by:` trailer naming the tool.
