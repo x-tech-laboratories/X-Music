@@ -11,8 +11,7 @@ import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sq
 
 import type { FileResult, ScanProgress, ScanReport } from '@shared/ipc'
 import { regroup_albums, split_values } from '@shared/library/albums'
-import { and, eq } from '@x-tech-laboratories/x-libs/drizzle'
-import { drizzle_of } from '@shared/library/database'
+import { and, drizzle_of, eq } from '@x-tech-laboratories/x-libs/drizzle'
 import { media as media_table } from '@shared/library/schema'
 import { create_upserter, type MediaCandidate, type TrackCandidate } from '@shared/library/identity'
 import { hash_audio, needs_rehash } from './audio_hash.ts'

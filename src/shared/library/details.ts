@@ -3,11 +3,11 @@
 // back the track, where each one is, which will actually play, and how the track came to be
 // identified the way it is (DESIGN-SPEC §6.5). Read-only.
 
-import { and, asc, count, desc, eq, inArray } from '@x-tech-laboratories/x-libs/drizzle'
+import { and, asc, count, desc, drizzle_of, eq, inArray } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { BUILTIN_FIELDS } from '../fields.ts'
-import { album_name, drizzle_of, to_hex } from './database.ts'
+import { album_name, to_hex } from './database.ts'
 import { media as media_table, media_tags, merge_journal, play_history, track_extras, track_values, tracks, values_ } from './schema.ts'
 
 export interface DetailMedia {

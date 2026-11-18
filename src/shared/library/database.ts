@@ -1,9 +1,9 @@
-// What every part of the library store shares: new ids, typed queries on a connection, and the few SQL helpers the
-// store's raw queries need.
+// What every part of the library store shares: new ids and the few SQL helpers the store's raw queries need; typed
+// queries on a connection come from X-Libs' drizzle_of.
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { open_drizzle, sql, type Drizzle } from '@x-tech-laboratories/x-libs/drizzle'
+import { sql } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase, SqlValue } from '@x-tech-laboratories/x-libs/sql'
 
 import { albums, tracks } from './schema.ts'
@@ -16,15 +16,6 @@ export function new_id(): string {
 }
 
 // ── Queries ──────────────────────────────────────────────────────────────────
-
-const drizzles = new WeakMap<SqlDatabase, Drizzle>()
-
-// Typed queries on the connection given, made once per connection.
-export function drizzle_of(database: SqlDatabase): Drizzle {
-  let drizzle = drizzles.get(database)
-  if (!drizzle) drizzles.set(database, (drizzle = open_drizzle(database)))
-  return drizzle
-}
 
 // The name of a track's album, as a column beside the track's own.
 export const album_name = sql<string | null>`(SELECT ${albums.name} FROM ${albums} WHERE ${albums.id} = ${tracks.album_id})`

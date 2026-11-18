@@ -4,12 +4,12 @@
 // try to merge two files that are the same recording. Deduplication is a separate, reviewable
 // operation, and silently merging someone's library on import would be the wrong default.
 
-import { and, eq } from '@x-tech-laboratories/x-libs/drizzle'
+import { and, drizzle_of, eq } from '@x-tech-laboratories/x-libs/drizzle'
 import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import type { ImportReport } from '../ipc.ts'
 import { regroup_albums } from '../library/albums.ts'
-import { drizzle_of, new_id } from '../library/database.ts'
+import { new_id } from '../library/database.ts'
 import { play_history, playlist_tracks, playlists } from '../library/schema.ts'
 import { create_upserter, type TrackCandidate } from '../library/identity.ts'
 import type { GmbrcData } from './gmbrc.ts'

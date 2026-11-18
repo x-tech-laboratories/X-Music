@@ -3,10 +3,10 @@
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { and, asc, count, desc, eq, or, sql } from '@x-tech-laboratories/x-libs/drizzle'
+import { and, asc, count, desc, drizzle_of, eq, or, sql } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
-import { drizzle_of, new_id } from './database.ts'
+import { new_id } from './database.ts'
 import { artwork, media, tracks } from './schema.ts'
 
 // ── Shapes ───────────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { asc, count, eq, isNotNull, sum } from '@x-tech-laboratories/x-libs/drizzle'
+import { asc, count, drizzle_of, eq, isNotNull, sum } from '@x-tech-laboratories/x-libs/drizzle'
 import { migrate_drizzle } from '@x-tech-laboratories/x-libs/drizzle'
 import { compile_filter, compile_group_by } from '@x-tech-laboratories/x-libs/filter_sql'
 import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
@@ -11,7 +11,7 @@ import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sq
 import { upgrade_definition } from '../filter_shapes.ts'
 import type { GroupRow, LibraryStats, QueryRequest, Root, TrackRow } from '../ipc.ts'
 import { group_sums, track_catalogue } from '../query/catalogue.ts'
-import { all_rows, drizzle_of, first_row, new_id, run } from './database.ts'
+import { all_rows, first_row, new_id, run } from './database.ts'
 import { install_history, track_history } from './history.ts'
 import { is_legacy, upgrade_legacy, type UpgradeReport } from './legacy.ts'
 import { migrations } from './migrations/index.ts'

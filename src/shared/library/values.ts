@@ -2,10 +2,10 @@
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { and, eq } from '@x-tech-laboratories/x-libs/drizzle'
+import { and, drizzle_of, eq } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
-import { drizzle_of, new_id } from './database.ts'
+import { new_id } from './database.ts'
 import { track_extras, track_values, values_ } from './schema.ts'
 
 // ── Values ───────────────────────────────────────────────────────────────────

@@ -4,11 +4,11 @@
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { asc, eq, inArray } from '@x-tech-laboratories/x-libs/drizzle'
+import { asc, drizzle_of, eq, inArray } from '@x-tech-laboratories/x-libs/drizzle'
 import { create_history, history_methods, type HistoryMethods } from '@x-tech-laboratories/x-libs/history'
 import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
-import { album_name, drizzle_of } from './database.ts'
+import { album_name } from './database.ts'
 import { albums, media, settings, track_extras, track_values, tracks, values_ } from './schema.ts'
 import { intern_value } from './values.ts'
 

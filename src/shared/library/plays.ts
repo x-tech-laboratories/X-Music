@@ -2,11 +2,11 @@
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { and, asc, count, desc, eq, sql } from '@x-tech-laboratories/x-libs/drizzle'
+import { and, asc, count, desc, drizzle_of, eq, sql } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import type { PlayerTrack } from '../ipc.ts'
-import { drizzle_of, first_row, new_id } from './database.ts'
+import { first_row, new_id } from './database.ts'
 import { media, play_history, tracks } from './schema.ts'
 
 // ── Reading ──────────────────────────────────────────────────────────────────
