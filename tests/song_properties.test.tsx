@@ -42,8 +42,9 @@ describe('song properties', () => {
 
     render(<SongProperties track_id="track-7" on_close={() => undefined} />)
 
-    await screen.findByRole('heading', { level: 2, name: 'All metadata' })
-    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Morning Tone', 'All metadata', 'Identity', 'Statistics', 'Merge history'])
+    await screen.findByRole('heading', { level: 3, name: 'All metadata' })
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Morning Tone'])
+    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual(['All metadata', 'Identity', 'Statistics', 'Merge history'])
     expect(screen.getAllByText('0:30').length).toBeGreaterThan(0)
     expect(screen.queryByText('Comment')).toBeNull()
     expect(screen.getByText('1 source · 3 plays')).toBeTruthy()
@@ -79,7 +80,7 @@ describe('song properties', () => {
     Object.assign(window, { xMusicHistory: { list_versions } })
 
     render(<><SongProperties track_id="track-7" on_close={() => undefined} /><Dialogs /></>)
-    await screen.findByRole('heading', { level: 2, name: 'All metadata' })
+    await screen.findByRole('heading', { level: 3, name: 'All metadata' })
     fireEvent.click(screen.getByRole('button', { name: 'History' }))
 
     expect(await screen.findByText('No history yet.')).toBeTruthy()

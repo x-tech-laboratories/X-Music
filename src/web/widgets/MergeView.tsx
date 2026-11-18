@@ -118,7 +118,7 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
         only_differences={only_differences}
       />
 
-      <Section title="Combined statistics">
+      <Section level={3} title="Combined statistics">
         <p className="muted small">
           These are not a choice: plays and skips are summed, the highest rating wins, and play
           history is merged and deduplicated.
@@ -130,7 +130,7 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
         </Tiles>
       </Section>
 
-      <Section title="Files the surviving track will hold">
+      <Section level={3} title="Files the surviving track will hold">
         <table>
           <thead><tr><th scope="col">Format</th><th scope="col">File</th><th scope="col">From</th></tr></thead>
           <tbody>

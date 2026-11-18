@@ -73,11 +73,11 @@ function Overview({ details }: { details: TrackDetails }) {
         <Facts rows={field_facts(details.fields.slice(0, 4))} />
       </div>
 
-      <Section title="All metadata">
+      <Section level={3} title="All metadata">
         <Facts layout="rows" rows={field_facts(details.fields)} />
       </Section>
 
-      <Section title="Identity">
+      <Section level={3} title="Identity">
         <p className="muted small">{identity_explanation[identity.source] ?? identity.source}</p>
         <Facts layout="rows" rows={[
           ['Decided by', <code>{identity.source}</code>],
@@ -88,7 +88,7 @@ function Overview({ details }: { details: TrackDetails }) {
         ]} />
       </Section>
 
-      <Section title="Statistics">
+      <Section level={3} title="Statistics">
         <p className="muted small">These belong to the track, not to any one file, so they survive a re-rip.</p>
         <Facts layout="rows" rows={[
           ['Rating', <Rating value={rating_to_stars(statistics.rating)} />],
@@ -101,7 +101,7 @@ function Overview({ details }: { details: TrackDetails }) {
       </Section>
 
       {(loudness.rg_track_gain !== null || loudness.rg_album_gain !== null) && (
-        <Section title="Loudness">
+        <Section level={3} title="Loudness">
           <Facts layout="rows" rows={[
             ['Track gain', loudness.rg_track_gain === null ? null : `${loudness.rg_track_gain} dB`],
             ['Album gain', loudness.rg_album_gain === null ? null : `${loudness.rg_album_gain} dB`]
@@ -110,7 +110,7 @@ function Overview({ details }: { details: TrackDetails }) {
       )}
 
       {details.merges.length > 0 && (
-        <Section title="Merge history">
+        <Section level={3} title="Merge history">
           <table>
             <thead><tr><th scope="col">When</th><th scope="col">Absorbed</th><th scope="col">Batch</th></tr></thead>
             <tbody>
@@ -133,13 +133,13 @@ function Source({ media }: { media: DetailMedia }) {
   const range = media.start_ms !== null || media.end_ms !== null
   return (
     <Section
-      class_name={s.source}
+      level={3}
       title={
-        <span className={s.source_title}>
-          {media.preferred && <Badge tone="good">Plays</Badge>}
-          {!media.present && <Badge tone="bad">Missing</Badge>}
-          <span className={s.path} title={media.uri}>{media.uri}</span>
-        </span>
+        <>
+          {media.preferred && <><Badge tone="good">Plays</Badge> </>}
+          {!media.present && <><Badge tone="bad">Missing</Badge> </>}
+          <code className="path">{media.uri}</code>
+        </>
       }
       tools={<button onClick={() => void page_ipc('show_in_folder', media.uri)} disabled={!media.present}>Show in folder</button>}
     >
@@ -193,7 +193,7 @@ function RawTags({ details }: { details: TrackDetails }) {
         both rather than losing the disagreement.
       </p>
       {details.media.map((media) => (
-        <Section key={media.id} class_name={s.source} title={<span className={s.path} title={media.uri}>{media.uri}</span>}>
+        <Section key={media.id} level={3} title={<code className="path">{media.uri}</code>}>
           {media.tags.length > 0
             ? <Facts layout="rows" rows={tag_facts(media.tags)} />
             : <Empty title="No raw tags stored" hint="The gmusicbrowser import records values on the track rather than per file; a scan fills these in." />}
