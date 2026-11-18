@@ -1,151 +1,30 @@
-// The format-string language (DESIGN-SPEC §5.5). One engine serves labels, now-playing text,
-// tooltips, tray text, notifications, column formats and the file renamer.
-// It lives in shared/ and touches no DOM, so it is unchanged by any UI-framework decision.
+// X-Music's format strings (DESIGN-SPEC §5.5) for labels, now-playing text, tooltips, tray text, notifications, column
+// formats and the file renamer: X-Libs' format_strings, with the music formats X-Music adds.
 
-import { format_clock } from '@x-tech-laboratories/x-libs/durations'
+// ── Imports ──────────────────────────────────────────────────────────────────
 
-export type FormatValue = string | number | null | undefined | readonly string[]
-export type FormatSource = (field_id: string) => FormatValue
+import {
+  compile_format as compile_with, format_record as format_record_with, format_string as format_string_with,
+  type FormatFunction, type FormatOptions, type FormatSource, type FormatValue
+} from '@x-tech-laboratories/x-libs/format_strings'
 
-interface Token {
-  kind: 'literal' | 'field' | 'group'
-  text?: string
-  fields?: string[]
-  spec?: string
-  children?: Token[]
+export { template_fields, type FormatSource, type FormatValue } from '@x-tech-laboratories/x-libs/format_strings'
+
+// ── Music formats ────────────────────────────────────────────────────────────
+
+// A rating from 0 to 100 as five stars, filled to the nearest whole star below.
+const stars: FormatFunction = (value) => {
+  const rating = Math.round((Number(value) / 20 + Number.EPSILON) * 10) / 10
+  return '★'.repeat(Math.floor(rating)) + '☆'.repeat(5 - Math.floor(rating))
 }
 
-// Parses a format string by the grammar in DESIGN-SPEC §5.5: {field}, {a|b}, {field:spec}, {genre:join(", ")} and [ groups ] that vanish when a field inside is empty.
-export function parse_format(input: string): Token[] {
-  let i = 0
+export const music_formats: FormatOptions = { formats: { stars } }
 
-  function parse_tokens(stop_at?: string): Token[] {
-    const out: Token[] = []
-    let literal = ''
+// ── Writing ──────────────────────────────────────────────────────────────────
 
-    const flush = (): void => {
-      if (literal) { out.push({ kind: 'literal', text: literal }); literal = '' }
-    }
+export const compile_format = (template: string): ((source: FormatSource) => string) => compile_with(template, music_formats)
 
-    while (i < input.length) {
-      const c = input[i]!
+export const format_string = (template: string, source: FormatSource): string => format_string_with(template, source, music_formats)
 
-      if (stop_at && c === stop_at) { i++; flush(); return out }
-
-      if (c === '\\' && i + 1 < input.length) { literal += input[i + 1]; i += 2; continue }
-
-      if (c === '[') { i++; flush(); out.push({ kind: 'group', children: parse_tokens(']') }); continue }
-
-      if (c === '{') {
-        i++
-        let body = ''
-        while (i < input.length && input[i] !== '}') body += input[i++]
-        i++ // consume '}'
-        flush()
-
-        const colon = body.indexOf(':')
-        const name_part = colon === -1 ? body : body.slice(0, colon)
-        const spec = colon === -1 ? undefined : body.slice(colon + 1)
-        out.push({ kind: 'field', fields: name_part.split('|').map((s) => s.trim()), spec })
-        continue
-      }
-
-      literal += c
-      i++
-    }
-
-    flush()
-    return out
-  }
-
-  return parse_tokens()
-}
-
-const is_empty = (v: FormatValue): boolean =>
-  v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)
-
-function apply_spec(value: FormatValue, spec: string | undefined): string {
-  if (is_empty(value)) return ''
-
-  if (spec === undefined) return Array.isArray(value) ? value.join(', ') : String(value)
-
-  if (Array.isArray(value)) {
-    const join = /^join\((.*)\)$/.exec(spec)
-    if (join) {
-      const raw = join[1]!.trim()
-      const sep = raw.replace(/^["'](.*)["']$/, '$1')
-      return value.join(sep)
-    }
-    if (spec === 'count') return String(value.length)
-    if (spec === 'first') return value[0] ?? ''
-    return value.join(', ')
-  }
-
-  const n = typeof value === 'number' ? value : Number(value)
-
-  if (spec === 'stars') {
-    const stars = Math.round((n / 20 + Number.EPSILON) * 10) / 10
-    return '★'.repeat(Math.floor(stars)) + '☆'.repeat(5 - Math.floor(stars))
-  }
-
-  if (spec === 'm:ss' || spec === 'h:mm:ss') return format_clock(n, { hours: spec === 'h:mm:ss' ? 'always' : 'auto' })
-
-  const printf = /^%0?(\d+)d$/.exec(spec)
-  if (printf && Number.isFinite(n)) return String(Math.trunc(n)).padStart(Number(printf[1]), '0')
-
-  const s = String(value)
-  switch (spec) {
-    case 'basename': return s.split('/').pop() ?? s
-    case 'dirname':  return s.slice(0, Math.max(0, s.lastIndexOf('/'))) || '/'
-    case 'ext':      { const b = s.split('/').pop() ?? s; const d = b.lastIndexOf('.'); return d > 0 ? b.slice(d + 1) : '' }
-    case 'upper':    return s.toLocaleUpperCase()
-    case 'lower':    return s.toLocaleLowerCase()
-    case 'title':    return s.replace(/\p{L}[\p{L}\p{M}']*/gu, (w) => w[0]!.toLocaleUpperCase() + w.slice(1).toLocaleLowerCase())
-    default:         return s
-  }
-}
-
-interface RenderResult { text: string; saw_empty_field: boolean }
-
-function render_tokens(tokens: readonly Token[], get: FormatSource): RenderResult {
-  let text = ''
-  let saw_empty_field = false
-
-  for (const t of tokens) {
-    if (t.kind === 'literal') { text += t.text; continue }
-
-    if (t.kind === 'group') {
-      const inner = render_tokens(t.children!, get)
-      // A bracketed group vanishes entirely if any field inside it is empty.
-      if (!inner.saw_empty_field) text += inner.text
-      continue
-    }
-
-    const found = t.fields!.map(get).find((v) => !is_empty(v))
-    if (found === undefined) { saw_empty_field = true; continue }
-    text += apply_spec(found, t.spec)
-  }
-
-  return { text, saw_empty_field }
-}
-
-export function format_string(template: string, get: FormatSource): string {
-  return render_tokens(parse_format(template), get).text
-}
-
-// Convenience for the common case of formatting a plain record.
-export const format_record = (template: string, row: Record<string, FormatValue>): string =>
-  format_string(template, (f) => row[f])
-
-// Every field a template references, so a caller knows what to fetch.
-export function template_fields(template: string): string[] {
-  const out = new Set<string>()
-  const walk = (tokens: readonly Token[]): void => {
-    for (const t of tokens) {
-      if (t.kind === 'field') t.fields!.forEach((f) => out.add(f))
-      else if (t.kind === 'group') walk(t.children!)
-    }
-  }
-  walk(parse_format(template))
-  return [...out]
-}
+export const format_record = (template: string, record: Readonly<Record<string, FormatValue>>): string =>
+  format_record_with(template, record, music_formats)
