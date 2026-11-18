@@ -9,6 +9,7 @@ import { Section, Stack, Tile, Tiles } from '@x-tech-laboratories/x-libs/web/rea
 import { MergeGrid, is_conflict, winner_of, type MergeChoices, type MergeField } from '@x-tech-laboratories/x-libs/web/react/merge_grid'
 import { PageView } from '@x-tech-laboratories/x-libs/web/react/page_view'
 import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
+import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
 import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
@@ -94,6 +95,11 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
 }) {
   const files_of = (id: TrackId): number => preview.media.filter((media) => media.from === id).length
   const source_name = (id: TrackId): string => `Source ${preview.ids.indexOf(id) + 1}`
+  const file_columns: TableColumn<MergePreview['media'][number]>[] = [
+    { label: 'Format', cell: (media) => (media.codec ?? 'Unknown').toUpperCase() },
+    { label: 'File', cell: (media) => <><code className="path">{media.uri}</code>{!media.present && <> <Badge tone="bad">Missing</Badge></>}</>, text: (media) => media.uri },
+    { label: 'From', cell: (media) => source_name(media.from), sort: (media) => preview.ids.indexOf(media.from) }
+  ]
 
   return (
     <Stack>
@@ -131,18 +137,7 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
       </Section>
 
       <Section level={3} title="Files the surviving track will hold">
-        <table>
-          <thead><tr><th scope="col">Format</th><th scope="col">File</th><th scope="col">From</th></tr></thead>
-          <tbody>
-            {preview.media.map((media) => (
-              <tr key={media.id}>
-                <td>{(media.codec ?? 'Unknown').toUpperCase()}</td>
-                <td><code title={media.uri}>{media.uri}</code> {!media.present && <Badge tone="bad">Missing</Badge>}</td>
-                <td>{source_name(media.from)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable caption="Files the surviving track will hold" columns={file_columns} rows={preview.media} row_key={(media) => media.id} column_hiding={false} />
       </Section>
     </Stack>
   )

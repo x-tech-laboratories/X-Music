@@ -9,6 +9,7 @@ import { Empty, Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/rea
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { plural, size, stamp } from '@x-tech-laboratories/x-libs/web/format'
 import { PageView } from '@x-tech-laboratories/x-libs/web/react/page_view'
+import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { rating_to_stars } from '@shared/fields'
 import { ipc, page_ipc } from '../lib/ipc.ts'
@@ -47,6 +48,25 @@ const hash_explanation: Record<string, string> = {
 }
 
 const not_hashed = 'Not hashed yet; scan this folder to enable move detection.'
+
+// ============================================================================
+// Tables
+// ============================================================================
+
+const merge_columns: TableColumn<TrackDetails['merges'][number]>[] = [
+  { label: 'When', cell: (merge) => when(merge.at), sort: (merge) => merge.at },
+  { label: 'Absorbed', class: 'number', cell: (merge) => plural(merge.absorbed, 'track'), sort: (merge) => merge.absorbed },
+  { label: 'Batch', cell: (merge) => <code>{merge.batch_id}</code>, text: (merge) => merge.batch_id }
+]
+
+const play_columns: TableColumn<TrackDetails['history'][number]>[] = [
+  {
+    label: 'Event',
+    cell: (entry) => <Badge tone={entry.kind === 'play' ? 'good' : 'warn'}>{entry.kind === 'play' ? 'Played' : 'Skipped'}</Badge>,
+    text: (entry) => (entry.kind === 'play' ? 'Played' : 'Skipped')
+  },
+  { label: 'When', cell: (entry) => when(entry.at), sort: (entry) => entry.at }
+]
 
 // ============================================================================
 // Sections
@@ -111,18 +131,7 @@ function Overview({ details }: { details: TrackDetails }) {
 
       {details.merges.length > 0 && (
         <Section level={3} title="Merge history">
-          <table>
-            <thead><tr><th scope="col">When</th><th scope="col">Absorbed</th><th scope="col">Batch</th></tr></thead>
-            <tbody>
-              {details.merges.map((merge) => (
-                <tr key={merge.batch_id}>
-                  <td>{when(merge.at)}</td>
-                  <td>{plural(merge.absorbed, 'track')}</td>
-                  <td><code>{merge.batch_id}</code></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable caption="Merge history" columns={merge_columns} rows={details.merges} row_key={(merge) => merge.batch_id} column_hiding={false} />
         </Section>
       )}
     </Stack>
@@ -213,17 +222,7 @@ function Plays({ details }: { details: TrackDetails }) {
         {plural(details.history_total, 'recorded event')}{shown_part} · {plural(plays, 'play')}, {plural(skips, 'skip')}
       </p>
       {details.history.length > 0 ? (
-        <table>
-          <thead><tr><th scope="col">Event</th><th scope="col">When</th></tr></thead>
-          <tbody>
-            {details.history.map((entry, index) => (
-              <tr key={`${entry.at}-${index}`}>
-                <td><Badge tone={entry.kind === 'play' ? 'good' : 'warn'}>{entry.kind === 'play' ? 'Played' : 'Skipped'}</Badge></td>
-                <td>{when(entry.at)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable caption="Plays and skips" columns={play_columns} rows={details.history} row_key={(entry) => `${entry.kind}-${entry.at}`} column_hiding={false} />
       ) : (
         <Empty title="Never played" />
       )}

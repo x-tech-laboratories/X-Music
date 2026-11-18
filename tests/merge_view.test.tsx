@@ -47,6 +47,8 @@ describe('merge view', () => {
     expect(cell_button('Genre', 'Keep all').getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByText('2 fields disagree; pick which value to keep')).toBeTruthy()
     expect(screen.getAllByText('0:30').length).toBeGreaterThan(0)
+    const files = screen.getByRole('table', { name: 'Files the surviving track will hold' })
+    expect(within(files).getAllByRole('row').slice(1).map((row) => row.textContent)).toEqual(['FLAC/music/a.flacSource 1', 'MP3/music/b.mp3 MissingSource 2'])
     // The switch is named once, by the words beside it.
     const only_differences = screen.getByRole('switch', { name: 'Only differences' })
     expect(only_differences.getAttribute('aria-label')).toBeNull()
