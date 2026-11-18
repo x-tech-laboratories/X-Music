@@ -110,6 +110,17 @@ describe('folders view', () => {
     expect(within(filter).getByRole('radio', { name: 'Failed 1' }).getAttribute('aria-checked')).toBe('true')
   })
 
+  it('says a scan that took under a second took less than a second', async () => {
+    const emit = fake_events()
+    render(<FoldersView />)
+
+    await screen.findByRole('table', { name: 'Music folders' })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Scan now' })))
+    emit('scan_done', { ...report, duration_ms: 400 })
+
+    expect(screen.getByText('Took').previousElementSibling?.textContent).toBe('less than a second')
+  })
+
   it('says why a scan could not start, without the bridge\'s own wording', async () => {
     install_bridge({ 'list_folders': roots, 'scan_folders': () => { throw new Error("Error invoking remote method 'scan_folders': Error: a scan is already running") } })
     render(<FoldersView />)

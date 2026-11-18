@@ -61,10 +61,6 @@ function folder_columns(scanning: boolean, remove: (root: Root) => void): TableC
 // Summary
 // ============================================================================
 
-function took(duration_in_milliseconds: number): string {
-  return duration_in_milliseconds < 1000 ? 'Under a second' : format_duration(duration_in_milliseconds / 1000)
-}
-
 function ScanSummary({ report, on_show_failed }: { report: ScanReport; on_show_failed: () => void }) {
   const failed = report.errors.length
   const notes = [
@@ -79,7 +75,7 @@ function ScanSummary({ report, on_show_failed }: { report: ScanReport; on_show_f
         <Tile label="New tracks" value={format_count(report.tracks_created)} value_first />
         <Tile label="Already known" value={format_count(report.tracks_matched)} value_first />
         <Tile label="Unchanged" value={format_count(report.files_skipped)} value_first />
-        <Tile label="Took" value={took(report.duration_ms)} value_first />
+        <Tile label="Took" value={format_duration(report.duration_ms / 1000)} value_first />
       </Tiles>
       {notes.length > 0 && (
         <p className={failed > 0 || report.marked_missing > 0 ? 'tone-warn' : 'muted'}>
