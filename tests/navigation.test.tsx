@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App } from '../src/web/App.tsx'
 import { view_of } from '../src/web/views/Navigation.tsx'
-import { library } from '../src/web/stores/library.ts'
+import { results } from '../src/web/stores/library.ts'
 import { emit_event, install_bridge } from './bridge.ts'
 
 // ============================================================================
@@ -29,8 +29,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
-  library.stats = null
-  library.error = null
+  results.update((before) => ({ ...before, stats: null, error: null }))
 })
 
 // ============================================================================
@@ -95,6 +94,16 @@ describe('navigation', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Library' })).toBeTruthy()
   })
 
+  it('sends an uncaught error in the page to the main log', async () => {
+    const calls = install_bridge({ get_log_levels: { default: 'warn', scopes: {} } })
+    render(<App />)
+    await waitFor(() => expect(calls.some((call) => call.channel === 'get_log_levels')).toBe(true))
+
+    act(() => void window.dispatchEvent(new ErrorEvent('error', { message: 'the page broke' })))
+
+    await waitFor(() => expect(calls.find((call) => call.channel === 'write_log')?.args[0]).toMatchObject({ level: 'error', scope: 'uncaught', message: 'the page broke' }))
+  })
+
   it('loads the library again when the MCP server changed it', async () => {
     const calls = install_bridge()
     render(<App />)
@@ -108,8 +117,7 @@ describe('navigation', () => {
   })
 
   it('puts the cursor in the library\'s search on /', async () => {
-    library.stats = { tracks: 1, media: 1, albums: 1, missing: 0, totalMs: 1000, schemaVersion: 1, path: '/tmp/x.db' }
-    install_bridge({ get_library_stats: library.stats })
+    install_bridge({ get_library_stats: { tracks: 1, media: 1, albums: 1, missing: 0, total_ms: 1000, schema_version: 1, path: '/tmp/x.db' } })
     render(<App />)
     const search = await screen.findByRole('searchbox', { name: 'Search the library' })
 
@@ -119,8 +127,7 @@ describe('navigation', () => {
   })
 
   it('shows no placeholder tabs for features still to come', async () => {
-    library.stats = { tracks: 1, media: 1, albums: 1, missing: 0, totalMs: 1000, schemaVersion: 1, path: '/tmp/x.db' }
-    install_bridge({ 'get_library_stats': library.stats })
+    install_bridge({ get_library_stats: { tracks: 1, media: 1, albums: 1, missing: 0, total_ms: 1000, schema_version: 1, path: '/tmp/x.db' } })
     render(<App />)
 
     await screen.findByRole('heading', { level: 1, name: 'Library' })
@@ -148,7 +155,7 @@ describe('library view', () => {
     install_bridge({
       'get_library_stats': () => {
         if (fails) throw new Error('database is locked')
-        return { tracks: 0, media: 0, albums: 0, missing: 0, totalMs: 0, schemaVersion: 1, path: '/tmp/x.db' }
+        return { tracks: 0, media: 0, albums: 0, missing: 0, total_ms: 0, schema_version: 1, path: '/tmp/x.db' }
       }
     })
     render(<App />)

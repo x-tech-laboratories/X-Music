@@ -100,9 +100,9 @@ describe('gmbrc import', () => {
     const db = fresh_db()
     const report = import_gmbrc(db, parse_gmbrc(gmbrc([row(1)])))
 
-    expect(report.tracksCreated).toBe(1)
-    expect(report.mediaCreated).toBe(1)
-    expect(report.playHistoryRows).toBe(2)
+    expect(report.tracks_created).toBe(1)
+    expect(report.media_created).toBe(1)
+    expect(report.play_history_rows).toBe(2)
 
     const t = db.prepare('SELECT title, rating, play_count, skip_count, year FROM tracks').get() as
       { title: string; rating: number; play_count: number; skip_count: number; year: number }
@@ -142,7 +142,7 @@ describe('gmbrc import', () => {
     const db = fresh_db()
     const report = import_gmbrc(db, parse_gmbrc(gmbrc([row(1, { missing: '1' })])))
 
-    expect(report.missingFlagged).toBe(1)
+    expect(report.missing_flagged).toBe(1)
     expect((db.prepare('SELECT COUNT(*) AS n FROM tracks').get() as { n: number }).n).toBe(1)
     expect((db.prepare('SELECT present FROM media').get() as { present: number }).present).toBe(0)
     db.close()
@@ -153,7 +153,7 @@ describe('gmbrc import', () => {
     const db = fresh_db()
     const report = import_gmbrc(db, parse_gmbrc(gmbrc([row(1), row(2)], extra)))
 
-    expect(report.playlistsCreated).toBe(1)
+    expect(report.playlists_created).toBe(1)
     const rows = db.prepare(
       `SELECT t.title FROM playlist_tracks pt JOIN tracks t ON t.id = pt.track_id
        ORDER BY pt.position`).all() as { title: string }[]
@@ -192,19 +192,19 @@ describe.runIf(existsSync(real_gmbrc))('against the real gmbrc on this machine',
     const db = fresh_db()
     const report = import_gmbrc(db, data)
 
-    expect(report.tracksCreated).toBe(data.songs.length)
+    expect(report.tracks_created).toBe(data.songs.length)
     // Every imported track must be reachable by the query engine.
     const n = (db.prepare('SELECT COUNT(*) AS n FROM tracks').get() as { n: number }).n
-    expect(n).toBe(report.tracksCreated)
+    expect(n).toBe(report.tracks_created)
 
     console.log('  real gmbrc:', JSON.stringify({
-      songs: report.songsRead,
-      tracks: report.tracksCreated,
-      media: report.mediaCreated,
-      missing: report.missingFlagged,
-      history: report.playHistoryRows,
-      playlists: report.playlistsCreated,
-      filters: report.savedFiltersFound
+      songs: report.songs_read,
+      tracks: report.tracks_created,
+      media: report.media_created,
+      missing: report.missing_flagged,
+      history: report.play_history_rows,
+      playlists: report.playlists_created,
+      filters: report.saved_filters_found
     }))
     db.close()
   })

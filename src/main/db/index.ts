@@ -15,6 +15,7 @@ export function library_path(): string {
 export function open_database(path = library_path()): DatabaseSync {
   mkdirSync(dirname(path), { recursive: true })
   const database = new DatabaseSync(path)
+  // Raw because Drizzle builds no PRAGMA.
   database.exec(`PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA temp_store = MEMORY;
                  PRAGMA mmap_size = 268435456; PRAGMA cache_size = -65536`)
   database.function('REGEXP', { deterministic: true }, regexp_matches)

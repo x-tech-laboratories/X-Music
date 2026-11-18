@@ -13,12 +13,16 @@ import { all_rows, drizzle_of, first_row, new_id, run } from './database.ts'
 import { install_history, track_history } from './history.ts'
 import { is_legacy, upgrade_legacy, type UpgradeReport } from './legacy.ts'
 import { migrations } from './migrations/index.ts'
-import { albums, media, roots, tracks } from './schema.ts'
+import {
+  albums, artwork, media, media_tags, merge_journal, play_history, playlist_tracks, playlists, roots, tag_writes,
+  track_extras, track_values, tracks, values_
+} from './schema.ts'
 
 // ── Opening ──────────────────────────────────────────────────────────────────
 
 export const library_owner = 'library'
 
+// Raw because sqlite_master and the migration log are SQLite's and X-Libs' own tables, not in the schema.
 function schema_version(database: SqlDatabase): number {
   const has_versions = first_row(database, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_versions'") !== undefined
   if (!has_versions) return 0
@@ -36,7 +40,7 @@ export type { UpgradeReport }
 
 // Brings an open connection up to date and starts the track history; run once each time the library opens. Gives back what converting an older library did, when it was one.
 export function open_library(database: SqlDatabase): UpgradeReport | null {
-  // SQLite changes a schema with foreign keys off and checks them after.
+  // SQLite changes a schema with foreign keys off and checks them after; PRAGMAs stay raw, since Drizzle builds none.
   database.exec('PRAGMA foreign_keys = OFF')
   const report = is_legacy(database) ? upgrade_legacy(database) : null
   migrate_drizzle(database, library_owner, migrations)
@@ -56,13 +60,13 @@ export function library_stats(database: SqlDatabase, path: string): LibraryStats
     media: db.select({ total: count() }).from(media).get()!.total,
     albums: db.select({ total: count() }).from(albums).get()!.total,
     missing: db.select({ total: count() }).from(media).where(eq(media.present, 0)).get()!.total,
-    totalMs: Number(db.select({ total: sum(tracks.length_ms) }).from(tracks).get()!.total ?? 0),
-    schemaVersion: schema_version(database),
+    total_ms: Number(db.select({ total: sum(tracks.length_ms) }).from(tracks).get()!.total ?? 0),
+    schema_version: schema_version(database),
     path
   }
 }
 
-// Album lives on the albums table and artist in track_values, so a row resolves both.
+// Album lives on the albums table and artist in track_values, so a row resolves both; raw, since the compiled filter around it is SQL.
 const track_columns = `
   t.id, t.title, t.year, t.track_number, t.length_ms, t.rating, t.play_count,
   (SELECT a.name FROM albums a WHERE a.id = t.album_id) AS album,
@@ -76,6 +80,7 @@ export function query_tracks(database: SqlDatabase, request: QueryRequest): Trac
   return all_rows<TrackRow>(database, paged, ...params).map((row) => ({ ...row }))
 }
 
+// Raw because the filter and the grouping compile to SQL.
 export function group_tracks(database: SqlDatabase, request: { filter: QueryRequest['filter']; field: string }): GroupRow[] {
   const { sql, params } = compile_group_by(request.filter, request.field)
   return all_rows<GroupRow>(database, sql, ...params).map((row) => ({ ...row }))
@@ -88,7 +93,7 @@ const as_root = (row: typeof roots.$inferSelect): Root => ({
   path: row.path,
   enabled: row.enabled === 1,
   slow: row.slow === 1,
-  lastScan: row.last_scan
+  last_scan: row.last_scan
 })
 
 export function list_roots(database: SqlDatabase): Root[] {
@@ -119,9 +124,12 @@ export function mark_roots_scanned(database: SqlDatabase, at: number): void {
 // Empties the library of tracks and everything hanging off them, keeping the music folders and settings; the caller backs up first. The track history and merge journal go too, since nothing is left for them to bring back.
 export function clear_library(database: SqlDatabase): void {
   in_transaction(database, () => {
-    for (const table of ['playlist_tracks', 'playlists', 'play_history', 'track_values', 'track_extras', 'tag_writes', 'media_tags', 'media', 'artwork', 'tracks', 'albums', 'values_', 'merge_journal', 'tracks_fts']) {
-      run(database, `DELETE FROM ${table}`)
+    const db = drizzle_of(database)
+    for (const table of [playlist_tracks, playlists, play_history, track_values, track_extras, tag_writes, media_tags, media, artwork, tracks, albums, values_, merge_journal]) {
+      db.delete(table).run()
     }
+    // Raw because the search index and the versions table are FTS and X-Libs history tables, not in the schema.
+    run(database, 'DELETE FROM tracks_fts')
     track_history.forget_touched(database)
     run(database, 'DELETE FROM track_versions')
   })

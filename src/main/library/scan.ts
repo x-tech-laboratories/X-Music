@@ -11,7 +11,9 @@ import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sq
 
 import type { FileResult, ScanProgress, ScanReport } from '@shared/ipc'
 import { regroup_albums, split_values } from '@shared/library/albums'
-import { all_rows, first_row, run } from '@shared/library/database'
+import { and, eq } from '@x-tech-laboratories/x-libs/drizzle'
+import { drizzle_of } from '@shared/library/database'
+import { media as media_table } from '@shared/library/schema'
 import { create_upserter, type MediaCandidate, type TrackCandidate } from '@shared/library/identity'
 import { hash_audio, needs_rehash } from './audio_hash.ts'
 
@@ -81,8 +83,8 @@ export async function scan_roots(
   const excludes = new Set([...DEFAULT_EXCLUDES, ...(opts.exclude_dirs ?? [])])
 
   const report: ScanReport = {
-    filesFound: 0, filesRead: 0, filesSkipped: 0, tracksCreated: 0, tracksMatched: 0,
-    movesDetected: 0, markedMissing: 0, errors: [], durationMs: 0
+    files_found: 0, files_read: 0, files_skipped: 0, tracks_created: 0, tracks_matched: 0,
+    moves_detected: 0, marked_missing: 0, errors: [], duration_ms: 0
   }
 
   // Collect first so the total is known and progress can be honest about how far along it is.
@@ -96,7 +98,7 @@ export async function scan_roots(
       if (opts.signal?.aborted) break
     }
   }
-  report.filesFound = files.length
+  report.files_found = files.length
 
   const upsert = create_upserter(db)
   const seen = new Set<string>()
@@ -112,24 +114,24 @@ export async function scan_roots(
     touched = []
     in_transaction(db, () => {
       const now = Date.now()
-      for (const id of seen_again) run(db, 'UPDATE media SET present = 1, last_seen = ? WHERE id = ?', now, id)
+      for (const id of seen_again) drizzle_of(db).update(media_table).set({ present: 1, last_seen: now }).where(eq(media_table.id, id)).run()
       for (const { path, track, media } of pending) {
         try {
           // Tags are not authoritative for X-Music's own statistics.
           const result = upsert(track, media, { statistics: false, metadata: true })
           seen.add(result.media_id)
-          report.filesRead++
+          report.files_read++
           const detail = `matched by ${result.matched_by === 'audio_hash' ? 'audio content' : result.matched_by}`
           if (result.created) {
-            report.tracksCreated++
-            opts.on_file?.({ path, outcome: 'new', trackId: result.track_id })
+            report.tracks_created++
+            opts.on_file?.({ path, outcome: 'new', track_id: result.track_id })
           } else if (result.moved) {
-            report.movesDetected++
-            report.tracksMatched++
-            opts.on_file?.({ path, outcome: 'moved', trackId: result.track_id, detail })
+            report.moves_detected++
+            report.tracks_matched++
+            opts.on_file?.({ path, outcome: 'moved', track_id: result.track_id, detail })
           } else {
-            report.tracksMatched++
-            opts.on_file?.({ path, outcome: 'matched', trackId: result.track_id, detail })
+            report.tracks_matched++
+            opts.on_file?.({ path, outcome: 'matched', track_id: result.track_id, detail })
           }
         } catch (err) {
           const message = (err as Error).message
@@ -146,7 +148,7 @@ export async function scan_roots(
 
     if (i % 25 === 0) {
       opts.on_progress?.({
-        phase: 'reading', found: files.length, processed: i, currentPath: path
+        phase: 'reading', found: files.length, processed: i, current_path: path
       })
     }
 
@@ -155,13 +157,12 @@ export async function scan_roots(
       const mtime = Math.floor(info.mtimeMs)
 
       // Unchanged files are the common case on a rescan; skip the expensive part entirely, unless the stored hash is missing or weaker than what hashing now produces.
-      const hit = first_row<{ id: string; algo: string | null }>(db,
-        'SELECT id, audio_hash_algo AS algo FROM media WHERE uri = ? AND subtrack_index = 0 AND mtime = ? AND filesize = ?',
-        path, mtime, info.size)
+      const hit = drizzle_of(db).select({ id: media_table.id, algo: media_table.audio_hash_algo }).from(media_table)
+        .where(and(eq(media_table.uri, path), eq(media_table.subtrack_index, 0), eq(media_table.mtime, mtime), eq(media_table.filesize, info.size))).get()
       if (hit && (opts.slow || !needs_rehash(path, hit.algo))) {
         touched.push(hit.id)
         seen.add(hit.id)
-        report.filesSkipped++
+        report.files_skipped++
         opts.on_file?.({ path, outcome: 'unchanged' })
         continue
       }
@@ -232,12 +233,12 @@ export async function scan_roots(
 
   if (!opts.signal?.aborted && roots.length > 0) {
     in_transaction(db, () => {
-      const candidates = all_rows<{ id: string; uri: string }>(db, `SELECT id, uri FROM media WHERE kind = 'file' AND present = 1`)
+      const candidates = drizzle_of(db).select({ id: media_table.id, uri: media_table.uri }).from(media_table).where(and(eq(media_table.kind, 'file'), eq(media_table.present, 1))).all()
       for (const m of candidates) {
         const under_root = roots.some((r) => m.uri.startsWith(r.endsWith('/') ? r : `${r}/`))
         if (under_root && !seen.has(m.id)) {
-          run(db, 'UPDATE media SET present = 0 WHERE id = ?', m.id)
-          report.markedMissing++
+          drizzle_of(db).update(media_table).set({ present: 0 }).where(eq(media_table.id, m.id)).run()
+          report.marked_missing++
           opts.on_file?.({ path: m.uri, outcome: 'missing', detail: 'no longer on disk' })
         }
       }
@@ -246,6 +247,6 @@ export async function scan_roots(
 
   in_transaction(db, () => regroup_albums(db))
 
-  report.durationMs = Date.now() - started
+  report.duration_ms = Date.now() - started
   return report
 }

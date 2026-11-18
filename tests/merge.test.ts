@@ -123,14 +123,14 @@ describe('merge preview', () => {
     const b = make_track({ rating: null, play_count: 5, skip_count: 2 })
 
     const stats = merge_preview(db, [a, b]).statistics
-    expect(stats).toMatchObject({ playCount: 15, skipCount: 3, rating: 80 })
+    expect(stats).toMatchObject({ play_count: 15, skip_count: 3, rating: 80 })
   })
 
   it('flags pinned sources, since merging overrides a human decision', () => {
     const a = make_track()
     const b = make_track()
     db.prepare('UPDATE tracks SET pinned = 1 WHERE id = ?').run(b)
-    expect(merge_preview(db, [a, b]).pinnedSources).toEqual([b])
+    expect(merge_preview(db, [a, b]).pinned_sources).toEqual([b])
   })
 
   it('refuses fewer than two tracks', () => {
@@ -147,7 +147,7 @@ describe('merging', () => {
 
     const r = merge_tracks(db, { ids: [a, b], survivor: a })
 
-    expect(r.mediaMoved).toBe(1)
+    expect(r.media_moved).toBe(1)
     expect(count('SELECT COUNT(*) AS n FROM media WHERE track_id = ?', a)).toBe(2)
     expect(count('SELECT COUNT(*) AS n FROM tracks')).toBe(1)
   })
@@ -266,7 +266,7 @@ describe('unmerge', () => {
     const result = merge_tracks(db, { ids: [a, b], survivor: a })
     expect(count('SELECT COUNT(*) AS n FROM tracks')).toBe(1)
 
-    const undone = unmerge(db, result.batchId)
+    const undone = unmerge(db, result.batch_id)
     expect(undone.restored).toEqual([b])
 
     expect(db.prepare('SELECT id, title, rating, play_count FROM tracks ORDER BY id').all())
@@ -289,7 +289,7 @@ describe('unmerge', () => {
     const r = merge_tracks(db, { ids: [a, b], survivor: a })
     expect(count('SELECT COUNT(*) AS n FROM play_history')).toBe(1)
 
-    unmerge(db, r.batchId)
+    unmerge(db, r.batch_id)
     expect(count('SELECT COUNT(*) AS n FROM play_history')).toBe(2)
   })
 
@@ -301,7 +301,7 @@ describe('unmerge', () => {
     db.prepare('INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, 1)').run(pl, b)
 
     const r = merge_tracks(db, { ids: [a, b], survivor: a })
-    unmerge(db, r.batchId)
+    unmerge(db, r.batch_id)
 
     expect(db.prepare('SELECT track_id, position FROM playlist_tracks ORDER BY position').all())
       .toEqual([{ track_id: a, position: 0 }, { track_id: b, position: 1 }])
@@ -311,8 +311,8 @@ describe('unmerge', () => {
     const a = make_track()
     const b = make_track()
     const r = merge_tracks(db, { ids: [a, b], survivor: a })
-    unmerge(db, r.batchId)
-    expect(() => unmerge(db, r.batchId)).toThrow(/already been undone/)
+    unmerge(db, r.batch_id)
+    expect(() => unmerge(db, r.batch_id)).toThrow(/already been undone/)
   })
 
   it('rejects an unknown batch', () => {
@@ -325,7 +325,7 @@ describe('unmerge', () => {
     const r = merge_tracks(db, { ids: [a, b], survivor: a })
     db.prepare("INSERT INTO tracks (id, title, rating, added, modified) VALUES (?, 'Someone else', 100, 5000, 0)").run(b)
 
-    expect(() => unmerge(db, r.batchId)).toThrow(/would overwrite a track this merge did not take/)
+    expect(() => unmerge(db, r.batch_id)).toThrow(/would overwrite a track this merge did not take/)
     expect(one<{ title: string; rating: number }>('SELECT title, rating FROM tracks WHERE id = ?', b)).toEqual({ title: 'Someone else', rating: 100 })
   })
 })
@@ -339,15 +339,15 @@ describe('listing merges', () => {
     const other_copy = make_track({ title: 'Blue in Green' })
     const first = merge_tracks(db, { ids: [keeper, copy], survivor: keeper })
     const second = merge_tracks(db, { ids: [other, other_copy], survivor: other })
-    db.prepare('UPDATE merge_journal SET at = 1000 WHERE batch_id = ?').run(first.batchId)
-    db.prepare('UPDATE merge_journal SET at = 2000 WHERE batch_id = ?').run(second.batchId)
-    unmerge(db, first.batchId)
+    db.prepare('UPDATE merge_journal SET at = 1000 WHERE batch_id = ?').run(first.batch_id)
+    db.prepare('UPDATE merge_journal SET at = 2000 WHERE batch_id = ?').run(second.batch_id)
+    unmerge(db, first.batch_id)
 
     expect(list_recent_merges(db, 10)).toEqual([
-      { batch_id: second.batchId, at: 2000, survivor_id: other, survivor_title: 'Blue in Green', absorbed: [{ id: other_copy, title: 'Blue in Green' }], undone: false },
-      { batch_id: first.batchId, at: 1000, survivor_id: keeper, survivor_title: 'So What', absorbed: [{ id: copy, title: 'So What (copy)' }], undone: true }
+      { batch_id: second.batch_id, at: 2000, survivor_id: other, survivor_title: 'Blue in Green', absorbed: [{ id: other_copy, title: 'Blue in Green' }], undone: false },
+      { batch_id: first.batch_id, at: 1000, survivor_id: keeper, survivor_title: 'So What', absorbed: [{ id: copy, title: 'So What (copy)' }], undone: true }
     ])
-    expect(list_recent_merges(db, 1).map((merge) => merge.batch_id)).toEqual([second.batchId])
+    expect(list_recent_merges(db, 1).map((merge) => merge.batch_id)).toEqual([second.batch_id])
   })
 
   it('names a survivor that is gone by its title before the merge', () => {

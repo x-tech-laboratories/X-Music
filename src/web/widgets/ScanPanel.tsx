@@ -42,7 +42,7 @@ function progress_detail(progress: ScanProgress): string {
 function folder_columns(scanning: boolean, remove: (root: Root) => void): TableColumn<Root>[] {
   return [
     { label: 'Folder', cell: (root) => <span className="path">{root.path}</span> },
-    { label: 'Last scanned', cell: (root) => <Age epoch={root.lastScan === null ? null : root.lastScan / 1000} missing="Never" /> },
+    { label: 'Last scanned', cell: (root) => <Age epoch={root.last_scan === null ? null : root.last_scan / 1000} missing="Never" /> },
     {
       label: 'Actions',
       id: 'actions',
@@ -68,21 +68,21 @@ function took(duration_in_milliseconds: number): string {
 function ScanSummary({ report, on_show_failed }: { report: ScanReport; on_show_failed: () => void }) {
   const failed = report.errors.length
   const notes = [
-    report.movesDetected > 0 && `${plural(report.movesDetected, 'moved or renamed file')} recognised by the audio, keeping ratings and play history.`,
-    report.markedMissing > 0 && `${plural(report.markedMissing, 'file')} no longer on disk, marked missing; their tracks and statistics are kept.`,
+    report.moves_detected > 0 && `${plural(report.moves_detected, 'moved or renamed file')} recognised by the audio, keeping ratings and play history.`,
+    report.marked_missing > 0 && `${plural(report.marked_missing, 'file')} no longer on disk, marked missing; their tracks and statistics are kept.`,
     failed > 0 && `${plural(failed, 'file')} could not be read.`
   ].filter(Boolean)
   return (
     <>
       <Tiles>
-        <Tile label="Files read" value={report.filesFound.toLocaleString()} value_first />
-        <Tile label="New tracks" value={report.tracksCreated.toLocaleString()} value_first />
-        <Tile label="Already known" value={report.tracksMatched.toLocaleString()} value_first />
-        <Tile label="Unchanged" value={report.filesSkipped.toLocaleString()} value_first />
-        <Tile label="Took" value={took(report.durationMs)} value_first />
+        <Tile label="Files read" value={report.files_found.toLocaleString()} value_first />
+        <Tile label="New tracks" value={report.tracks_created.toLocaleString()} value_first />
+        <Tile label="Already known" value={report.tracks_matched.toLocaleString()} value_first />
+        <Tile label="Unchanged" value={report.files_skipped.toLocaleString()} value_first />
+        <Tile label="Took" value={took(report.duration_ms)} value_first />
       </Tiles>
       {notes.length > 0 && (
-        <p className={failed > 0 || report.markedMissing > 0 ? 'tone-warn' : 'muted'}>
+        <p className={failed > 0 || report.marked_missing > 0 ? 'tone-warn' : 'muted'}>
           {notes.join(' ')}
           {failed > 0 && <> <button type="button" onClick={on_show_failed}>{failed === 1 ? 'Show the failed file' : 'Show the failed files'}</button></>}
         </p>

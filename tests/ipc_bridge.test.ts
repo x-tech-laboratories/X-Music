@@ -5,7 +5,8 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { trusted_sender } from '@main/sender'
-import { api_method_names, history_channels, page_method_names, x_music_bridge, x_music_events, x_music_history_bridge, x_music_page_bridge, type PlayerStatus } from '@shared/ipc'
+import { is_read_only } from '@shared/api'
+import { api_method_names, history_channels, page_method_names, x_music_bridge, x_music_events, x_music_history_bridge, x_music_log_bridge, x_music_page_bridge, type PlayerStatus } from '@shared/ipc'
 
 type Answer = (event: unknown, ...args: unknown[]) => Promise<unknown>
 
@@ -28,6 +29,7 @@ describe('IPC bridge', () => {
       'get_app_info', 'get_library_stats', 'list_tracks', 'list_track_groups', 'get_track', 'list_duplicates', 'get_merge_preview',
       'list_folders', 'get_default_gmbrc_path', 'get_gmbrc_preview', 'get_player_status'
     ])
+    expect(page_method_names.filter((name) => is_read_only(name))).toEqual([])
   })
 
   it('exposes the client and the events where the page reads them', () => {
@@ -42,6 +44,15 @@ describe('IPC bridge', () => {
     expect(Object.keys(exposed.xMusic as object).sort()).toEqual([...api_method_names].sort())
     expect(Object.keys(exposed.xMusicPage as object).sort()).toEqual([...page_method_names].sort())
     expect(typeof (exposed.xMusicEvents as { on: unknown }).on).toBe('function')
+  })
+
+  it('takes the page\'s log records on a bridge of their own, with the levels the main process sets', () => {
+    const handled: string[] = []
+    const ipc_main = { handle: (channel: string) => void handled.push(channel), removeHandler: vi.fn() }
+
+    x_music_log_bridge.handle(ipc_main, {} as never)
+
+    expect(handled).toEqual(['xMusicLog:write_log', 'xMusicLog:get_log_levels'])
   })
 
   it('pushes an event to every window by name', () => {

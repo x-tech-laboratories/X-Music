@@ -3,10 +3,12 @@
 // back the track, where each one is, which will actually play, and how the track came to be
 // identified the way it is (DESIGN-SPEC §6.5). Read-only.
 
+import { and, asc, count, desc, eq, inArray } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { BUILTIN_FIELDS } from '../fields.ts'
-import { all_rows, first_row, to_hex } from './database.ts'
+import { album_name, drizzle_of, to_hex } from './database.ts'
+import { media as media_table, media_tags, merge_journal, play_history, track_extras, track_values, tracks, values_ } from './schema.ts'
 
 export interface DetailMedia {
   id: string
@@ -18,19 +20,19 @@ export interface DetailMedia {
   codec: string | null
   container: string | null
   bitrate: number | null
-  bitrateMode: string | null
+  bitrate_mode: string | null
   samplerate: number | null
   channels: number | null
-  bitsPerSample: number | null
+  bits_per_sample: number | null
   filesize: number | null
   mtime: number | null
-  lastSeen: number | null
-  qualityRank: number
-  audioHashHex: string | null
-  audioHashAlgo: string | null
-  subtrackIndex: number
-  startMs: number | null
-  endMs: number | null
+  last_seen: number | null
+  quality_rank: number
+  audio_hash_hex: string | null
+  audio_hash_algo: string | null
+  subtrack_index: number
+  start_ms: number | null
+  end_ms: number | null
   // Raw tags read from this source, so disagreements between sources stay visible.
   tags: { field: string; value: string }[]
 }
@@ -51,13 +53,13 @@ export interface TrackDetails {
   id: string
   title: string | null
   album: string | null
-  albumId: string | null
+  album_id: string | null
 
   identity: {
     source: string
     key: string | null
     pinned: boolean
-    mbRecordingId: string | null
+    mb_recording_id: string | null
     acoustid: string | null
   }
 
@@ -66,27 +68,27 @@ export interface TrackDetails {
 
   statistics: {
     rating: number | null
-    playCount: number
-    skipCount: number
-    firstPlayed: number | null
-    lastPlayed: number | null
-    lastSkipped: number | null
+    play_count: number
+    skip_count: number
+    first_played: number | null
+    last_played: number | null
+    last_skipped: number | null
     added: number
     modified: number
-    bookmarkMs: number | null
+    bookmark_ms: number | null
   }
 
   loudness: {
-    rgTrackGain: number | null
-    rgAlbumGain: number | null
+    rg_track_gain: number | null
+    rg_album_gain: number | null
   }
 
   // Most recent first, capped: the full list can run to hundreds of entries.
   history: HistoryEntry[]
-  historyTotal: number
+  history_total: number
 
   // Present when this track absorbed others, so the merge can be found and undone.
-  merges: { batchId: string; at: number; absorbed: number }[]
+  merges: { batch_id: string; at: number; absorbed: number }[]
 }
 
 const HISTORY_LIMIT = 200
@@ -100,33 +102,33 @@ const field_name_by_id = (): Map<number, { id: string; name: string }> => {
 }
 
 export function track_details(database: SqlDatabase, track_id: string): TrackDetails | null {
-  const t = first_row<Record<string, unknown>>(database, `
-    SELECT t.id, t.title, t.album_id AS albumId, t.year, t.track_number AS trackNumber,
-           t.disc_number AS discNumber, t.length_ms AS lengthMs, t.compilation, t.bpm,
-           t.identity_source AS identitySource, t.identity_key AS identityKey, t.pinned,
-           t.mb_recording_id AS mbRecordingId, t.acoustid,
-           t.rating, t.play_count AS playCount, t.skip_count AS skipCount,
-           t.first_played AS firstPlayed, t.last_played AS lastPlayed,
-           t.last_skipped AS lastSkipped, t.added, t.modified, t.bookmark_ms AS bookmarkMs,
-           t.rg_track_gain AS rgTrackGain, t.rg_album_gain AS rgAlbumGain,
-           (SELECT a.name FROM albums a WHERE a.id = t.album_id) AS album
-    FROM tracks t WHERE t.id = ?`, track_id)
+  const db = drizzle_of(database)
+  const t = db.select({
+    id: tracks.id, title: tracks.title, album_id: tracks.album_id, year: tracks.year, track_number: tracks.track_number,
+    disc_number: tracks.disc_number, length_ms: tracks.length_ms, compilation: tracks.compilation, bpm: tracks.bpm,
+    identity_source: tracks.identity_source, identity_key: tracks.identity_key, pinned: tracks.pinned,
+    mb_recording_id: tracks.mb_recording_id, acoustid: tracks.acoustid,
+    rating: tracks.rating, play_count: tracks.play_count, skip_count: tracks.skip_count,
+    first_played: tracks.first_played, last_played: tracks.last_played,
+    last_skipped: tracks.last_skipped, added: tracks.added, modified: tracks.modified, bookmark_ms: tracks.bookmark_ms,
+    rg_track_gain: tracks.rg_track_gain, rg_album_gain: tracks.rg_album_gain,
+    album: album_name
+  }).from(tracks).where(eq(tracks.id, track_id)).get()
 
   if (!t) return null
 
   const names = field_name_by_id()
 
   // Multi-value fields, collapsed for display but marked so the UI can say they are sets.
-  const set_rows = all_rows<{ fieldId: number; value: string }>(database, `
-    SELECT tv.field_id AS fieldId, vv.value FROM track_values tv
-    JOIN values_ vv ON vv.id = tv.value_id
-    WHERE tv.track_id = ? ORDER BY tv.field_id, tv.ordinal`, track_id)
+  const set_rows = db.select({ field_id: track_values.field_id, value: values_.value })
+    .from(track_values).innerJoin(values_, eq(values_.id, track_values.value_id))
+    .where(eq(track_values.track_id, track_id)).orderBy(asc(track_values.field_id), asc(track_values.ordinal)).all()
 
   const sets = new Map<number, string[]>()
-  for (const r of set_rows) sets.set(r.fieldId, [...(sets.get(r.fieldId) ?? []), r.value])
+  for (const r of set_rows) sets.set(r.field_id, [...(sets.get(r.field_id) ?? []), r.value])
 
-  const extra_rows = all_rows<{ fieldId: number; value: string }>(database,
-    'SELECT field_id AS fieldId, value FROM track_extras WHERE track_id = ?', track_id)
+  const extra_rows = db.select({ field_id: track_extras.field_id, value: track_extras.value })
+    .from(track_extras).where(eq(track_extras.track_id, track_id)).all()
 
   const fields: DetailField[] = []
 
@@ -140,9 +142,9 @@ export function track_details(database: SqlDatabase, track_id: string): TrackDet
   scalar('title', 'Title', t.title)
   scalar('album', 'Album', t.album)
   scalar('year', 'Year', t.year)
-  scalar('track_number', 'Track', t.trackNumber)
-  scalar('disc_number', 'Disc', t.discNumber)
-  scalar('length', 'Length', t.lengthMs)
+  scalar('track_number', 'Track', t.track_number)
+  scalar('disc_number', 'Disc', t.disc_number)
+  scalar('length', 'Length', t.length_ms)
   scalar('bpm', 'BPM', t.bpm)
   scalar('compilation', 'Compilation', t.compilation ? 'Yes' : null)
 
@@ -153,28 +155,28 @@ export function track_details(database: SqlDatabase, track_id: string): TrackDet
   }
 
   for (const r of extra_rows) {
-    const meta = names.get(r.fieldId)
+    const meta = names.get(r.field_id)
     if (!meta) continue
     fields.push({ field: meta.id, name: meta.name, value: r.value, multi: false })
   }
 
   // ── sources ──────────────────────────────────────────────────────────────
-  const media_rows = all_rows<Record<string, unknown>>(database, `
-    SELECT id, kind, uri, provider, present, codec, container, bitrate,
-           bitrate_mode AS bitrateMode, samplerate, channels, bits_per_sample AS bitsPerSample,
-           filesize, mtime, last_seen AS lastSeen, quality_rank AS qualityRank,
-           audio_hash AS audioHash, audio_hash_algo AS audioHashAlgo,
-           subtrack_index AS subtrackIndex, start_ms AS startMs, end_ms AS endMs
-    FROM media WHERE track_id = ?
-    ORDER BY present DESC, quality_rank DESC, added, id`, track_id)
+  const media_rows = db.select({
+    id: media_table.id, kind: media_table.kind, uri: media_table.uri, provider: media_table.provider, present: media_table.present, codec: media_table.codec,
+    container: media_table.container, bitrate: media_table.bitrate, bitrate_mode: media_table.bitrate_mode, samplerate: media_table.samplerate,
+    channels: media_table.channels, bits_per_sample: media_table.bits_per_sample, filesize: media_table.filesize, mtime: media_table.mtime,
+    last_seen: media_table.last_seen, quality_rank: media_table.quality_rank, audio_hash: media_table.audio_hash, audio_hash_algo: media_table.audio_hash_algo,
+    subtrack_index: media_table.subtrack_index, start_ms: media_table.start_ms, end_ms: media_table.end_ms
+  }).from(media_table).where(eq(media_table.track_id, track_id))
+    .orderBy(desc(media_table.present), desc(media_table.quality_rank), asc(media_table.added), asc(media_table.id)).all()
 
-  const tag_rows = all_rows<{ mediaId: string; fieldId: number; value: string | null }>(database, `
-    SELECT media_id AS mediaId, field_id AS fieldId, value FROM media_tags
-    WHERE media_id IN (SELECT id FROM media WHERE track_id = ?)
-    ORDER BY media_id, field_id, ordinal`, track_id)
+  const track_media = db.select({ id: media_table.id }).from(media_table).where(eq(media_table.track_id, track_id))
+  const tag_rows = db.select({ media_id: media_tags.media_id, field_id: media_tags.field_id, value: media_tags.value })
+    .from(media_tags).where(inArray(media_tags.media_id, track_media))
+    .orderBy(asc(media_tags.media_id), asc(media_tags.field_id), asc(media_tags.ordinal)).all()
 
   const media: DetailMedia[] = media_rows.map((m, index) => {
-    const hash = m.audioHash as Uint8Array | null
+    const hash = m.audio_hash as Uint8Array | null
     return {
       id: m.id as string,
       kind: m.kind as string,
@@ -186,35 +188,35 @@ export function track_details(database: SqlDatabase, track_id: string): TrackDet
       codec: (m.codec ?? null) as string | null,
       container: (m.container ?? null) as string | null,
       bitrate: (m.bitrate ?? null) as number | null,
-      bitrateMode: (m.bitrateMode ?? null) as string | null,
+      bitrate_mode: (m.bitrate_mode ?? null) as string | null,
       samplerate: (m.samplerate ?? null) as number | null,
       channels: (m.channels ?? null) as number | null,
-      bitsPerSample: (m.bitsPerSample ?? null) as number | null,
+      bits_per_sample: (m.bits_per_sample ?? null) as number | null,
       filesize: (m.filesize ?? null) as number | null,
       mtime: (m.mtime ?? null) as number | null,
-      lastSeen: (m.lastSeen ?? null) as number | null,
-      qualityRank: (m.qualityRank ?? 0) as number,
-      audioHashHex: hash ? to_hex(hash) : null,
-      audioHashAlgo: (m.audioHashAlgo ?? null) as string | null,
-      subtrackIndex: (m.subtrackIndex ?? 0) as number,
-      startMs: (m.startMs ?? null) as number | null,
-      endMs: (m.endMs ?? null) as number | null,
+      last_seen: (m.last_seen ?? null) as number | null,
+      quality_rank: (m.quality_rank ?? 0) as number,
+      audio_hash_hex: hash ? to_hex(hash) : null,
+      audio_hash_algo: (m.audio_hash_algo ?? null) as string | null,
+      subtrack_index: (m.subtrack_index ?? 0) as number,
+      start_ms: (m.start_ms ?? null) as number | null,
+      end_ms: (m.end_ms ?? null) as number | null,
       tags: tag_rows
-        .filter((r) => r.mediaId === m.id && r.value !== null)
-        .map((r) => ({ field: names.get(r.fieldId)?.name ?? `field ${r.fieldId}`, value: r.value! }))
+        .filter((r) => r.media_id === m.id && r.value !== null)
+        .map((r) => ({ field: names.get(r.field_id)?.name ?? `field ${r.field_id}`, value: r.value! }))
     }
   })
 
   // ── history ──────────────────────────────────────────────────────────────
-  const history_total = first_row<{ n: number }>(database, 'SELECT COUNT(*) AS n FROM play_history WHERE track_id = ?', track_id)!.n
+  const history_total = db.select({ n: count() }).from(play_history).where(eq(play_history.track_id, track_id)).get()!.n
 
-  const history = all_rows<{ at: number; kind: number }>(database,
-    'SELECT at, kind FROM play_history WHERE track_id = ? ORDER BY at DESC LIMIT ?', track_id, HISTORY_LIMIT)
+  const history = db.select({ at: play_history.at, kind: play_history.kind }).from(play_history)
+    .where(eq(play_history.track_id, track_id)).orderBy(desc(play_history.at)).limit(HISTORY_LIMIT).all()
     .map((r) => ({ at: r.at, kind: r.kind === 1 ? 'skip' as const : 'play' as const }))
 
-  const merges = all_rows<{ batchId: string; at: number; snapshot: string }>(database, `
-    SELECT batch_id AS batchId, at, snapshot FROM merge_journal
-    WHERE survivor_id = ? AND undone = 0 ORDER BY at DESC`, track_id)
+  const merges = db.select({ batch_id: merge_journal.batch_id, at: merge_journal.at, snapshot: merge_journal.snapshot })
+    .from(merge_journal).where(and(eq(merge_journal.survivor_id, track_id), eq(merge_journal.undone, 0)))
+    .orderBy(desc(merge_journal.at)).all()
     .map((m) => {
       let absorbed = 0
       try {
@@ -222,40 +224,40 @@ export function track_details(database: SqlDatabase, track_id: string): TrackDet
       } catch {
         absorbed = 0
       }
-      return { batchId: m.batchId, at: m.at, absorbed }
+      return { batch_id: m.batch_id, at: m.at, absorbed }
     })
 
   return {
     id: t.id as string,
     title: (t.title ?? null) as string | null,
     album: (t.album ?? null) as string | null,
-    albumId: (t.albumId ?? null) as string | null,
+    album_id: (t.album_id ?? null) as string | null,
     identity: {
-      source: (t.identitySource ?? 'heuristic') as string,
-      key: (t.identityKey ?? null) as string | null,
+      source: (t.identity_source ?? 'heuristic') as string,
+      key: (t.identity_key ?? null) as string | null,
       pinned: !!t.pinned,
-      mbRecordingId: (t.mbRecordingId ?? null) as string | null,
+      mb_recording_id: (t.mb_recording_id ?? null) as string | null,
       acoustid: (t.acoustid ?? null) as string | null
     },
     fields,
     media,
     statistics: {
       rating: (t.rating ?? null) as number | null,
-      playCount: (t.playCount ?? 0) as number,
-      skipCount: (t.skipCount ?? 0) as number,
-      firstPlayed: (t.firstPlayed ?? null) as number | null,
-      lastPlayed: (t.lastPlayed ?? null) as number | null,
-      lastSkipped: (t.lastSkipped ?? null) as number | null,
+      play_count: (t.play_count ?? 0) as number,
+      skip_count: (t.skip_count ?? 0) as number,
+      first_played: (t.first_played ?? null) as number | null,
+      last_played: (t.last_played ?? null) as number | null,
+      last_skipped: (t.last_skipped ?? null) as number | null,
       added: (t.added ?? 0) as number,
       modified: (t.modified ?? 0) as number,
-      bookmarkMs: (t.bookmarkMs ?? null) as number | null
+      bookmark_ms: (t.bookmark_ms ?? null) as number | null
     },
     loudness: {
-      rgTrackGain: (t.rgTrackGain ?? null) as number | null,
-      rgAlbumGain: (t.rgAlbumGain ?? null) as number | null
+      rg_track_gain: (t.rg_track_gain ?? null) as number | null,
+      rg_album_gain: (t.rg_album_gain ?? null) as number | null
     },
     history,
-    historyTotal: history_total,
+    history_total,
     merges
   }
 }

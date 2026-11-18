@@ -7,13 +7,13 @@ import { create_window } from '@x-tech-laboratories/x-libs/electron/window'
 import { take_staged_restore } from '@x-tech-laboratories/x-libs/server/sqlite_backups'
 
 import { is_read_only, mcp_instructions, x_music_api } from '@shared/api'
-import { history_channels, x_music_backups_bridge, x_music_bridge, x_music_events, x_music_history_bridge, x_music_mcp_bridge } from '@shared/ipc'
+import { history_channels, x_music_backups_bridge, x_music_bridge, x_music_events, x_music_history_bridge, x_music_log_bridge, x_music_mcp_bridge } from '@shared/ipc'
 import { describe_upgrade } from '@shared/library/legacy'
 import { library_backups, open_library_backed_up } from './backups.ts'
 import { open_database, library_path } from './db/index.ts'
 import { register_ipc, type ApiImplementation } from './ipc.ts'
 import { trusted_sender } from './sender.ts'
-import { describe_logging, log } from './log.ts'
+import { log, main_log } from './log.ts'
 import { art_cache_dir } from './artcache.ts'
 
 const is_dev = !app.isPackaged
@@ -36,8 +36,6 @@ function create_main_window(): BrowserWindow {
     native_theme: nativeTheme,
     shell,
     screen,
-    // Halon's root surface, shown before the page paints.
-    background: { light: '#f1f5f9', dark: '#060b14' },
     // A player must keep ticking when its window is hidden, so Chromium may not throttle its timers.
     background_throttling: false,
     title_bar_style: process.platform === 'darwin' ? 'hiddenInset' : 'default'
@@ -82,7 +80,8 @@ function local_mcp_for(api: ApiImplementation) {
 }
 
 async function start(): Promise<void> {
-  log.info('starting', { logging: describe_logging(), version: app.getVersion() })
+  log.info('starting', { logging: main_log.describe(), version: app.getVersion() })
+  x_music_log_bridge.handle(ipcMain, main_log.methods, { trusted, envelopes: true })
 
   // The url carries the cache path; only files inside the cache directory are served.
   protocol.handle('x-music-art', (request) => {

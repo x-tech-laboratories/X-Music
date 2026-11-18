@@ -78,7 +78,7 @@ const rows = async (): Promise<HTMLElement[]> => {
 }
 
 beforeEach(() => {
-  calls = record_calls({ undo_merge: { batchId: 'merge-a', restored: ['track-4'], survivor: 'track-3' } })
+  calls = record_calls({ undo_merge: { batch_id: 'merge-a', restored: ['track-4'], survivor: 'track-3' } })
   install_history()
 })
 

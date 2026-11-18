@@ -25,7 +25,7 @@ import { art_cache_dir, resize_image } from './artcache.ts'
 import { clear_library_backed_up, type LibraryBackups } from './backups.ts'
 import { resolve_artwork, thumbnail } from './library/artwork.ts'
 import { scan_roots } from './library/scan.ts'
-import { log_from_renderer, logger } from './log.ts'
+import { logger } from './log.ts'
 import { Player } from './play/player.ts'
 import { MpvEngine, find_mpv } from './play/mpv.ts'
 import { NullEngine } from './play/engine.ts'
@@ -99,8 +99,8 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
     // Reads and parses without writing anything, so the user can see what an import would do.
     get_gmbrc_preview: (path) => {
       if (!existsSync(path)) {
-        return { path, exists: false, songs: 0, savedFilters: 0, savedLists: 0,
-                 playHistoryEntries: 0, unmappedColumns: [] }
+        return { path, exists: false, songs: 0, saved_filters: 0, saved_lists: 0,
+                 play_history_entries: 0, unmapped_columns: [] }
       }
       try {
         const data = parse_gmbrc(readFileSync(path, 'utf8'))
@@ -108,16 +108,16 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
           path,
           exists: true,
           version: data.version,
-          baseFolder: data.base_folder,
+          base_folder: data.base_folder,
           songs: data.songs.length,
-          savedFilters: data.saved_filters.length,
-          savedLists: data.saved_lists.length,
-          playHistoryEntries: data.songs.reduce((n, s) => n + s.play_history.length, 0),
-          unmappedColumns: data.unmapped_columns
+          saved_filters: data.saved_filters.length,
+          saved_lists: data.saved_lists.length,
+          play_history_entries: data.songs.reduce((n, s) => n + s.play_history.length, 0),
+          unmapped_columns: data.unmapped_columns
         }
       } catch (err) {
-        return { path, exists: true, songs: 0, savedFilters: 0, savedLists: 0,
-                 playHistoryEntries: 0, unmappedColumns: [], error: (err as Error).message }
+        return { path, exists: true, songs: 0, saved_filters: 0, saved_lists: 0,
+                 play_history_entries: 0, unmapped_columns: [], error: (err as Error).message }
       }
     },
 
@@ -197,6 +197,7 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
     },
 
     remove_from_queue: (index) => { player.dequeue(index); return player.status() },
+    move_in_queue: (index, to_index) => { player.move_in_queue(index, to_index); return player.status() },
     clear_queue: () => { player.clear_queue(); return player.status() },
     set_repeat: (mode) => { player.set_repeat(mode); return player.status() },
     set_shuffle: (on) => { player.set_shuffle(on); return player.status() },
@@ -207,7 +208,7 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
 
     undo_merge: (batch_id) => unmerge(db, batch_id),
 
-    list_duplicates: (reasons, length_tolerance_ms, limit) => find_duplicates(db, { reasons, lengthToleranceMs: length_tolerance_ms, limit }),
+    list_duplicates: (reasons, length_tolerance_ms, limit) => find_duplicates(db, { reasons, length_tolerance_ms, limit }),
 
     // Clearing replaces the whole library, so a backup is taken first and the clear is refused if it fails.
     clear_library: async () => {
@@ -244,19 +245,12 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
       return { revealed: true }
     },
 
-    get_cover_url: async (track_id, size) => {
+    cache_cover: async (track_id, size) => {
       const art_options = { cache_dir: art_cache_dir(), resize: resize_image }
       const art = await resolve_artwork(db, track_id, art_options)
       const path = size ? thumbnail(art_options, art, size) : art.path
       return { url: path ? `x-music-art://local${encodeURI(path)}` : null, source: art.source }
-    },
-
-    write_log: (record) => {
-      log_from_renderer(record.level, record.scope, record.message, record.data)
-      return { logged: true }
-    },
-
-    get_log_config: () => ({ spec: process.env.X_MUSIC_LOG })
+    }
   }
 
   const recorded = recording(db, handlers)

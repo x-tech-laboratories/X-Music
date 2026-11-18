@@ -22,7 +22,7 @@ const tracks = (count: number): TrackRow[] =>
     track_number: index + 1, length_ms: 61_000, rating: null, play_count: 0
   }))
 
-const stats = (count: number) => ({ tracks: count, media: count, albums: 1, missing: 0, totalMs: 0, schemaVersion: 4, path: '/tmp/x.db' })
+const stats = (count: number) => ({ tracks: count, media: count, albums: 1, missing: 0, total_ms: 0, schema_version: 4, path: '/tmp/x.db' })
 
 const calls = new Map<string, ReturnType<typeof vi.fn>>()
 
@@ -33,7 +33,7 @@ function bridge(listed: TrackRow[]): void {
     'list_tracks': listed,
     'get_library_stats': stats(listed.length),
     'list_track_groups': [],
-    'get_player_status': { state: 'idle', track: null, media: null, positionMs: 0, durationMs: null, volume: 80, repeat: 'off', shuffle: false, queue: [], contextLength: 0, contextIndex: -1 }
+    'get_player_status': { state: 'idle', track: null, media: null, position_ms: 0, duration_ms: null, volume: 80, repeat: 'off', shuffle: false, queue: [], context_length: 0, context_index: -1 }
   }
   // A plain object of every channel, as the preload exposes it.
   for (const channel of api_method_names) calls.set(channel, vi.fn(async () => answers[channel] ?? answers.get_player_status))
@@ -157,7 +157,7 @@ describe('song list', () => {
   })
 
   it('marks the playing track with Halon\'s now-playing row', () => {
-    player_status.set({ state: 'playing', track: { id: 'track-20' }, positionMs: 0, durationMs: 61_000 } as unknown as typeof player.status)
+    player_status.set({ state: 'playing', track: { id: 'track-20' }, position_ms: 0, duration_ms: 61_000 } as unknown as typeof player.status)
     render(<SongList />)
 
     expect(row('Track 2').classList.contains('now-playing')).toBe(true)

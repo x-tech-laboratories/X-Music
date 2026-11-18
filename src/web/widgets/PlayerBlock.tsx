@@ -58,7 +58,7 @@ function TimeBar({ duration_in_milliseconds }: { duration_in_milliseconds: numbe
 export function PlayerBlock() {
   const status = use_store(player_status)
   const track = status?.track ?? null
-  const duration = track ? status?.durationMs ?? track.lengthMs : null
+  const duration = track ? status?.duration_ms ?? track.length_ms : null
   const repeat = status?.repeat ?? 'off'
   const shuffle = status?.shuffle ?? false
   const queued = status?.queue.length ?? 0

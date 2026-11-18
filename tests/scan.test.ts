@@ -48,7 +48,7 @@ describe('scanning', () => {
     await writeFile(join(dir, 'cover.jpg'), Buffer.alloc(64))
 
     const report = await scan_roots(db, [dir])
-    expect(report.filesFound).toBe(1)
+    expect(report.files_found).toBe(1)
     expect(tracks()).toBe(1)
     expect(media()).toBe(1)
   })
@@ -57,7 +57,7 @@ describe('scanning', () => {
     await mkdir(join(dir, 'album'), { recursive: true })
     await writeFile(join(dir, 'album', 'one.flac'), flac('0'.repeat(31) + '2', Buffer.alloc(512, 2)))
     const report = await scan_roots(db, [dir])
-    expect(report.filesFound).toBe(1)
+    expect(report.files_found).toBe(1)
   })
 
   it('is idempotent: a second scan creates nothing', async () => {
@@ -68,8 +68,8 @@ describe('scanning', () => {
     const second = await scan_roots(db, [dir])
     expect({ t: tracks(), m: media() }).toEqual(before)
     // The unchanged file takes the cheap path rather than being re-read.
-    expect(second.filesSkipped).toBe(1)
-    expect(second.filesRead).toBe(0)
+    expect(second.files_skipped).toBe(1)
+    expect(second.files_read).toBe(0)
   })
 
   it('rehashes an unchanged file that has no hash yet, as imported rows do', async () => {
@@ -78,11 +78,11 @@ describe('scanning', () => {
     db.exec('UPDATE media SET audio_hash = NULL, audio_hash_algo = NULL')
 
     const second = await scan_roots(db, [dir])
-    expect(second.filesRead).toBe(1)
+    expect(second.files_read).toBe(1)
     expect(count('SELECT COUNT(*) AS n FROM media WHERE audio_hash IS NOT NULL')).toBe(1)
 
     const third = await scan_roots(db, [dir])
-    expect(third.filesSkipped).toBe(1)
+    expect(third.files_skipped).toBe(1)
   })
 
   it('recognises a renamed file as the same track, keeping its rating', async () => {
@@ -94,7 +94,7 @@ describe('scanning', () => {
     await rename(join(dir, 'before.flac'), join(dir, 'after.flac'))
 
     const report = await scan_roots(db, [dir])
-    expect(report.movesDetected).toBe(1)
+    expect(report.moves_detected).toBe(1)
     expect(tracks()).toBe(1)
     expect(media()).toBe(1)
 
@@ -116,7 +116,7 @@ describe('scanning', () => {
     await rm(join(dir, 'gone.flac'))
     const report = await scan_roots(db, [dir])
 
-    expect(report.markedMissing).toBe(1)
+    expect(report.marked_missing).toBe(1)
     expect(tracks()).toBe(1)
     expect((db.prepare('SELECT present FROM media').get() as { present: number }).present).toBe(0)
     expect((db.prepare('SELECT rating FROM tracks').get() as { rating: number }).rating).toBe(60)
@@ -131,7 +131,7 @@ describe('scanning', () => {
     await utimes(p, new Date(), new Date(Date.now() + 5000))
 
     const report = await scan_roots(db, [dir])
-    expect(report.filesRead).toBe(1)
+    expect(report.files_read).toBe(1)
     expect(media()).toBe(1)
   })
 
@@ -153,8 +153,8 @@ describe('scanning', () => {
     await writeFile(join(dir, 'fine.flac'), flac('f'.repeat(32), Buffer.alloc(512, 9)))
 
     const report = await scan_roots(db, [dir])
-    expect(report.filesFound).toBe(2)
-    expect(report.errors.length + report.filesRead).toBe(2)
+    expect(report.files_found).toBe(2)
+    expect(report.errors.length + report.files_read).toBe(2)
   })
 
   it('reports an outcome for every file it touches', async () => {
@@ -165,7 +165,7 @@ describe('scanning', () => {
     const seen: { path: string; outcome: string }[] = []
     const first = await scan_roots(db, [dir], { on_file: (r) => seen.push(r) })
 
-    expect(seen).toHaveLength(first.filesFound)
+    expect(seen).toHaveLength(first.files_found)
     expect(seen.map((s) => s.outcome).sort()).toEqual(['error', 'new'])
   })
 
@@ -206,7 +206,7 @@ describe('scanning', () => {
     await writeFile(join(dir, 'here.flac'), flac('2'.repeat(32), Buffer.alloc(512, 11)))
     const report = await scan_roots(db, [dir])
 
-    expect(report.markedMissing).toBe(0)
+    expect(report.marked_missing).toBe(0)
     expect((db.prepare("SELECT present FROM media WHERE uri = '/other/x.flac'")
       .get() as { present: number }).present).toBe(1)
   })

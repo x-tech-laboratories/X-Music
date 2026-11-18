@@ -143,12 +143,12 @@ describe('playing a track', () => {
     const off = new NullEngine()
     const p1 = new Player(db, off)
     await p1.play_track(id)
-    expect(p1.status().media?.gainDb).toBeNull()
+    expect(p1.status().media?.gain_db).toBeNull()
 
     const on = new NullEngine()
     const p2 = new Player(db, on, { replay_gain: 'track', preamp_db: 2 })
     await p2.play_track(id)
-    expect(p2.status().media?.gainDb).toBe(-4)
+    expect(p2.status().media?.gain_db).toBe(-4)
 
     await p1.dispose(); await p2.dispose()
   })
@@ -275,7 +275,7 @@ describe('queue and context', () => {
 
     await player.previous()
     expect(player.status().track?.id).toBe(b)
-    expect(player.status().positionMs).toBe(0)
+    expect(player.status().position_ms).toBe(0)
 
     await player.previous()
     expect(player.status().track?.id).toBe(a)
@@ -286,6 +286,38 @@ describe('queue and context', () => {
     player.enqueue([a, b, c])
     player.dequeue(1)
     expect(player.status().queue).toEqual([a, c])
+  })
+
+  it('moves a queued track to another place in the queue', async () => {
+    const [a, b, c, d] = [make_track(), make_track(), make_track(), make_track()]
+    player.enqueue([a, b, c, d])
+
+    player.move_in_queue(0, 2)
+    expect(player.status().queue).toEqual([b, c, a, d])
+
+    player.move_in_queue(3, 0)
+    expect(player.status().queue).toEqual([d, b, c, a])
+
+    player.move_in_queue(1, 99)
+    expect(player.status().queue).toEqual([d, c, a, b])
+  })
+
+  it('refuses to move a place the queue does not have', async () => {
+    player.enqueue([make_track()])
+
+    expect(() => player.move_in_queue(1, 0)).toThrow('no queued track at 1')
+    expect(() => player.move_in_queue(-1, 0)).toThrow('no queued track at -1')
+  })
+
+  it('plays a moved track in its new place', async () => {
+    const [a, b, c] = [make_track(), make_track(), make_track()]
+    player.enqueue([a, b, c])
+    player.move_in_queue(2, 0)
+
+    await player.next(true)
+
+    expect(player.status().track?.id).toBe(c)
+    expect(player.status().queue).toEqual([a, b])
   })
 })
 

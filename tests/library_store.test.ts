@@ -36,13 +36,13 @@ describe('music folders', () => {
     const archive = add_root(db, '/archive')
 
     expect(list_roots(db).map((root) => root.path)).toEqual(['/archive', '/music'])
-    expect(music).toMatchObject({ path: '/music', enabled: true, slow: false, lastScan: null })
+    expect(music).toMatchObject({ path: '/music', enabled: true, slow: false, last_scan: null })
 
     remove_root(db, archive.id)
     mark_roots_scanned(db, 1234)
 
     expect(enabled_root_paths(db)).toEqual(['/music'])
-    expect(list_roots(db)[0]!.lastScan).toBe(1234)
+    expect(list_roots(db)[0]!.last_scan).toBe(1234)
   })
 })
 
@@ -51,7 +51,7 @@ describe('library counts', () => {
     fill()
 
     expect(library_stats(db, '/tmp/library.db')).toEqual({
-      tracks: 2, media: 2, albums: 1, missing: 1, totalMs: 3000, schemaVersion: 2, path: '/tmp/library.db'
+      tracks: 2, media: 2, albums: 1, missing: 1, total_ms: 3000, schema_version: 2, path: '/tmp/library.db'
     })
   })
 })

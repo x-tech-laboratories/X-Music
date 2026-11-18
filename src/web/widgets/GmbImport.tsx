@@ -40,16 +40,16 @@ function Preview({ found }: { found: GmbPreview }) {
     <>
       <Tiles>
         <Tile label="Tracks" value={found.songs.toLocaleString()} value_first />
-        <Tile label="Play events" value={found.playHistoryEntries.toLocaleString()} value_first />
-        <Tile label="Saved lists" value={found.savedLists.toLocaleString()} value_first />
-        <Tile label="Saved filters" value={found.savedFilters.toLocaleString()} value_first />
+        <Tile label="Play events" value={found.play_history_entries.toLocaleString()} value_first />
+        <Tile label="Saved lists" value={found.saved_lists.toLocaleString()} value_first />
+        <Tile label="Saved filters" value={found.saved_filters.toLocaleString()} value_first />
       </Tiles>
       <Facts layout="rows" rows={[
-        found.baseFolder ? ['Music folder', <span className="path">{found.baseFolder}</span>] : null,
+        found.base_folder ? ['Music folder', <span className="path">{found.base_folder}</span>] : null,
         found.version ? ['gmusicbrowser version', found.version] : null
       ]} />
-      {found.unmappedColumns.length > 0 && (
-        <p className="tone-warn">These columns are not known to X-Music and are left out: {found.unmappedColumns.join(', ')}.</p>
+      {found.unmapped_columns.length > 0 && (
+        <p className="tone-warn">These columns are not known to X-Music and are left out: {found.unmapped_columns.join(', ')}.</p>
       )}
     </>
   )
@@ -59,8 +59,8 @@ function Imported({ report }: { report: ImportReport }) {
   return (
     <Section title="Imported">
       <p>
-        Brought in {plural(report.tracksCreated, 'track')} and {plural(report.mediaCreated, 'file')}, with{' '}
-        {plural(report.playHistoryRows, 'play event')} and {plural(report.playlistsCreated, 'playlist')}.
+        Brought in {plural(report.tracks_created, 'track')} and {plural(report.media_created, 'file')}, with{' '}
+        {plural(report.play_history_rows, 'play event')} and {plural(report.playlists_created, 'playlist')}.
       </p>
       {report.notes.map((note) => <p key={note} className="muted">{note}</p>)}
       <div>
@@ -99,7 +99,7 @@ export function GmbImport() {
     try {
       const done = await ipc('import_gmbrc', checked, options.statistics, options.labels, options.playlists)
       set_report(done)
-      toast(`Imported ${plural(done.tracksCreated, 'track')}`, { tone: 'good', link: { href: view_href('library'), text: 'Show the library' } })
+      toast(`Imported ${plural(done.tracks_created, 'track')}`, { tone: 'good', link: { href: view_href('library'), text: 'Show the library' } })
       await library.refresh()
     } catch (failure) {
       set_error(describe_error(failure))

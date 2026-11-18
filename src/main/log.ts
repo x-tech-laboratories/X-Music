@@ -1,43 +1,9 @@
-// The main process's logger.
-// Configured entirely by environment, so a user reporting a problem can turn on detail without a
-// rebuild: X_MUSIC_LOG=debug, or X_MUSIC_LOG=warn,play:debug to make one area noisy while the rest
-// stays quiet. X_MUSIC_LOG_FILE additionally appends to a file.
+// The main process's log on X-Libs: X_MUSIC_LOG sets the levels, such as warn,play:debug, and X_MUSIC_LOG_FILE adds a file.
 
-import { appendFileSync } from 'node:fs'
-import {
-  create_logger, format_record, parse_level_spec, type Level, type Logger, type LogRecord
-} from '@x-tech-laboratories/x-libs/log'
+import { create_main_log } from '@x-tech-laboratories/x-libs/electron/log'
 
-const spec = parse_level_spec(process.env.X_MUSIC_LOG)
-const file = process.env.X_MUSIC_LOG_FILE
+export const main_log = create_main_log({ setting: process.env.X_MUSIC_LOG, file: process.env.X_MUSIC_LOG_FILE })
 
-const to_console = (record: LogRecord): void => {
-  const line = format_record(record)
-  // Warnings and worse go to stderr so they survive stdout redirection.
-  if (record.level === 'info' || record.level === 'debug') console.log(line)
-  else console.error(line)
-}
+export const log = main_log.logger('app')
 
-const sink = (record: LogRecord): void => {
-  to_console(record)
-  if (!file) return
-  try {
-    appendFileSync(file, `${format_record(record)}\n`)
-  } catch {
-    // A log that cannot be written must not take the app down with it.
-  }
-}
-
-export const log = create_logger('app', spec, sink)
-
-export const logger = (scope: string): Logger => create_logger(scope, spec, sink)
-
-// Records arriving from the renderer, already levelled and scoped there.
-export function log_from_renderer(level: Level, scope: string, message: string, data?: unknown): void {
-  create_logger(`ui:${scope}`, spec, sink)[level](message, data)
-}
-
-export const describe_logging = (): string =>
-  `level=${spec.default}` +
-  (Object.keys(spec.scopes).length ? ` scopes=${JSON.stringify(spec.scopes)}` : '') +
-  (file ? ` file=${file}` : '')
+export const logger = main_log.logger

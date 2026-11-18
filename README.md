@@ -98,7 +98,8 @@ otherwise makes Electron run as bare node and die on the ESM entry point.
 | `npm run db:generate` | Write a migration for a change to `src/shared/library/schema.ts` and bundle the migrations |
 
 Benchmarks default to 50k synthetic tracks (the §12 target); `X_MUSIC_BENCH_SIZE=20000 npm run bench`
-for a quicker pass. Point the app at a scratch database with `X_MUSIC_DB=/tmp/x-music.db`.
+for a quicker pass. `npm run app` runs on a scratch database and profile folder unless given `--real-library` or
+`X_MUSIC_REAL_LIBRARY=1`; `X_MUSIC_DB` names the database file, and `X_MUSIC_MPV` the mpv to play with when none is on `PATH`.
 
 ### Logging
 
@@ -192,15 +193,16 @@ Every call the window makes on the library and the player is a tool, described o
 is marked so, and a client asks before running it: `add_folder`, `remove_folder`, `scan_folders`,
 `cancel_scan`, `import_gmbrc`, `merge_tracks`, `undo_merge`, `restore_version`, `set_history_keep_days`,
 `clear_library` and the player's `play_track`, `toggle_playback`, `play_next`, `play_previous`,
-`stop_playback`, `seek`, `set_volume`, `queue_tracks`, `remove_from_queue`, `clear_queue`, `set_repeat` and
+`stop_playback`, `seek`, `set_volume`, `queue_tracks`, `remove_from_queue`, `move_in_queue`, `clear_queue`, `set_repeat` and
 `set_shuffle`.
 
 The tools that remove or replace data can be undone as they are in the window: `clear_library` backs the
 library up first and is refused if that fails, `undo_merge` puts a merge back, and every change to a track,
 `restore_version` included, is a version in the history. A change made through MCP shows in the open window
-at once. Lengths are in milliseconds, ratings and the volume 0 to 100, dates Unix seconds, and ids are opaque
+at once. Lengths are in milliseconds, ratings and the volume 0 to 100, dates Unix milliseconds, and ids are opaque
 strings from the `list_` and `get_` tools. The dialogs, the file manager and the window's log are not
-offered.
+offered, and neither are the backup calls: a restore replaces the whole library and restarts X-Music, so
+backups are made, restored and scheduled only from Settings.
 
 ## Testing
 

@@ -39,7 +39,7 @@ const leaf: JsonSchema = {
 }
 
 const filter: JsonSchema = {
-  description: 'Which tracks: a test on one field such as {"field": "rating", "op": ">=", "value": 80}, or {"op": "and" | "or" | "not", "children": [...]} of others. {"op": "and", "children": []} is every track. Lengths are in milliseconds, ratings 0 to 100, dates Unix seconds.',
+  description: 'Which tracks: a test on one field such as {"field": "rating", "op": ">=", "value": 80}, or {"op": "and" | "or" | "not", "children": [...]} of others. {"op": "and", "children": []} is every track. Lengths are in milliseconds, ratings 0 to 100, dates Unix milliseconds.',
   anyOf: [
     leaf,
     {
@@ -184,6 +184,13 @@ export const x_music_api: ApiSpec<XMusicApi & XMusicHistoryApi> = {
     ]
   },
   remove_from_queue: { description: 'Takes one track out of the queue.', params: [{ name: 'index', schema: { type: 'integer', minimum: 0, description: 'Its place in the queue, from 0.' } }] },
+  move_in_queue: {
+    description: 'Moves one track to another place in the queue.',
+    params: [
+      { name: 'index', schema: { type: 'integer', minimum: 0, description: 'Its place in the queue now, from 0.' } },
+      { name: 'to_index', schema: { type: 'integer', minimum: 0, description: 'The place it moves to, from 0; past the end puts it last.' } }
+    ]
+  },
   clear_queue: { description: 'Empties the queue.', params: [] },
   set_repeat: { description: 'Sets whether the list or the track repeats.', params: [{ name: 'mode', schema: { type: 'string', enum: ['off', 'all', 'one'] } }] },
   set_shuffle: { description: 'Turns shuffle on or off.', params: [{ name: 'on', schema: { type: 'boolean' } }] },
@@ -217,6 +224,6 @@ export function is_read_only(method: string): boolean {
 export const mcp_instructions = [
   'X-Music is a music player holding one person\'s music library: tracks, the files they play from, ratings, plays and playlists.',
   'A track is a piece of music, not a file; its ids, like every id here, are opaque strings from the list_ and get_ calls.',
-  'Lengths and positions are in milliseconds, ratings and volume 0 to 100, dates Unix seconds.',
+  'Lengths and positions are in milliseconds, ratings and volume 0 to 100, dates Unix milliseconds.',
   'get_library_stats and list_tracks are the places to start.'
 ].join(' ')

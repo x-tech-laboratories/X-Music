@@ -2,19 +2,20 @@
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { and, count, eq } from '@x-tech-laboratories/x-libs/drizzle'
+import { and, asc, count, desc, eq, sql } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import type { PlayerTrack } from '../ipc.ts'
-import { all_rows, drizzle_of, first_row, new_id, run } from './database.ts'
-import { media, play_history } from './schema.ts'
+import { drizzle_of, first_row, new_id } from './database.ts'
+import { media, play_history, tracks } from './schema.ts'
 
 // ── Reading ──────────────────────────────────────────────────────────────────
 
+// Raw because the album and first artist are correlated subqueries, which read plainer as SQL.
 export function get_player_track(database: SqlDatabase, track_id: string): PlayerTrack | null {
   const row = first_row<PlayerTrack>(
     database,
-    `SELECT t.id, t.title, t.length_ms AS lengthMs, t.rating,
+    `SELECT t.id, t.title, t.length_ms, t.rating,
        (SELECT a.name FROM albums a WHERE a.id = t.album_id) AS album,
        (SELECT vv.value FROM track_values tv JOIN values_ vv ON vv.id = tv.value_id
          WHERE tv.track_id = t.id AND tv.field_id = 1 ORDER BY tv.ordinal LIMIT 1) AS artist
@@ -28,23 +29,23 @@ export interface PlayableFile {
   id: string
   uri: string
   present: number
-  startMs: number | null
-  endMs: number | null
-  trackGain: number | null
-  albumGain: number | null
+  start_ms: number | null
+  end_ms: number | null
+  track_gain: number | null
+  album_gain: number | null
 }
 
 // A track's files, the ones last seen and best first.
 export function list_playable_files(database: SqlDatabase, track_id: string): PlayableFile[] {
-  return all_rows<PlayableFile>(
-    database,
-    `SELECT m.id, m.uri, m.present, m.start_ms AS startMs, m.end_ms AS endMs,
-            t.rg_track_gain AS trackGain, t.rg_album_gain AS albumGain
-     FROM media m JOIN tracks t ON t.id = m.track_id
-     WHERE m.track_id = ? AND m.kind = 'file'
-     ORDER BY m.present DESC, m.quality_rank DESC, m.added, m.id`,
-    track_id
-  ).map((row) => ({ ...row }))
+  return drizzle_of(database)
+    .select({
+      id: media.id, uri: media.uri, present: media.present, start_ms: media.start_ms, end_ms: media.end_ms,
+      track_gain: tracks.rg_track_gain, album_gain: tracks.rg_album_gain
+    })
+    .from(media).innerJoin(tracks, eq(tracks.id, media.track_id))
+    .where(and(eq(media.track_id, track_id), eq(media.kind, 'file')))
+    .orderBy(desc(media.present), desc(media.quality_rank), asc(media.added), asc(media.id))
+    .all()
 }
 
 export function has_any_file(database: SqlDatabase, track_id: string): boolean {
@@ -58,11 +59,13 @@ export function set_file_present(database: SqlDatabase, media_id: string, presen
 }
 
 export function count_play(database: SqlDatabase, track_id: string, at: number): void {
-  run(database, 'UPDATE tracks SET play_count = play_count + 1, last_played = ?, first_played = COALESCE(first_played, ?) WHERE id = ?', at, at, track_id)
+  drizzle_of(database).update(tracks)
+    .set({ play_count: sql`${tracks.play_count} + 1`, last_played: at, first_played: sql`COALESCE(${tracks.first_played}, ${at})` })
+    .where(eq(tracks.id, track_id)).run()
   drizzle_of(database).insert(play_history).values({ id: new_id(), track_id, at, kind: 0 }).onConflictDoNothing().run()
 }
 
 export function count_skip(database: SqlDatabase, track_id: string, at: number): void {
-  run(database, 'UPDATE tracks SET skip_count = skip_count + 1, last_skipped = ? WHERE id = ?', at, track_id)
+  drizzle_of(database).update(tracks).set({ skip_count: sql`${tracks.skip_count} + 1`, last_skipped: at }).where(eq(tracks.id, track_id)).run()
   drizzle_of(database).insert(play_history).values({ id: new_id(), track_id, at, kind: 1 }).onConflictDoNothing().run()
 }

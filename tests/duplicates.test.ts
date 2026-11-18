@@ -62,7 +62,7 @@ describe('duplicate detection', () => {
     expect(groups).toHaveLength(1)
     expect(groups[0]!.reason).toBe('audio_hash')
     expect(groups[0]!.confidence).toBe('certain')
-    expect(groups[0]!.members.map((m) => m.trackId).sort()).toEqual([a, b].sort())
+    expect(groups[0]!.members.map((m) => m.track_id).sort()).toEqual([a, b].sort())
   })
 
   it('treats a shared MusicBrainz recording id as certain', () => {
@@ -129,7 +129,7 @@ describe('duplicate detection', () => {
     make_track({ title: 'Drift', artist: 'A', length_ms: 308_000 })
 
     expect(find_duplicates(db, { reasons: ['fuzzy'] })).toEqual([])
-    expect(find_duplicates(db, { reasons: ['fuzzy'], lengthToleranceMs: 10_000 }))
+    expect(find_duplicates(db, { reasons: ['fuzzy'], length_tolerance_ms: 10_000 }))
       .toHaveLength(1)
   })
 
@@ -151,7 +151,7 @@ describe('duplicate detection', () => {
     add_media(b, '/x.mp3', 'cc'.repeat(16))
 
     const m = find_duplicates(db)[0]!.members
-    expect(m.every((x) => x.mediaCount === 1)).toBe(true)
+    expect(m.every((x) => x.media_count === 1)).toBe(true)
     expect(m.map((x) => x.artist)).toEqual(['A', 'A'])
   })
 

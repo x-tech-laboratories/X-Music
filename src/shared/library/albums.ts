@@ -3,10 +3,12 @@
 // recomputed. The importer and the scanner both key albums through this file, so the same file
 // read by either lands on the same album.
 
+import { eq } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { field } from '../fields.ts'
-import { all_rows, first_row, new_id, run } from './database.ts'
+import { all_rows, drizzle_of, new_id, run } from './database.ts'
+import { albums, tracks } from './schema.ts'
 
 const KEY_SEP = '\x1f'
 
@@ -116,7 +118,7 @@ export function regroup_albums(database: SqlDatabase): RegroupReport {
   const artist_field = field('artist').field_id!
   const album_artist_field = field('album_artist').field_id!
 
-  // Tracks filed under a per-artist key, i.e. every candidate for being part of a compilation.
+  // Tracks filed under a per-artist key, i.e. every candidate for being part of a compilation; raw, since its correlated subqueries read plainer as SQL.
   const rows = all_rows<{ id: string; year: number | null; name: string | null; artist: string | null; uri: string | null }>(
     database,
     `SELECT t.id, t.year, a.name,
@@ -143,18 +145,19 @@ export function regroup_albums(database: SqlDatabase): RegroupReport {
   }
 
   const now = Date.now()
+  const db = drizzle_of(database)
 
   for (const [key, g] of groups) {
     if (g.artists.size < COMPILATION_ARTISTS) continue
-    run(database, `INSERT INTO albums (id, match_key, name, year, is_compilation, added) VALUES (?, ?, ?, ?, 1, ?)
-                   ON CONFLICT(match_key) DO UPDATE SET is_compilation = 1`, new_id(), key, g.input.album ?? null, g.input.year ?? null, now)
-    const album_id = first_row<{ id: string }>(database, 'SELECT id FROM albums WHERE match_key = ?', key)!.id
-    for (const track_id of g.tracks) run(database, 'UPDATE tracks SET album_id = ? WHERE id = ?', album_id, track_id)
+    db.insert(albums).values({ id: new_id(), match_key: key, name: g.input.album ?? null, year: g.input.year ?? null, is_compilation: 1, added: now })
+      .onConflictDoUpdate({ target: albums.match_key, set: { is_compilation: 1 } }).run()
+    const album_id = db.select({ id: albums.id }).from(albums).where(eq(albums.match_key, key)).get()!.id
+    for (const track_id of g.tracks) db.update(tracks).set({ album_id }).where(eq(tracks.id, track_id)).run()
     report.compilations_found++
     report.tracks_moved += g.tracks.length
   }
 
-  // An album a merge could still be undone onto has to survive, or the undo has nothing to restore.
+  // An album a merge could still be undone onto has to survive, or the undo has nothing to restore; raw, since json_each is SQLite's own.
   report.albums_removed = run(database, `
     DELETE FROM albums
      WHERE pinned = 0

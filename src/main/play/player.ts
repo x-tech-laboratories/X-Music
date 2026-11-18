@@ -131,13 +131,13 @@ export class Player {
       // Found on disk after being marked absent: the drive came back, so record that.
       if (row.present === 0) set_file_present(this.db, row.id, true)
 
-      const gain = mode === 'track' ? row.trackGain : mode === 'album' ? row.albumGain : null
+      const gain = mode === 'track' ? row.track_gain : mode === 'album' ? row.album_gain : null
       return {
         id: row.id,
         uri: row.uri,
-        startMs: row.startMs,
-        endMs: row.endMs,
-        gainDb: gain === null ? null : gain + (this.opts.preamp_db ?? 0)
+        start_ms: row.start_ms,
+        end_ms: row.end_ms,
+        gain_db: gain === null ? null : gain + (this.opts.preamp_db ?? 0)
       }
     }
 
@@ -152,7 +152,7 @@ export class Player {
   // ── statistics ─────────────────────────────────────────────────────────
   private maybe_count_play(): void {
     if (this.settled || !this.current_track) return
-    if (!counts_as_play(this.furthest_ms, this.duration_ms ?? this.current_track.lengthMs)) return
+    if (!counts_as_play(this.furthest_ms, this.duration_ms ?? this.current_track.length_ms)) return
 
     this.settled = true
     count_play(this.db, this.current_track.id, Date.now())
@@ -175,7 +175,7 @@ export class Player {
     this.order = this.shuffle ? shuffle_order(this.context.length, this.seed) : null
   }
 
-  // Position of `contextIndex` within the walk order.
+  // Position of `context_index` within the walk order.
   private order_position(): number {
     if (!this.order) return this.context_index
     return this.order.indexOf(this.context_index)
@@ -227,6 +227,15 @@ export class Player {
     this.publish()
   }
 
+  // Takes the queued track at index out and puts it at to_index, or at the end when to_index is past it.
+  move_in_queue(index: number, to_index: number): void {
+    if (!Number.isInteger(index) || index < 0 || index >= this.queue.length) throw new Error(`no queued track at ${index}`)
+    const rest = this.queue.filter((_, place) => place !== index)
+    const to = Math.min(Math.max(0, Math.trunc(to_index)), rest.length)
+    this.queue = [...rest.slice(0, to), this.queue[index]!, ...rest.slice(to)]
+    this.publish()
+  }
+
   clear_queue(): void {
     this.queue = []
     this.publish()
@@ -256,12 +265,12 @@ export class Player {
     this.position_ms = 0
     this.furthest_ms = 0
     this.settled = false
-    this.duration_ms = track.lengthMs
+    this.duration_ms = track.length_ms
     this.error = undefined
     if (context_index >= 0) this.context_index = context_index
 
     const opts: LoadOptions = {
-      start_ms: media.startMs, end_ms: media.endMs, gain_db: media.gainDb
+      start_ms: media.start_ms, end_ms: media.end_ms, gain_db: media.gain_db
     }
 
     const started = await this.drive(async () => {
@@ -296,7 +305,7 @@ export class Player {
     const media = this.load_media(upcoming)
     if (!media) return
     await this.engine.preload(media.uri, {
-      start_ms: media.startMs, end_ms: media.endMs, gain_db: media.gainDb
+      start_ms: media.start_ms, end_ms: media.end_ms, gain_db: media.gain_db
     })
   }
 
@@ -348,7 +357,7 @@ export class Player {
   private async on_ended(): Promise<void> {
     // Reaching the end is a complete listen even if the position tick missed the threshold.
     if (!this.settled && this.current_track) {
-      this.furthest_ms = this.duration_ms ?? this.current_track.lengthMs ?? PLAY_THRESHOLD_MS
+      this.furthest_ms = this.duration_ms ?? this.current_track.length_ms ?? PLAY_THRESHOLD_MS
       this.maybe_count_play()
     }
     await this.next(false)
@@ -411,14 +420,14 @@ export class Player {
       state: this.state,
       track: this.current_track,
       media: this.current_media,
-      positionMs: this.position_ms,
-      durationMs: this.duration_ms,
+      position_ms: this.position_ms,
+      duration_ms: this.duration_ms,
       volume: this.volume,
       repeat: this.repeat,
       shuffle: this.shuffle,
       queue: [...this.queue],
-      contextLength: this.context.length,
-      contextIndex: this.context_index,
+      context_length: this.context.length,
+      context_index: this.context_index,
       error: this.error
     }
   }

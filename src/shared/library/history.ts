@@ -4,10 +4,12 @@
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
+import { asc, eq, inArray } from '@x-tech-laboratories/x-libs/drizzle'
 import { create_history, history_methods, type HistoryMethods } from '@x-tech-laboratories/x-libs/history'
 import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
-import { all_rows, first_row, placeholders, run } from './database.ts'
+import { album_name, drizzle_of } from './database.ts'
+import { albums, media, settings, track_extras, track_values, tracks, values_ } from './schema.ts'
 import { intern_value } from './values.ts'
 
 // ── Snapshots ────────────────────────────────────────────────────────────────
@@ -60,29 +62,31 @@ const edited_columns = [
 
 // ── Reading and applying ─────────────────────────────────────────────────────
 
+// In this order, since versions are compared by their JSON.
+const state_select = {
+  ...Object.fromEntries([...edited_columns, ...listening].map((column) => [column, tracks[column]])),
+  album: album_name
+}
+
 function read_track(database: SqlDatabase, track_id: string): TrackSnapshot | null {
-  const track = first_row<TrackState>(
-    database,
-    `SELECT ${edited_columns.join(', ')}, ${listening.join(', ')}, (SELECT name FROM albums WHERE albums.id = tracks.album_id) AS album
-     FROM tracks WHERE id = ?`,
-    track_id
-  )
+  const db = drizzle_of(database)
+  const track = db.select(state_select).from(tracks).where(eq(tracks.id, track_id)).get() as TrackState | undefined
   if (!track) return null
   return {
-    track: { ...track },
-    values: all_rows<TrackSnapshot['values'][number]>(
-      database,
-      `SELECT track_values.field_id, values_.value, track_values.ordinal FROM track_values JOIN values_ ON values_.id = track_values.value_id
-       WHERE track_values.track_id = ? ORDER BY track_values.field_id, track_values.ordinal`,
-      track_id
-    ).map((row) => ({ ...row })),
-    extras: all_rows<TrackSnapshot['extras'][number]>(database, 'SELECT field_id, value FROM track_extras WHERE track_id = ? ORDER BY field_id', track_id).map((row) => ({ ...row })),
-    media: all_rows<{ id: string }>(database, 'SELECT id FROM media WHERE track_id = ? ORDER BY id', track_id).map((row) => row.id)
+    track,
+    values: db.select({ field_id: track_values.field_id, value: values_.value, ordinal: track_values.ordinal })
+      .from(track_values).innerJoin(values_, eq(values_.id, track_values.value_id))
+      .where(eq(track_values.track_id, track_id)).orderBy(asc(track_values.field_id), asc(track_values.ordinal)).all(),
+    extras: db.select({ field_id: track_extras.field_id, value: track_extras.value }).from(track_extras)
+      .where(eq(track_extras.track_id, track_id)).orderBy(asc(track_extras.field_id)).all(),
+    media: db.select({ id: media.id }).from(media).where(eq(media.track_id, track_id)).orderBy(asc(media.id)).all().map((row) => row.id)
   }
 }
 
-const exists = (database: SqlDatabase, table: string, id: string | null): boolean =>
-  id !== null && first_row(database, `SELECT 1 FROM ${table} WHERE id = ?`, id) !== undefined
+const keyed = { albums, media, tracks }
+
+const exists = (database: SqlDatabase, table: keyof typeof keyed, id: string | null): boolean =>
+  id !== null && drizzle_of(database).select({ id: keyed[table].id }).from(keyed[table]).where(eq(keyed[table].id, id)).get() !== undefined
 
 // Puts a track back as the snapshot has it: an album or file that is gone is left out, and files are only claimed, never let go.
 function apply_track(database: SqlDatabase, track_id: string, snapshot: TrackSnapshot): void {
@@ -92,27 +96,22 @@ function apply_track(database: SqlDatabase, track_id: string, snapshot: TrackSna
     primary_media_id: exists(database, 'media', snapshot.track.primary_media_id) ? snapshot.track.primary_media_id : null
   }
   const now = Date.now()
+  const db = drizzle_of(database)
+  const columns_of = <Column extends keyof typeof state>(columns: readonly Column[]) => Object.fromEntries(columns.map((column) => [column, state[column]])) as Pick<typeof state, Column>
 
   if (exists(database, 'tracks', track_id)) {
-    run(database, `UPDATE tracks SET ${edited_columns.map((column) => `${column} = ?`).join(', ')}, modified = ? WHERE id = ?`, ...edited_columns.map((column) => state[column]), now, track_id)
+    db.update(tracks).set({ ...columns_of(edited_columns), modified: now }).where(eq(tracks.id, track_id)).run()
   } else {
-    const columns = [...edited_columns, ...listening]
-    run(
-      database,
-      `INSERT INTO tracks (id, ${columns.join(', ')}, modified) VALUES (?, ${placeholders(columns)}, ?)`,
-      track_id,
-      ...columns.map((column) => state[column]),
-      now
-    )
+    db.insert(tracks).values({ id: track_id, ...columns_of([...edited_columns, ...listening]), modified: now }).run()
   }
 
-  run(database, 'DELETE FROM track_values WHERE track_id = ?', track_id)
+  db.delete(track_values).where(eq(track_values.track_id, track_id)).run()
   for (const { field_id, value, ordinal } of snapshot.values) {
-    run(database, 'INSERT OR IGNORE INTO track_values (track_id, field_id, value_id, ordinal) VALUES (?, ?, ?, ?)', track_id, field_id, intern_value(database, field_id, value), ordinal)
+    db.insert(track_values).values({ track_id, field_id, value_id: intern_value(database, field_id, value), ordinal }).onConflictDoNothing().run()
   }
-  run(database, 'DELETE FROM track_extras WHERE track_id = ?', track_id)
-  for (const { field_id, value } of snapshot.extras) run(database, 'INSERT INTO track_extras (track_id, field_id, value) VALUES (?, ?, ?)', track_id, field_id, value)
-  if (snapshot.media.length > 0) run(database, `UPDATE media SET track_id = ? WHERE id IN (${placeholders(snapshot.media)})`, track_id, ...snapshot.media)
+  db.delete(track_extras).where(eq(track_extras.track_id, track_id)).run()
+  for (const { field_id, value } of snapshot.extras) db.insert(track_extras).values({ track_id, field_id, value }).run()
+  if (snapshot.media.length > 0) db.update(media).set({ track_id }).where(inArray(media.id, snapshot.media)).run()
 }
 
 function without_listening(snapshot: TrackSnapshot): unknown {
@@ -144,14 +143,15 @@ export const history_keep_days_key = 'history.keep_days'
 export const default_history_keep_days = 365
 
 export function get_history_keep_days(database: SqlDatabase): number {
-  const row = first_row<{ value: string }>(database, 'SELECT value FROM settings WHERE key = ?', history_keep_days_key)
+  const row = drizzle_of(database).select({ value: settings.value }).from(settings).where(eq(settings.key, history_keep_days_key)).get()
   const days = row ? Number(JSON.parse(row.value)) : default_history_keep_days
   return Number.isFinite(days) && days > 0 ? days : default_history_keep_days
 }
 
 export function set_history_keep_days(database: SqlDatabase, days: number): void {
   if (!Number.isFinite(days) || days < 1) throw new Error('versions must be kept for at least one day')
-  run(database, 'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value', history_keep_days_key, JSON.stringify(Math.round(days)))
+  const value = JSON.stringify(Math.round(days))
+  drizzle_of(database).insert(settings).values({ key: history_keep_days_key, value }).onConflictDoUpdate({ target: settings.key, set: { value } }).run()
   prune_history(database)
 }
 

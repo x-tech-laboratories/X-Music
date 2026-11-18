@@ -19,15 +19,16 @@ npm run build            # typecheck + electron-vite build
 ```sh
 SP=<scratchpad>
 unset ELECTRON_RUN_AS_NODE
-X_MUSIC_LOG=info X_MUSIC_LOG_FILE=$SP/x-music.log \
+X_MUSIC_SCRATCH=$SP/x-music X_MUSIC_LOG=info X_MUSIC_LOG_FILE=$SP/x-music.log \
   nohup bash scripts/run.sh --remote-debugging-port=9222 > $SP/launch.out 2>&1 &
 sleep 8
 grep -i "devtools listening" $SP/launch.out
 ```
 
-`scripts/run.sh` finds mpv and Electron, and builds first if `out/` is missing.
-Point it at a scratch database with `X_MUSIC_DB=/tmp/x-music.db` rather than touching
-`~/.config/x-music/library.db`.
+`scripts/run.sh` finds mpv and Electron, and builds first if `out/` is missing. It always runs on a
+scratch database and scratch profile folder (`--user-data-dir`) under `X_MUSIC_SCRATCH`, a new temp
+folder when that is unset, so the real library in `~/.config/x-music` is never opened. Only
+`--real-library` or `X_MUSIC_REAL_LIBRARY=1` opens the real one; never pass either from a check.
 
 ## Drive
 

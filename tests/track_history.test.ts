@@ -90,7 +90,7 @@ describe('track history', () => {
     const recent = track_history_methods(() => db).list_recent_versions(10)
     expect(recent.slice(0, 2).map((version) => version.kind).sort()).toEqual(['deleted', 'edited'])
 
-    unmerge(db, merge.batchId)
+    unmerge(db, merge.batch_id)
     record_history(db)
 
     expect(versions(absorbed)[0]!.kind).toBe('restored')

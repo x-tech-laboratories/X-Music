@@ -15,13 +15,13 @@ import { install_bridge } from './bridge.ts'
 const now = new Date('2026-11-17T12:00:00Z').getTime()
 
 const roots: Root[] = [
-  { id: '1', path: '/tmp/x-music-fixture/music', enabled: true, slow: false, lastScan: now - 3 * 3600_000 },
-  { id: '2', path: '/tmp/x-music-fixture/more', enabled: true, slow: false, lastScan: null }
+  { id: '1', path: '/tmp/x-music-fixture/music', enabled: true, slow: false, last_scan: now - 3 * 3600_000 },
+  { id: '2', path: '/tmp/x-music-fixture/more', enabled: true, slow: false, last_scan: null }
 ]
 
 const report: ScanReport = {
-  filesFound: 3, filesRead: 2, filesSkipped: 1, tracksCreated: 1, tracksMatched: 0, movesDetected: 0,
-  markedMissing: 0, errors: [{ path: '/tmp/x-music-fixture/music/broken.flac', message: 'not an audio file' }], durationMs: 2400
+  files_found: 3, files_read: 2, files_skipped: 1, tracks_created: 1, tracks_matched: 0, moves_detected: 0,
+  marked_missing: 0, errors: [{ path: '/tmp/x-music-fixture/music/broken.flac', message: 'not an audio file' }], duration_ms: 2400
 }
 
 type Listener = (payload: unknown) => void
@@ -90,7 +90,7 @@ describe('folders view', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy()
 
     const files: FileResult[] = [
-      { path: '/tmp/x-music-fixture/music/a.flac', outcome: 'new', trackId: '7' },
+      { path: '/tmp/x-music-fixture/music/a.flac', outcome: 'new', track_id: '7' },
       { path: '/tmp/x-music-fixture/music/b.flac', outcome: 'unchanged' },
       { path: '/tmp/x-music-fixture/music/broken.flac', outcome: 'error', detail: 'not an audio file' }
     ]

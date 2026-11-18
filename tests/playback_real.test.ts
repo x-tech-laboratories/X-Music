@@ -39,18 +39,18 @@ describe.runIf(has_live_library() && mpv)('playback against the real library', (
     const deadline = Date.now() + 15_000
     while (Date.now() < deadline) {
       const s = player.status()
-      if (s.positionMs > 0 || s.error) break
+      if (s.position_ms > 0 || s.error) break
       await new Promise((r) => setTimeout(r, 250))
     }
 
     const s = player.status()
-    console.log(`  state=${s.state} position=${s.positionMs}ms duration=${s.durationMs}ms`)
+    console.log(`  state=${s.state} position=${s.position_ms}ms duration=${s.duration_ms}ms`)
     console.log(`  states seen: ${[...new Set(states)].join(', ')}`)
     if (s.error) console.log(`  error: ${s.error}`)
 
     expect(s.error).toBeUndefined()
     expect(s.state).toBe('playing')
-    expect(s.positionMs).toBeGreaterThan(0)
+    expect(s.position_ms).toBeGreaterThan(0)
 
     await player.dispose()
     db.close()

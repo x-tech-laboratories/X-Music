@@ -15,8 +15,8 @@ import { install_bridge } from './bridge.ts'
 // ============================================================================
 
 const status = (queue: string[]): PlayerStatus => ({
-  state: 'idle', track: null, media: null, positionMs: 0, durationMs: null, volume: 80,
-  repeat: 'off', shuffle: false, queue, contextLength: 0, contextIndex: -1
+  state: 'idle', track: null, media: null, position_ms: 0, duration_ms: null, volume: 80,
+  repeat: 'off', shuffle: false, queue, context_length: 0, context_index: -1
 })
 
 const details = { id: '99', title: 'Hidden by the filters', fields: [{ field: 'artist', name: 'Artist', value: 'Sample Trio', multi: true }] } as unknown as TrackDetails
@@ -84,7 +84,7 @@ describe('now playing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Now playing' }))
     expect(screen.getByText('Nothing is playing.')).toBeTruthy()
 
-    act(() => { player_status.set({ ...status([]), track: { id: '1', title: 'Song A', artist: 'Sample Trio', album: 'Album B', lengthMs: 1000, rating: null } }) })
+    act(() => { player_status.set({ ...status([]), track: { id: '1', title: 'Song A', artist: 'Sample Trio', album: 'Album B', length_ms: 1000, rating: null } }) })
     expect(screen.getByText('Song A')).toBeTruthy()
   })
 })
