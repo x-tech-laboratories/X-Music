@@ -14,20 +14,20 @@ describe('track cover', () => {
     let answer: (art: { url: string | null; source: string }) => void = () => undefined
     const calls = record_calls({ 'cache_cover': () => new Promise((resolve) => { answer = resolve }) })
 
-    const { container } = render(<TrackCover track_id="track-7" size={88} />)
+    const { container } = render(<TrackCover track_id="track-7" size="medium" />)
 
     const cover = container.querySelector('.cover')!
     expect(cover.getAttribute('aria-busy')).toBe('true')
     expect(cover.querySelector('svg')).toBeNull()
     answer({ url: 'x-music-art://7', source: 'embedded' })
     await waitFor(() => expect(cover.querySelector('img')?.getAttribute('src')).toBe('x-music-art://7'))
-    expect(calls.find((call) => call.channel === 'cache_cover')?.args).toEqual(['track-7', 88])
+    expect(calls.find((call) => call.channel === 'cache_cover')?.args).toEqual(['track-7', 96])
   })
 
   it('shows the music placeholder for a track with no art', async () => {
     record_calls({ 'cache_cover': { url: null, source: 'none' } })
 
-    const { container } = render(<TrackCover track_id="track-7" size={88} />)
+    const { container } = render(<TrackCover track_id="track-7" size="medium" />)
 
     await waitFor(() => expect(container.querySelector('.cover svg.line-icon')).not.toBeNull())
     expect(container.querySelector('img')).toBeNull()
@@ -36,7 +36,7 @@ describe('track cover', () => {
   it('shows the placeholder without asking when nothing is playing', () => {
     const calls = record_calls()
 
-    const { container } = render(<TrackCover track_id={null} size={88} />)
+    const { container } = render(<TrackCover track_id={null} size="medium" />)
 
     expect(container.querySelector('.cover svg.line-icon')).not.toBeNull()
     expect(calls.some((call) => call.channel === 'cache_cover')).toBe(false)

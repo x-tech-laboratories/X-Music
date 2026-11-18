@@ -1,6 +1,6 @@
 .body { max-width: 90ch; }
 
-.hero { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: var(--space-6); align-items: start; }
+.hero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-6); align-items: start; }
 
 .source :global(.panel-head) > h2 { flex: 1; min-width: 0; }
 
@@ -21,5 +21,4 @@
 
 @media (max-width: 640px) {
   .hero { grid-template-columns: minmax(0, 1fr); }
-  .hero > :first-child { max-width: 160px; }
 }

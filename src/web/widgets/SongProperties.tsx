@@ -69,7 +69,7 @@ function Overview({ details }: { details: TrackDetails }) {
   return (
     <Stack>
       <div className={s.hero}>
-        <TrackCover track_id={details.id} size={160} />
+        <TrackCover track_id={details.id} size="large" />
         <Facts rows={field_facts(details.fields.slice(0, 4))} />
       </div>
 

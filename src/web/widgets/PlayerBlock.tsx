@@ -106,7 +106,7 @@ export function PlayerBlock() {
           {!failed && <TimeBar duration_in_milliseconds={duration} />}
         </div>
 
-        <TrackCover track_id={track?.id ?? null} size={88} />
+        <TrackCover track_id={track?.id ?? null} size="medium" />
       </div>
 
       {failed && (
