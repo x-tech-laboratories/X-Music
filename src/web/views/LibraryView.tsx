@@ -7,7 +7,7 @@ import { use_store } from '@x-tech-laboratories/x-libs/web/react/store'
 import { library, results } from '../stores/library.ts'
 import { FilterPane } from '../widgets/FilterPane.tsx'
 import { SongList } from '../widgets/SongList.tsx'
-import { view_href } from './Navigation.tsx'
+import { view_href } from './routes.ts'
 
 // ============================================================================
 // Panes

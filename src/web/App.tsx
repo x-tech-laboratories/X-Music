@@ -24,7 +24,7 @@ import { FoldersView } from './views/FoldersView.tsx'
 import { HistoryView } from './views/HistoryView.tsx'
 import { ImportView } from './views/ImportView.tsx'
 import { LibraryView } from './views/LibraryView.tsx'
-import { Navigation, view_href, view_labels, view_of, type ViewId } from './views/Navigation.tsx'
+import { view_href, view_labels, view_of, views, type ViewId } from './views/routes.ts'
 import { SettingsView, type Density } from './views/SettingsView.tsx'
 
 // ============================================================================
@@ -108,18 +108,15 @@ export function App() {
   ])
 
   const sidebar = (
-    <>
-      <Navigation current={view} />
-      <div className="player-column">
-        <Split
-          storage_key="x-music.split.vbleft"
-          axis="vertical"
-          specs={[{ min: 150, max: 320 }, { min: 120, grow: true }]}
-          preferred={[196, undefined]}
-          panes={[<PlayerBlock key="player" />, <TabbedLists key="lists" />]}
-        />
-      </div>
-    </>
+    <div className="player-column">
+      <Split
+        storage_key="x-music.split.vbleft"
+        axis="vertical"
+        specs={[{ min: 150, max: 320 }, { min: 120, grow: true }]}
+        preferred={[196, undefined]}
+        panes={[<PlayerBlock key="player" />, <TabbedLists key="lists" />]}
+      />
+    </div>
   )
 
   return (
@@ -127,12 +124,14 @@ export function App() {
       brand="X-Music"
       brand_icon={app_icon}
       brand_href={view_href('library')}
+      views={views}
+      active={view}
       sidebar={sidebar}
       sidebar_width={{ default_width: 420, min: 280, max: 720, storage_key: 'x-music.sidebar-width' }}
       theme={theme}
-      settings={{ href: view_href('settings'), active: view === 'settings' }}
+      settings={{ href: view_href('settings') }}
       status_bar={<StatusBar />}
-      main_class={view === 'library' ? 'library-main' : undefined}
+      main_class={view === 'library' ? 'fill' : undefined}
       view_key={view}
       contained
     >
