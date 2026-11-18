@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Dialogs } from '@x-tech-laboratories/x-libs/web/react/dialog'
 import { Toasts } from '@x-tech-laboratories/x-libs/web/react/toasts'
+import { stamp } from '@x-tech-laboratories/x-libs/web/format'
 import type { MergeEntry, TrackSnapshot, Version } from '@shared/ipc'
 import { changes_between, HistoryView } from '../src/web/views/HistoryView.tsx'
 import { record_calls, type Call } from './calls.ts'
@@ -102,6 +103,7 @@ describe('history page', () => {
       expect.stringContaining('Added to the library')
     ])
     expect(listed[0]!.textContent).toContain('Edited')
+    expect(within(listed[0]!).getAllByRole('cell')[0]!.textContent).toBe(stamp(Date.parse(edited.changed_at) / 1000))
     expect(listed[1]!.textContent).toContain('Took in Freddie Freeloader (copy)')
     expect(history.list_recent_versions).toHaveBeenCalledWith(50)
     expect(history.list_recent_merges).toHaveBeenCalledWith(50)

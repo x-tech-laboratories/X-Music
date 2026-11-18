@@ -11,7 +11,7 @@ import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/rea
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
-import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import { plural, stamp } from '@x-tech-laboratories/x-libs/web/format'
 import type { MergeEntry, TrackSnapshot, TrackState, Version, VersionKind } from '@shared/ipc'
 import { BUILTIN_FIELDS, rating_to_stars } from '@shared/fields'
 import { library } from '../stores/library.ts'
@@ -36,7 +36,7 @@ const merge_labels: Record<'merged' | 'undone', [text: string, tone: Tone]> = {
   undone: ['Merge undone', 'none']
 }
 
-const when = (milliseconds: number): string => new Date(milliseconds).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+const when = (milliseconds: number): string => stamp(milliseconds / 1000)
 
 const ARTIST_FIELD = BUILTIN_FIELDS.find((field) => field.id === 'artist')!.field_id!
 
