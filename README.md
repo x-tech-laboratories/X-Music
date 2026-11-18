@@ -98,7 +98,8 @@ otherwise makes Electron run as bare node and die on the ESM entry point.
 | `npm run db:generate` | Write a migration for a change to `src/shared/library/schema.ts` and bundle the migrations |
 
 Benchmarks default to 50k synthetic tracks (the §12 target); `X_MUSIC_BENCH_SIZE=20000 npm run bench`
-for a quicker pass. Point the app at a scratch database with `X_MUSIC_DB=/tmp/x-music.db`.
+for a quicker pass. `npm run app` runs on a scratch database and profile folder unless given `--real-library` or
+`X_MUSIC_REAL_LIBRARY=1`; `X_MUSIC_DB` names the database file, and `X_MUSIC_MPV` the mpv to play with when none is on `PATH`.
 
 ### Logging
 
@@ -200,7 +201,8 @@ library up first and is refused if that fails, `undo_merge` puts a merge back, a
 `restore_version` included, is a version in the history. A change made through MCP shows in the open window
 at once. Lengths are in milliseconds, ratings and the volume 0 to 100, dates Unix milliseconds, and ids are opaque
 strings from the `list_` and `get_` tools. The dialogs, the file manager and the window's log are not
-offered.
+offered, and neither are the backup calls: a restore replaces the whole library and restarts X-Music, so
+backups are made, restored and scheduled only from Settings.
 
 ## Testing
 
