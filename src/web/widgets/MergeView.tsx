@@ -100,9 +100,9 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
 
   return (
     <Stack>
-      {preview.pinnedSources.length > 0 && (
+      {preview.pinned_sources.length > 0 && (
         <p className="tone-warn">
-          {plural(preview.pinnedSources.length, 'source')} of these was merged or split by hand before. Merging replaces
+          {plural(preview.pinned_sources.length, 'source')} of these was merged or split by hand before. Merging replaces
           that decision.
         </p>
       )}
@@ -127,8 +127,8 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
           history is merged and deduplicated.
         </p>
         <Tiles>
-          <Tile label="Plays" value={preview.statistics.playCount} value_first />
-          <Tile label="Skips" value={preview.statistics.skipCount} value_first />
+          <Tile label="Plays" value={preview.statistics.play_count} value_first />
+          <Tile label="Skips" value={preview.statistics.skip_count} value_first />
           <Tile label="Rating" value={<Rating value={rating_to_stars(preview.statistics.rating)} />} value_first />
         </Tiles>
       </Section>
@@ -171,10 +171,10 @@ export function MergeView({ ids, on_close, on_undone }: MergeViewProps) {
     try {
       const result = await ipc('merge_tracks', preview.ids, survivor_id, resolutions_for(preview, survivor, choices))
       await library.refresh()
-      toast(`Merged ${plural(preview.ids.length, 'track')} into one holding ${plural(result.mediaMoved + 1, 'file')}`, {
+      toast(`Merged ${plural(preview.ids.length, 'track')} into one holding ${plural(result.media_moved + 1, 'file')}`, {
         tone: 'good',
         duration_in_milliseconds: 10_000,
-        action: { text: 'Undo', run: () => void undo_merge(result.batchId, on_undone) }
+        action: { text: 'Undo', run: () => void undo_merge(result.batch_id, on_undone) }
       })
       on_close?.(true)
     } catch (error) {

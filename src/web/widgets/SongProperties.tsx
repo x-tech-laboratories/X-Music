@@ -82,7 +82,7 @@ function Overview({ details }: { details: TrackDetails }) {
         <Facts layout="rows" rows={[
           ['Decided by', <code>{identity.source}</code>],
           ['Pinned', identity.pinned ? 'Yes, a person decided this' : 'No'],
-          identity.mbRecordingId !== null && ['MusicBrainz', <code>{identity.mbRecordingId}</code>],
+          identity.mb_recording_id !== null && ['MusicBrainz', <code>{identity.mb_recording_id}</code>],
           identity.acoustid !== null && ['AcoustID', <code>{identity.acoustid}</code>],
           identity.key !== null && ['Match key', <code className={s.wrap}>{identity.key.replaceAll('\u001f', ' · ')}</code>]
         ]} />
@@ -92,19 +92,19 @@ function Overview({ details }: { details: TrackDetails }) {
         <p className="muted small">These belong to the track, not to any one file, so they survive a re-rip.</p>
         <Facts layout="rows" rows={[
           ['Rating', <Rating value={rating_to_stars(statistics.rating)} />],
-          ['Plays', statistics.playCount],
-          ['Skips', statistics.skipCount],
-          ['First played', when(statistics.firstPlayed)],
-          ['Last played', when(statistics.lastPlayed)],
+          ['Plays', statistics.play_count],
+          ['Skips', statistics.skip_count],
+          ['First played', when(statistics.first_played)],
+          ['Last played', when(statistics.last_played)],
           ['Added', when(statistics.added)]
         ]} />
       </Section>
 
-      {(loudness.rgTrackGain !== null || loudness.rgAlbumGain !== null) && (
+      {(loudness.rg_track_gain !== null || loudness.rg_album_gain !== null) && (
         <Section title="Loudness">
           <Facts layout="rows" rows={[
-            ['Track gain', loudness.rgTrackGain === null ? null : `${loudness.rgTrackGain} dB`],
-            ['Album gain', loudness.rgAlbumGain === null ? null : `${loudness.rgAlbumGain} dB`]
+            ['Track gain', loudness.rg_track_gain === null ? null : `${loudness.rg_track_gain} dB`],
+            ['Album gain', loudness.rg_album_gain === null ? null : `${loudness.rg_album_gain} dB`]
           ]} />
         </Section>
       )}
@@ -115,10 +115,10 @@ function Overview({ details }: { details: TrackDetails }) {
             <thead><tr><th scope="col">When</th><th scope="col">Absorbed</th><th scope="col">Batch</th></tr></thead>
             <tbody>
               {details.merges.map((merge) => (
-                <tr key={merge.batchId}>
+                <tr key={merge.batch_id}>
                   <td>{when(merge.at)}</td>
                   <td>{plural(merge.absorbed, 'track')}</td>
-                  <td><code>{merge.batchId}</code></td>
+                  <td><code>{merge.batch_id}</code></td>
                 </tr>
               ))}
             </tbody>
@@ -130,7 +130,7 @@ function Overview({ details }: { details: TrackDetails }) {
 }
 
 function Source({ media }: { media: DetailMedia }) {
-  const range = media.startMs !== null || media.endMs !== null
+  const range = media.start_ms !== null || media.end_ms !== null
   return (
     <Section
       class_name={s.source}
@@ -145,21 +145,21 @@ function Source({ media }: { media: DetailMedia }) {
     >
       <Facts rows={[
         ['Format', (media.codec ?? media.kind).toUpperCase()],
-        ['Bitrate', unit(media.bitrate, media.bitrateMode ? `kbps ${media.bitrateMode}` : 'kbps')],
+        ['Bitrate', unit(media.bitrate, media.bitrate_mode ? `kbps ${media.bitrate_mode}` : 'kbps')],
         ['Sample rate', unit(media.samplerate, 'Hz')],
         ['Channels', media.channels],
-        ['Bit depth', media.bitsPerSample],
+        ['Bit depth', media.bits_per_sample],
         ['Size', size(media.filesize)],
         ['Modified', when(media.mtime)],
-        ['Last seen', when(media.lastSeen)],
-        ['Quality rank', media.qualityRank],
-        range && ['Range', `${clock(media.startMs)} – ${clock(media.endMs)} (index ${media.subtrackIndex})`]
+        ['Last seen', when(media.last_seen)],
+        ['Quality rank', media.quality_rank],
+        range && ['Range', `${clock(media.start_ms)} – ${clock(media.end_ms)} (index ${media.subtrack_index})`]
       ]} />
       <Facts layout="rows" rows={[
-        ['Audio hash', media.audioHashHex ? <code className={s.wrap}>{media.audioHashHex}</code> : 'None'],
-        media.audioHashAlgo !== null && ['Hash method', <code>{media.audioHashAlgo}</code>]
+        ['Audio hash', media.audio_hash_hex ? <code className={s.wrap}>{media.audio_hash_hex}</code> : 'None'],
+        media.audio_hash_algo !== null && ['Hash method', <code>{media.audio_hash_algo}</code>]
       ]} />
-      <p className="muted small">{hash_explanation[media.audioHashAlgo ?? ''] ?? not_hashed}</p>
+      <p className="muted small">{hash_explanation[media.audio_hash_algo ?? ''] ?? not_hashed}</p>
     </Section>
   )
 }
@@ -206,11 +206,11 @@ function RawTags({ details }: { details: TrackDetails }) {
 function Plays({ details }: { details: TrackDetails }) {
   const plays = details.history.filter((entry) => entry.kind === 'play').length
   const skips = details.history.length - plays
-  const shown_part = details.historyTotal > details.history.length ? `, showing the most recent ${details.history.length}` : ''
+  const shown_part = details.history_total > details.history.length ? `, showing the most recent ${details.history.length}` : ''
   return (
     <Stack>
       <p className="muted">
-        {plural(details.historyTotal, 'recorded event')}{shown_part} · {plural(plays, 'play')}, {plural(skips, 'skip')}
+        {plural(details.history_total, 'recorded event')}{shown_part} · {plural(plays, 'play')}, {plural(skips, 'skip')}
       </p>
       {details.history.length > 0 ? (
         <table>
@@ -250,7 +250,7 @@ export function SongProperties({ track_id, on_close }: { track_id: string; on_cl
   return (
     <PageView
       title={details?.title ?? 'Track'}
-      subtitle={details ? `${plural(details.media.length, 'source')} · ${plural(details.statistics.playCount, 'play')}` : undefined}
+      subtitle={details ? `${plural(details.media.length, 'source')} · ${plural(details.statistics.play_count, 'play')}` : undefined}
       on_close={on_close}
       actions={details && <button onClick={() => open_track_history(details.id, details.title ?? 'Untitled track', () => void resource.reload(true))}>History</button>}
       sections={sections}

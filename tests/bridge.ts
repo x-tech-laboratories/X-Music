@@ -3,11 +3,11 @@
 import { page_log_method_names } from '@x-tech-laboratories/x-libs/log_protocol'
 import { api_method_names, history_channels, page_method_names, type LibraryStats, type PlayerStatus } from '@shared/ipc'
 
-export const empty_stats: LibraryStats = { tracks: 0, media: 0, albums: 0, missing: 0, totalMs: 0, schemaVersion: 1, path: '/tmp/x-music-test.db' }
+export const empty_stats: LibraryStats = { tracks: 0, media: 0, albums: 0, missing: 0, total_ms: 0, schema_version: 1, path: '/tmp/x-music-test.db' }
 
 const idle_status: PlayerStatus = {
-  state: 'idle', track: null, media: null, positionMs: 0, durationMs: null, volume: 80,
-  repeat: 'off', shuffle: false, queue: [], contextLength: 0, contextIndex: -1
+  state: 'idle', track: null, media: null, position_ms: 0, duration_ms: null, volume: 80,
+  repeat: 'off', shuffle: false, queue: [], context_length: 0, context_index: -1
 }
 
 // What each call answers unless a test overrides it; a function answer gets the call's arguments and may throw to make the call fail.

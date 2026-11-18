@@ -21,7 +21,7 @@ let last_tick_at = 0
 
 function apply(status: PlayerStatus): void {
   player_status.set(status)
-  player_position.set(status.positionMs)
+  player_position.set(status.position_ms)
 }
 
 // Every call answers with the new status; a failed call says so in a toast rather than going unseen.
@@ -46,12 +46,12 @@ function init(): () => void {
   })
 
   const stop_position = window.xMusicEvents.on('player_position', (tick) => {
-    player_position.set(tick.positionMs)
+    player_position.set(tick.position_ms)
     last_tick_at = performance.now()
     // Replacing status redraws everything that reads it, so only do it when the duration moved.
     const status = player_status.get()
-    if (status && tick.durationMs !== null && tick.durationMs !== status.durationMs) {
-      player_status.set({ ...status, durationMs: tick.durationMs })
+    if (status && tick.duration_ms !== null && tick.duration_ms !== status.duration_ms) {
+      player_status.set({ ...status, duration_ms: tick.duration_ms })
     }
   })
 

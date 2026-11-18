@@ -11,11 +11,11 @@ import { PlayerBlock } from '../src/web/widgets/PlayerBlock.tsx'
 import { record_calls } from './calls.ts'
 
 const idle: PlayerStatus = {
-  state: 'paused', track: null, media: null, positionMs: 0, durationMs: 200_000, volume: 80,
-  repeat: 'off', shuffle: false, queue: [], contextLength: 0, contextIndex: -1
+  state: 'paused', track: null, media: null, position_ms: 0, duration_ms: 200_000, volume: 80,
+  repeat: 'off', shuffle: false, queue: [], context_length: 0, context_index: -1
 }
 
-const track = { id: 'track-7', title: 'Morning Tone', artist: 'Example Band', album: 'First Light', lengthMs: 30_000, rating: null }
+const track = { id: 'track-7', title: 'Morning Tone', artist: 'Example Band', album: 'First Light', length_ms: 30_000, rating: null }
 
 afterEach(() => {
   cleanup()

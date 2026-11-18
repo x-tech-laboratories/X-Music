@@ -24,7 +24,7 @@ describe.runIf(has_live_library())('against the real library on this machine', (
     console.log(`  sample fuzzy groups:`)
     for (const g of fuzzy.slice(0, 6)) {
       console.log(`    [${g.members.length}] ` + g.members.map((m) =>
-        `artist=${JSON.stringify(m.artist)} title=${JSON.stringify(m.title)} len=${m.lengthMs}`
+        `artist=${JSON.stringify(m.artist)} title=${JSON.stringify(m.title)} len=${m.length_ms}`
       ).join('  ||  '))
     }
     for (const g of groups.slice(0, 3)) {
@@ -33,7 +33,7 @@ describe.runIf(has_live_library())('against the real library on this machine', (
     }
 
     if (groups.length > 0) {
-      const ids = groups[0]!.members.map((m) => m.trackId)
+      const ids = groups[0]!.members.map((m) => m.track_id)
       const p = merge_preview(db, ids)
 
       expect(p.ids).toEqual(ids)

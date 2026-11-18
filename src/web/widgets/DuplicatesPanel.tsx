@@ -19,7 +19,7 @@ import { ipc } from '../lib/ipc.ts'
 import { library } from '../stores/library.ts'
 import { MergeView } from './MergeView.tsx'
 
-type TrackId = DuplicateMember['trackId']
+type TrackId = DuplicateMember['track_id']
 
 const MAX_SHOWN = 200
 
@@ -57,10 +57,10 @@ const MEMBER_COLUMNS: TableColumn<DuplicateMember>[] = [
   { label: 'Title', sort: (member) => member.title, cell: (member) => member.title ?? '—' },
   { label: 'Artist', sort: (member) => member.artist, cell: (member) => member.artist ?? '—' },
   { label: 'Album', sort: (member) => member.album, cell: (member) => member.album ?? '—' },
-  { label: 'Length', class: 'number', sort: (member) => member.lengthMs, cell: (member) => format_clock(member.lengthMs, { empty: '—' }) },
+  { label: 'Length', class: 'number', sort: (member) => member.length_ms, cell: (member) => format_clock(member.length_ms, { empty: '—' }) },
   { label: 'Rating', sort: (member) => member.rating, cell: (member) => <Rating value={rating_to_stars(member.rating)} /> },
-  { label: 'Plays', class: 'number', sort: (member) => member.playCount, cell: (member) => member.playCount.toLocaleString() },
-  { label: 'Files', class: 'number', sort: (member) => member.mediaCount, cell: (member) => member.mediaCount.toLocaleString() },
+  { label: 'Plays', class: 'number', sort: (member) => member.play_count, cell: (member) => member.play_count.toLocaleString() },
+  { label: 'Files', class: 'number', sort: (member) => member.media_count, cell: (member) => member.media_count.toLocaleString() },
   { label: 'Formats', sort: (member) => member.codecs, cell: (member) => member.codecs || '—' }
 ]
 
@@ -85,7 +85,7 @@ function GroupPanel({ group, merged, working, on_quick_merge, on_review }: Group
   return (
     <Section title={lead?.title ?? 'Untitled'} tools={tools}>
       <p className="muted"><StateBadge labels={CONFIDENCES} state={group.confidence} /> {group.explanation}</p>
-      <DataTable caption="Tracks in this group" columns={MEMBER_COLUMNS} rows={group.members} row_key={(member) => String(member.trackId)} column_hiding={false} />
+      <DataTable caption="Tracks in this group" columns={MEMBER_COLUMNS} rows={group.members} row_key={(member) => String(member.track_id)} column_hiding={false} />
     </Section>
   )
 }
@@ -120,7 +120,7 @@ export function DuplicatesPanel() {
   async function quick_merge(group: DuplicateGroup): Promise<void> {
     set_working((now) => ({ ...now, [group.key]: true }))
     try {
-      const ids = group.members.map((member) => member.trackId)
+      const ids = group.members.map((member) => member.track_id)
       const preview = await ipc('get_merge_preview', ids)
       const result = await ipc('merge_tracks', ids, preview.survivor)
       set_merges((now) => ({ ...now, [group.key]: result }))
@@ -136,7 +136,7 @@ export function DuplicatesPanel() {
   async function undo(key: string, result: MergeResult): Promise<void> {
     set_working((now) => ({ ...now, [key]: true }))
     try {
-      await ipc('undo_merge', result.batchId)
+      await ipc('undo_merge', result.batch_id)
       set_merges(({ [key]: _undone, ...rest }) => rest)
       await library.refresh()
     } catch (failure) {
@@ -184,7 +184,7 @@ export function DuplicatesPanel() {
               merged={merges[group.key] !== undefined}
               working={working[group.key] ?? false}
               on_quick_merge={() => void quick_merge(group)}
-              on_review={() => set_reviewing(group.members.map((member) => member.trackId))}
+              on_review={() => set_reviewing(group.members.map((member) => member.track_id))}
             />
           ))}
         </>

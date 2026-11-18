@@ -50,16 +50,16 @@ export function import_gmbrc(database: SqlDatabase, data: GmbrcData, opts: Impor
   const with_playlists = opts.playlists ?? true
 
   const report: ImportReport = {
-    songsRead: data.songs.length,
-    tracksCreated: 0,
-    tracksUpdated: 0,
-    mediaMatched: 0,
-    mediaCreated: 0,
-    missingFlagged: 0,
-    playHistoryRows: 0,
-    playlistsCreated: 0,
-    savedFiltersFound: data.saved_filters.length,
-    unmappedColumns: data.unmapped_columns,
+    songs_read: data.songs.length,
+    tracks_created: 0,
+    tracks_updated: 0,
+    media_matched: 0,
+    media_created: 0,
+    missing_flagged: 0,
+    play_history_rows: 0,
+    playlists_created: 0,
+    saved_filters_found: data.saved_filters.length,
+    unmapped_columns: data.unmapped_columns,
     notes: []
   }
 
@@ -117,18 +117,18 @@ export function import_gmbrc(database: SqlDatabase, data: GmbrcData, opts: Impor
         present: !song.missing
       }, { statistics: with_stats, metadata: true })
 
-      if (result.created) report.tracksCreated++
-      else report.tracksUpdated++
-      if (result.matched_by === 'uri' || result.matched_by === 'audio_hash') report.mediaMatched++
-      else report.mediaCreated++
-      if (song.missing) report.missingFlagged++
+      if (result.created) report.tracks_created++
+      else report.tracks_updated++
+      if (result.matched_by === 'uri' || result.matched_by === 'audio_hash') report.media_matched++
+      else report.media_created++
+      if (song.missing) report.missing_flagged++
 
       track_by_gmb_id.set(song.gmb_id, result.track_id)
 
       if (with_stats) {
         for (const at of song.play_history) {
           run(database, 'INSERT OR IGNORE INTO play_history (id, track_id, at, kind) VALUES (?, ?, ?, 0)', new_id(), result.track_id, at * 1000)
-          report.playHistoryRows++
+          report.play_history_rows++
         }
       }
     }
@@ -151,7 +151,7 @@ export function import_gmbrc(database: SqlDatabase, data: GmbrcData, opts: Impor
             run(database, 'INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)', playlist_id, track_id, position++)
           }
         }
-        report.playlistsCreated++
+        report.playlists_created++
       }
     }
 
@@ -164,9 +164,9 @@ export function import_gmbrc(database: SqlDatabase, data: GmbrcData, opts: Impor
       'strings map onto the X-Music filter AST, which is a separate import step (DESIGN-SPEC 9.3).'
     )
   }
-  if (report.missingFlagged > 0) {
+  if (report.missing_flagged > 0) {
     report.notes.push(
-      `${report.missingFlagged} files were flagged missing by gmusicbrowser. Their tracks were ` +
+      `${report.missing_flagged} files were flagged missing by gmusicbrowser. Their tracks were ` +
       'imported with the media marked not present, so ratings and history are preserved.'
     )
   }

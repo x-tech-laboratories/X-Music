@@ -117,7 +117,7 @@ describe('navigation', () => {
   })
 
   it('puts the cursor in the library\'s search on /', async () => {
-    install_bridge({ get_library_stats: { tracks: 1, media: 1, albums: 1, missing: 0, totalMs: 1000, schemaVersion: 1, path: '/tmp/x.db' } })
+    install_bridge({ get_library_stats: { tracks: 1, media: 1, albums: 1, missing: 0, total_ms: 1000, schema_version: 1, path: '/tmp/x.db' } })
     render(<App />)
     const search = await screen.findByRole('searchbox', { name: 'Search the library' })
 
@@ -127,7 +127,7 @@ describe('navigation', () => {
   })
 
   it('shows no placeholder tabs for features still to come', async () => {
-    install_bridge({ get_library_stats: { tracks: 1, media: 1, albums: 1, missing: 0, totalMs: 1000, schemaVersion: 1, path: '/tmp/x.db' } })
+    install_bridge({ get_library_stats: { tracks: 1, media: 1, albums: 1, missing: 0, total_ms: 1000, schema_version: 1, path: '/tmp/x.db' } })
     render(<App />)
 
     await screen.findByRole('heading', { level: 1, name: 'Library' })
@@ -155,7 +155,7 @@ describe('library view', () => {
     install_bridge({
       'get_library_stats': () => {
         if (fails) throw new Error('database is locked')
-        return { tracks: 0, media: 0, albums: 0, missing: 0, totalMs: 0, schemaVersion: 1, path: '/tmp/x.db' }
+        return { tracks: 0, media: 0, albums: 0, missing: 0, total_ms: 0, schema_version: 1, path: '/tmp/x.db' }
       }
     })
     render(<App />)

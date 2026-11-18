@@ -34,7 +34,7 @@ import { SettingsView, type Density } from './views/SettingsView.tsx'
 const SEEK_STEP_IN_MILLISECONDS = 10_000
 
 const seek_by = (step: number): void => {
-  const duration = player.status?.durationMs ?? null
+  const duration = player.status?.duration_ms ?? null
   if (duration === null) return
   void player.seek(Math.min(duration, Math.max(0, player.position_ms + step)))
 }
@@ -54,7 +54,7 @@ function StatusBar() {
       <span>{plural(stats.media, 'file')}</span>
       <span>{plural(stats.albums, 'album')}</span>
       {stats.missing > 0 && <span className="tone-warn">{stats.missing.toLocaleString()} missing</span>}
-      <span>{format_duration(stats.totalMs / 1000, { largest_unit: 'days' })}</span>
+      <span>{format_duration(stats.total_ms / 1000, { largest_unit: 'days' })}</span>
     </>
   )
 }

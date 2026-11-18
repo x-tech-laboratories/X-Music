@@ -99,8 +99,8 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
     // Reads and parses without writing anything, so the user can see what an import would do.
     get_gmbrc_preview: (path) => {
       if (!existsSync(path)) {
-        return { path, exists: false, songs: 0, savedFilters: 0, savedLists: 0,
-                 playHistoryEntries: 0, unmappedColumns: [] }
+        return { path, exists: false, songs: 0, saved_filters: 0, saved_lists: 0,
+                 play_history_entries: 0, unmapped_columns: [] }
       }
       try {
         const data = parse_gmbrc(readFileSync(path, 'utf8'))
@@ -108,16 +108,16 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
           path,
           exists: true,
           version: data.version,
-          baseFolder: data.base_folder,
+          base_folder: data.base_folder,
           songs: data.songs.length,
-          savedFilters: data.saved_filters.length,
-          savedLists: data.saved_lists.length,
-          playHistoryEntries: data.songs.reduce((n, s) => n + s.play_history.length, 0),
-          unmappedColumns: data.unmapped_columns
+          saved_filters: data.saved_filters.length,
+          saved_lists: data.saved_lists.length,
+          play_history_entries: data.songs.reduce((n, s) => n + s.play_history.length, 0),
+          unmapped_columns: data.unmapped_columns
         }
       } catch (err) {
-        return { path, exists: true, songs: 0, savedFilters: 0, savedLists: 0,
-                 playHistoryEntries: 0, unmappedColumns: [], error: (err as Error).message }
+        return { path, exists: true, songs: 0, saved_filters: 0, saved_lists: 0,
+                 play_history_entries: 0, unmapped_columns: [], error: (err as Error).message }
       }
     },
 
@@ -208,7 +208,7 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
 
     undo_merge: (batch_id) => unmerge(db, batch_id),
 
-    list_duplicates: (reasons, length_tolerance_ms, limit) => find_duplicates(db, { reasons, lengthToleranceMs: length_tolerance_ms, limit }),
+    list_duplicates: (reasons, length_tolerance_ms, limit) => find_duplicates(db, { reasons, length_tolerance_ms, limit }),
 
     // Clearing replaces the whole library, so a backup is taken first and the clear is refused if it fails.
     clear_library: async () => {

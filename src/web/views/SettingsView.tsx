@@ -58,7 +58,7 @@ function LibraryDatabase() {
     plural(stats.tracks, 'track'),
     plural(stats.media, 'file'),
     plural(stats.albums, 'album'),
-    format_duration(stats.totalMs / 1000, { largest_unit: 'days' }),
+    format_duration(stats.total_ms / 1000, { largest_unit: 'days' }),
     ...(stats.missing > 0 ? [`${stats.missing.toLocaleString()} missing`] : [])
   ].join(' · ')
 

@@ -18,7 +18,7 @@ describe('field catalogue', () => {
   it('gives every multi and extra field a stable numeric id', () => {
     for (const d of BUILTIN_FIELDS) {
       if (d.storage === 'multi' || d.storage === 'extra') {
-        expect(d.field_id, `${d.id} needs a fieldId`).toBeTypeOf('number')
+        expect(d.field_id, `${d.id} needs a field_id`).toBeTypeOf('number')
       }
     }
   })

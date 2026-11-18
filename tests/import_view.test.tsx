@@ -15,13 +15,13 @@ import { install_bridge, type Call } from './bridge.ts'
 const fixture_path = '/tmp/x-music-fixture/gmbrc'
 
 const preview: GmbPreview = {
-  path: fixture_path, exists: true, version: '1.1.16', baseFolder: '/tmp/x-music-fixture/music',
-  songs: 1234, savedFilters: 2, savedLists: 3, playHistoryEntries: 5678, unmappedColumns: []
+  path: fixture_path, exists: true, version: '1.1.16', base_folder: '/tmp/x-music-fixture/music',
+  songs: 1234, saved_filters: 2, saved_lists: 3, play_history_entries: 5678, unmapped_columns: []
 }
 
 const report: ImportReport = {
-  songsRead: 1234, tracksCreated: 1200, tracksUpdated: 0, mediaCreated: 1234, mediaMatched: 0, missingFlagged: 0, playHistoryRows: 5678,
-  playlistsCreated: 3, savedFiltersFound: 2, unmappedColumns: [], notes: ['34 songs were already in the library.']
+  songs_read: 1234, tracks_created: 1200, tracks_updated: 0, media_created: 1234, media_matched: 0, missing_flagged: 0, play_history_rows: 5678,
+  playlists_created: 3, saved_filters_found: 2, unmapped_columns: [], notes: ['34 songs were already in the library.']
 }
 
 let calls: Call[] = []

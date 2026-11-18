@@ -81,8 +81,8 @@ export async function scan_roots(
   const excludes = new Set([...DEFAULT_EXCLUDES, ...(opts.exclude_dirs ?? [])])
 
   const report: ScanReport = {
-    filesFound: 0, filesRead: 0, filesSkipped: 0, tracksCreated: 0, tracksMatched: 0,
-    movesDetected: 0, markedMissing: 0, errors: [], durationMs: 0
+    files_found: 0, files_read: 0, files_skipped: 0, tracks_created: 0, tracks_matched: 0,
+    moves_detected: 0, marked_missing: 0, errors: [], duration_ms: 0
   }
 
   // Collect first so the total is known and progress can be honest about how far along it is.
@@ -96,7 +96,7 @@ export async function scan_roots(
       if (opts.signal?.aborted) break
     }
   }
-  report.filesFound = files.length
+  report.files_found = files.length
 
   const upsert = create_upserter(db)
   const seen = new Set<string>()
@@ -118,18 +118,18 @@ export async function scan_roots(
           // Tags are not authoritative for X-Music's own statistics.
           const result = upsert(track, media, { statistics: false, metadata: true })
           seen.add(result.media_id)
-          report.filesRead++
+          report.files_read++
           const detail = `matched by ${result.matched_by === 'audio_hash' ? 'audio content' : result.matched_by}`
           if (result.created) {
-            report.tracksCreated++
-            opts.on_file?.({ path, outcome: 'new', trackId: result.track_id })
+            report.tracks_created++
+            opts.on_file?.({ path, outcome: 'new', track_id: result.track_id })
           } else if (result.moved) {
-            report.movesDetected++
-            report.tracksMatched++
-            opts.on_file?.({ path, outcome: 'moved', trackId: result.track_id, detail })
+            report.moves_detected++
+            report.tracks_matched++
+            opts.on_file?.({ path, outcome: 'moved', track_id: result.track_id, detail })
           } else {
-            report.tracksMatched++
-            opts.on_file?.({ path, outcome: 'matched', trackId: result.track_id, detail })
+            report.tracks_matched++
+            opts.on_file?.({ path, outcome: 'matched', track_id: result.track_id, detail })
           }
         } catch (err) {
           const message = (err as Error).message
@@ -146,7 +146,7 @@ export async function scan_roots(
 
     if (i % 25 === 0) {
       opts.on_progress?.({
-        phase: 'reading', found: files.length, processed: i, currentPath: path
+        phase: 'reading', found: files.length, processed: i, current_path: path
       })
     }
 
@@ -161,7 +161,7 @@ export async function scan_roots(
       if (hit && (opts.slow || !needs_rehash(path, hit.algo))) {
         touched.push(hit.id)
         seen.add(hit.id)
-        report.filesSkipped++
+        report.files_skipped++
         opts.on_file?.({ path, outcome: 'unchanged' })
         continue
       }
@@ -237,7 +237,7 @@ export async function scan_roots(
         const under_root = roots.some((r) => m.uri.startsWith(r.endsWith('/') ? r : `${r}/`))
         if (under_root && !seen.has(m.id)) {
           run(db, 'UPDATE media SET present = 0 WHERE id = ?', m.id)
-          report.markedMissing++
+          report.marked_missing++
           opts.on_file?.({ path: m.uri, outcome: 'missing', detail: 'no longer on disk' })
         }
       }
@@ -246,6 +246,6 @@ export async function scan_roots(
 
   in_transaction(db, () => regroup_albums(db))
 
-  report.durationMs = Date.now() - started
+  report.duration_ms = Date.now() - started
   return report
 }

@@ -56,8 +56,8 @@ export function library_stats(database: SqlDatabase, path: string): LibraryStats
     media: db.select({ total: count() }).from(media).get()!.total,
     albums: db.select({ total: count() }).from(albums).get()!.total,
     missing: db.select({ total: count() }).from(media).where(eq(media.present, 0)).get()!.total,
-    totalMs: Number(db.select({ total: sum(tracks.length_ms) }).from(tracks).get()!.total ?? 0),
-    schemaVersion: schema_version(database),
+    total_ms: Number(db.select({ total: sum(tracks.length_ms) }).from(tracks).get()!.total ?? 0),
+    schema_version: schema_version(database),
     path
   }
 }
@@ -88,7 +88,7 @@ const as_root = (row: typeof roots.$inferSelect): Root => ({
   path: row.path,
   enabled: row.enabled === 1,
   slow: row.slow === 1,
-  lastScan: row.last_scan
+  last_scan: row.last_scan
 })
 
 export function list_roots(database: SqlDatabase): Root[] {

@@ -14,7 +14,7 @@ import { media, play_history } from './schema.ts'
 export function get_player_track(database: SqlDatabase, track_id: string): PlayerTrack | null {
   const row = first_row<PlayerTrack>(
     database,
-    `SELECT t.id, t.title, t.length_ms AS lengthMs, t.rating,
+    `SELECT t.id, t.title, t.length_ms, t.rating,
        (SELECT a.name FROM albums a WHERE a.id = t.album_id) AS album,
        (SELECT vv.value FROM track_values tv JOIN values_ vv ON vv.id = tv.value_id
          WHERE tv.track_id = t.id AND tv.field_id = 1 ORDER BY tv.ordinal LIMIT 1) AS artist
@@ -28,18 +28,18 @@ export interface PlayableFile {
   id: string
   uri: string
   present: number
-  startMs: number | null
-  endMs: number | null
-  trackGain: number | null
-  albumGain: number | null
+  start_ms: number | null
+  end_ms: number | null
+  track_gain: number | null
+  album_gain: number | null
 }
 
 // A track's files, the ones last seen and best first.
 export function list_playable_files(database: SqlDatabase, track_id: string): PlayableFile[] {
   return all_rows<PlayableFile>(
     database,
-    `SELECT m.id, m.uri, m.present, m.start_ms AS startMs, m.end_ms AS endMs,
-            t.rg_track_gain AS trackGain, t.rg_album_gain AS albumGain
+    `SELECT m.id, m.uri, m.present, m.start_ms, m.end_ms,
+            t.rg_track_gain AS track_gain, t.rg_album_gain AS album_gain
      FROM media m JOIN tracks t ON t.id = m.track_id
      WHERE m.track_id = ? AND m.kind = 'file'
      ORDER BY m.present DESC, m.quality_rank DESC, m.added, m.id`,

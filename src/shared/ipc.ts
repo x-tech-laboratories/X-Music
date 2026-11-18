@@ -25,8 +25,8 @@ export interface LibraryStats {
   media: number
   albums: number
   missing: number
-  totalMs: number
-  schemaVersion: number
+  total_ms: number
+  schema_version: number
   path: string
 }
 
@@ -60,26 +60,26 @@ export interface GmbPreview {
   path: string
   exists: boolean
   version?: string
-  baseFolder?: string
+  base_folder?: string
   songs: number
-  savedFilters: number
-  savedLists: number
-  playHistoryEntries: number
-  unmappedColumns: string[]
+  saved_filters: number
+  saved_lists: number
+  play_history_entries: number
+  unmapped_columns: string[]
   error?: string
 }
 
 export interface ImportReport {
-  songsRead: number
-  tracksCreated: number
-  tracksUpdated: number
-  mediaMatched: number
-  mediaCreated: number
-  missingFlagged: number
-  playHistoryRows: number
-  playlistsCreated: number
-  savedFiltersFound: number
-  unmappedColumns: string[]
+  songs_read: number
+  tracks_created: number
+  tracks_updated: number
+  media_matched: number
+  media_created: number
+  missing_flagged: number
+  play_history_rows: number
+  playlists_created: number
+  saved_filters_found: number
+  unmapped_columns: string[]
   notes: string[]
 }
 
@@ -88,14 +88,14 @@ export interface Root {
   path: string
   enabled: boolean
   slow: boolean
-  lastScan: number | null
+  last_scan: number | null
 }
 
 export interface ScanProgress {
   phase: 'walking' | 'reading' | 'finishing'
   found: number
   processed: number
-  currentPath?: string
+  current_path?: string
 }
 
 export type FileOutcome = 'new' | 'matched' | 'moved' | 'unchanged' | 'error' | 'missing'
@@ -105,19 +105,19 @@ export interface FileResult {
   outcome: FileOutcome
   // Why, for errors; the previous path, for moves.
   detail?: string
-  trackId?: string
+  track_id?: string
 }
 
 export interface ScanReport {
-  filesFound: number
-  filesRead: number
-  filesSkipped: number
-  tracksCreated: number
-  tracksMatched: number
-  movesDetected: number
-  markedMissing: number
+  files_found: number
+  files_read: number
+  files_skipped: number
+  tracks_created: number
+  tracks_matched: number
+  moves_detected: number
+  marked_missing: number
   errors: { path: string; message: string }[]
-  durationMs: number
+  duration_ms: number
 }
 
 export type RepeatMode = 'off' | 'all' | 'one'
@@ -127,32 +127,32 @@ export interface PlayerTrack {
   title: string | null
   artist: string | null
   album: string | null
-  lengthMs: number | null
+  length_ms: number | null
   rating: number | null
 }
 
 export interface PlayerMedia {
   id: string
   uri: string
-  startMs: number | null
-  endMs: number | null
-  gainDb: number | null
+  start_ms: number | null
+  end_ms: number | null
+  gain_db: number | null
 }
 
 export interface PlayerStatus {
   state: 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error'
   track: PlayerTrack | null
   media: PlayerMedia | null
-  positionMs: number
-  durationMs: number | null
+  position_ms: number
+  duration_ms: number | null
   volume: number
   repeat: RepeatMode
   shuffle: boolean
   // Tracks explicitly queued, which drain before the standing context.
   queue: string[]
   // The list the player walks when the queue is empty.
-  contextLength: number
-  contextIndex: number
+  context_length: number
+  context_index: number
   error?: string
 }
 
@@ -174,7 +174,7 @@ export interface XMusicApi {
   list_duplicates: (reasons?: DuplicateReason[], length_tolerance_ms?: number, limit?: number) => DuplicateGroup[]
   get_merge_preview: (track_ids: string[]) => MergePreview
   merge_tracks: (track_ids: string[], survivor_id: string, resolutions?: Record<string, Resolution>) => MergeResult
-  undo_merge: (batch_id: string) => { batchId: string; restored: string[]; survivor: string }
+  undo_merge: (batch_id: string) => { batch_id: string; restored: string[]; survivor: string }
   list_folders: () => Root[]
   add_folder: (path: string) => Root
   remove_folder: (folder_id: string) => { removed: boolean }
@@ -230,7 +230,7 @@ export type XMusicEvents = {
   scan_done: ScanReport
   player_status: PlayerStatus
   // Throttled; the UI interpolates between ticks rather than being fed every frame.
-  player_position: { positionMs: number; durationMs: number | null }
+  player_position: { position_ms: number; duration_ms: number | null }
   // The library changed outside the window, through the MCP server.
   changed: null
 }

@@ -59,23 +59,23 @@ export interface MergePreview {
   fields: PreviewField[]
   media: PreviewMedia[]
   statistics: {
-    playCount: number
-    skipCount: number
+    play_count: number
+    skip_count: number
     rating: number | null
-    firstPlayed: number | null
-    lastPlayed: number | null
+    first_played: number | null
+    last_played: number | null
   }
   // True when at least one source is pinned; merging overrides a human decision.
-  pinnedSources: string[]
+  pinned_sources: string[]
 }
 
 export interface MergeResult {
-  batchId: string
+  batch_id: string
   survivor: string
   absorbed: string[]
-  mediaMoved: number
-  historyMoved: number
-  playlistEntriesRepointed: number
+  media_moved: number
+  history_moved: number
+  playlist_entries_repointed: number
 }
 
 // Scalar fields offered for resolution, in the order a person reads them.
@@ -220,9 +220,9 @@ export function merge_preview(database: SqlDatabase, ids: readonly string[]): Me
       : { field: field_id, name: d.name, multi: false, conflict: false, value: first })
   }
 
-  for (const fieldId of MULTI_FIELDS) {
-    const d = field(fieldId)
-    const options = rows.map((r) => ({ from: r.id, value: sets.get(r.id)?.get(fieldId) ?? [] }))
+  for (const field_id of MULTI_FIELDS) {
+    const d = field(field_id)
+    const options = rows.map((r) => ({ from: r.id, value: sets.get(r.id)?.get(field_id) ?? [] }))
     const union = [...new Set(options.flatMap((o) => o.value as string[]))]
     const non_empty = options.filter((o) => (o.value as string[]).length > 0)
 
@@ -231,20 +231,20 @@ export function merge_preview(database: SqlDatabase, ids: readonly string[]): Me
       !non_empty.every((o) => same_set(o.value as string[], first_set))
 
     fields.push(conflict
-      ? { field: fieldId, name: d.name, multi: true, conflict: true, options, union }
-      : { field: fieldId, name: d.name, multi: true, conflict: false, value: first_set, union })
+      ? { field: field_id, name: d.name, multi: true, conflict: true, options, union }
+      : { field: field_id, name: d.name, multi: true, conflict: false, value: first_set, union })
   }
 
-  for (const fieldId of EXTRA_FIELDS) {
-    const d = field(fieldId)
-    const options = rows.map((r) => ({ from: r.id, value: extras.get(r.id)?.get(fieldId) ?? null }))
+  for (const field_id of EXTRA_FIELDS) {
+    const d = field(field_id)
+    const options = rows.map((r) => ({ from: r.id, value: extras.get(r.id)?.get(field_id) ?? null }))
     const present = options.filter((o) => o.value !== null && o.value !== '')
     const first = present[0]?.value ?? null
     const conflict = present.length > 1 && !present.every((o) => o.value === first)
 
     fields.push(conflict
-      ? { field: fieldId, name: d.name, multi: false, conflict: true, options }
-      : { field: fieldId, name: d.name, multi: false, conflict: false, value: first })
+      ? { field: field_id, name: d.name, multi: false, conflict: true, options }
+      : { field: field_id, name: d.name, multi: false, conflict: false, value: first })
   }
 
   const media = all_rows<{ id: string; track_id: string; uri: string; codec: string | null; bitrate: number | null; present: number }>(
@@ -265,14 +265,14 @@ export function merge_preview(database: SqlDatabase, ids: readonly string[]): Me
       bitrate: m.bitrate, present: !!m.present
     })),
     statistics: {
-      playCount: rows.reduce((n, r) => n + r.play_count, 0),
-      skipCount: rows.reduce((n, r) => n + r.skip_count, 0),
+      play_count: rows.reduce((n, r) => n + r.play_count, 0),
+      skip_count: rows.reduce((n, r) => n + r.skip_count, 0),
       // A deliberate rating must not be lost to an unrated duplicate.
       rating: ratings.length ? Math.max(...ratings) : null,
-      firstPlayed: first_played.length ? Math.min(...first_played) : null,
-      lastPlayed: last_played.length ? Math.max(...last_played) : null
+      first_played: first_played.length ? Math.min(...first_played) : null,
+      last_played: last_played.length ? Math.max(...last_played) : null
     },
-    pinnedSources: rows.filter((r) => r.pinned === 1).map((r) => r.id)
+    pinned_sources: rows.filter((r) => r.pinned === 1).map((r) => r.id)
   }
 }
 
@@ -416,7 +416,7 @@ export function merge_tracks(database: SqlDatabase, req: MergeRequest): MergeRes
                         last_played = ?, last_skipped = ?, added = ?,
                         pinned = 1, identity_source = 'manual', modified = ?
       WHERE id = ?`,
-      stats.rating, stats.playCount, stats.skipCount, stats.firstPlayed, stats.lastPlayed,
+      stats.rating, stats.play_count, stats.skip_count, stats.first_played, stats.last_played,
       last_skipped.length ? Math.max(...last_skipped) : null, added, now, req.survivor)
 
     // ── remove the absorbed tracks ───────────────────────────────────────────
@@ -426,12 +426,12 @@ export function merge_tracks(database: SqlDatabase, req: MergeRequest): MergeRes
     run(database, 'INSERT INTO merge_journal (id, batch_id, at, survivor_id, snapshot) VALUES (?, ?, ?, ?, ?)',
       new_id(), batch_id, now, req.survivor, JSON.stringify(before))
 
-    return { batchId: batch_id, survivor: req.survivor, absorbed, mediaMoved: media_moved, historyMoved: history_moved, playlistEntriesRepointed: playlist_entries_repointed }
+    return { batch_id, survivor: req.survivor, absorbed, media_moved, history_moved, playlist_entries_repointed }
   })
 }
 
 export interface UnmergeResult {
-  batchId: string
+  batch_id: string
   restored: string[]
   survivor: string
 }
@@ -509,7 +509,7 @@ export function unmerge(database: SqlDatabase, batch_id: string): UnmergeResult 
 
     run(database, 'UPDATE merge_journal SET undone = 1 WHERE batch_id = ?', batch_id)
 
-    return { batchId: batch_id, restored, survivor }
+    return { batch_id, restored, survivor }
   })
 }
 

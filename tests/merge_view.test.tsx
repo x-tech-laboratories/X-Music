@@ -22,11 +22,11 @@ const preview: MergePreview = {
     { id: 'file-1', from: 'track-11', uri: '/music/a.flac', codec: 'flac', bitrate: 900, present: true },
     { id: 'file-2', from: 'track-12', uri: '/music/b.mp3', codec: 'mp3', bitrate: 320, present: false }
   ],
-  statistics: { playCount: 4, skipCount: 1, rating: 60, firstPlayed: null, lastPlayed: null },
-  pinnedSources: []
+  statistics: { play_count: 4, skip_count: 1, rating: 60, first_played: null, last_played: null },
+  pinned_sources: []
 }
 
-const result: MergeResult = { batchId: 'batch-1', survivor: 'track-11', absorbed: ['track-12'], mediaMoved: 1, historyMoved: 0, playlistEntriesRepointed: 0 }
+const result: MergeResult = { batch_id: 'batch-1', survivor: 'track-11', absorbed: ['track-12'], media_moved: 1, history_moved: 0, playlist_entries_repointed: 0 }
 
 afterEach(cleanup)
 

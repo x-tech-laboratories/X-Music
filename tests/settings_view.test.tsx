@@ -40,7 +40,7 @@ describe('settings view', () => {
   })
 
   it('shows the library database and the version', () => {
-    results.update((before) => ({ ...before, stats: { tracks: 1200, media: 1300, albums: 90, missing: 0, totalMs: 3_600_000, schemaVersion: 1, path: '/tmp/x-music-test.db' } }))
+    results.update((before) => ({ ...before, stats: { tracks: 1200, media: 1300, albums: 90, missing: 0, total_ms: 3_600_000, schema_version: 1, path: '/tmp/x-music-test.db' } }))
     render(<SettingsView info={info} density="normal" on_density={() => undefined} />)
 
     expect(screen.getByText('/tmp/x-music-test.db')).toBeTruthy()
