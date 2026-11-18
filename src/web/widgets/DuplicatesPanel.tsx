@@ -11,7 +11,7 @@ import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
 import { is_number_in } from '@x-tech-laboratories/x-libs/web/prefs'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import { rating_to_stars } from '@shared/fields'
 import type { DuplicateGroup, DuplicateMember, DuplicateReason, MergeResult } from '@shared/ipc'
@@ -127,7 +127,7 @@ export function DuplicatesPanel() {
       toast(`Merged ${plural(ids.length, 'track')} into one`, { tone: 'good', duration_in_milliseconds: UNDO_TOAST_IN_MILLISECONDS, action: { text: 'Undo', run: () => void undo(group.key, result) } })
       await library.refresh()
     } catch (failure) {
-      toast(`Could not merge: ${describe_error(failure)}`, { tone: 'bad' })
+      toast(`Could not merge: ${describe_call_error(failure)}`, { tone: 'bad' })
     } finally {
       set_working((now) => ({ ...now, [group.key]: false }))
     }
@@ -140,7 +140,7 @@ export function DuplicatesPanel() {
       set_merges(({ [key]: _undone, ...rest }) => rest)
       await library.refresh()
     } catch (failure) {
-      toast(`Could not undo the merge: ${describe_error(failure)}`, { tone: 'bad' })
+      toast(`Could not undo the merge: ${describe_call_error(failure)}`, { tone: 'bad' })
     } finally {
       set_working((now) => ({ ...now, [key]: false }))
     }

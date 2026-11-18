@@ -8,8 +8,7 @@ import { LocalMcpSettings } from '@x-tech-laboratories/x-libs/web/react/local_mc
 import { Facts, PageHeading, SettingRow, SettingsPage, type SettingsCategory } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
-import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge'
+import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { format_duration } from '@x-tech-laboratories/x-libs/durations'
 import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { Theme } from '@x-tech-laboratories/x-libs/web/theme'
@@ -92,7 +91,7 @@ function HistoryKeeping() {
       await window.xMusicHistory.set_history_keep_days(next)
     } catch (error) {
       set_days(before)
-      toast(`Could not change how long changes are kept: ${clean_error_message(describe_error(error))}`, { tone: 'bad' })
+      toast(`Could not change how long changes are kept: ${describe_call_error(error)}`, { tone: 'bad' })
     }
   }
 

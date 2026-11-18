@@ -9,7 +9,7 @@ import { Empty, Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/rea
 import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { Age } from '@x-tech-laboratories/x-libs/web/react/time'
 import { format_duration } from '@x-tech-laboratories/x-libs/durations'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { FileOutcome, FileResult, Root, ScanProgress, ScanReport } from '@shared/ipc'
 import { ipc, page_ipc } from '../lib/ipc.ts'
@@ -131,7 +131,7 @@ export function ScanPanel() {
       await ipc('add_folder', path)
       await roots.reload(true)
     } catch (failure) {
-      set_error(describe_error(failure))
+      set_error(describe_call_error(failure))
     }
   }
 
@@ -141,7 +141,7 @@ export function ScanPanel() {
       await ipc('remove_folder', root.id)
       await roots.reload(true)
     } catch (failure) {
-      set_error(describe_error(failure))
+      set_error(describe_call_error(failure))
     }
   }
 
@@ -154,7 +154,7 @@ export function ScanPanel() {
     try {
       await ipc('scan_folders')
     } catch (failure) {
-      set_error(describe_error(failure))
+      set_error(describe_call_error(failure))
       set_scanning(false)
       set_progress(null)
     }

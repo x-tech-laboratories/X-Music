@@ -5,7 +5,7 @@ import { PathInput, Switch } from '@x-tech-laboratories/x-libs/web/react/control
 import { Facts, FormRow, Section, SettingRow, Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { GmbPreview, ImportReport } from '@shared/ipc'
 import { ipc, page_ipc } from '../lib/ipc.ts'
@@ -85,7 +85,7 @@ export function GmbImport() {
   const [error, set_error] = useState<string | null>(null)
 
   useEffect(() => {
-    ipc('get_default_gmbrc_path').then(set_path, (failure: unknown) => set_error(describe_error(failure)))
+    ipc('get_default_gmbrc_path').then(set_path, (failure: unknown) => set_error(describe_call_error(failure)))
   }, [])
 
   useEffect(() => {
@@ -102,7 +102,7 @@ export function GmbImport() {
       toast(`Imported ${plural(done.tracks_created, 'track')}`, { tone: 'good', link: { href: view_href('library'), text: 'Show the library' } })
       await library.refresh()
     } catch (failure) {
-      set_error(describe_error(failure))
+      set_error(describe_call_error(failure))
     } finally {
       set_busy(false)
     }

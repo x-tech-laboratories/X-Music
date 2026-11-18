@@ -15,8 +15,7 @@ import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { is_boolean } from '@x-tech-laboratories/x-libs/web/prefs'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
-import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge'
+import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { rating_to_stars } from '@shared/fields'
 import { ipc } from '../lib/ipc.ts'
 import { library } from '../stores/library.ts'
@@ -58,8 +57,6 @@ function resolutions_for(preview: MergePreview, survivor: string, choices: Merge
   return resolutions
 }
 
-const failure = (error: unknown): string => clean_error_message(describe_error(error))
-
 // ============================================================================
 // Undo
 // ============================================================================
@@ -71,7 +68,7 @@ export async function undo_merge(batch_id: string, on_undone?: () => void): Prom
     on_undone?.()
     toast('Merge undone', { tone: 'good' })
   } catch (error) {
-    toast(`Could not undo the merge: ${failure(error)}`, { tone: 'bad' })
+    toast(`Could not undo the merge: ${describe_call_error(error)}`, { tone: 'bad' })
   }
 }
 
@@ -178,7 +175,7 @@ export function MergeView({ ids, on_close, on_undone }: MergeViewProps) {
       })
       on_close?.(true)
     } catch (error) {
-      toast(`Could not merge: ${failure(error)}`, { tone: 'bad' })
+      toast(`Could not merge: ${describe_call_error(error)}`, { tone: 'bad' })
       set_busy(false)
     }
   }

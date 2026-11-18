@@ -9,8 +9,7 @@ import { PageHeading, Toolbar } from '@x-tech-laboratories/x-libs/web/react/layo
 import { Empty, Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
-import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { MergeEntry, TrackSnapshot, TrackState, Version, VersionKind } from '@shared/ipc'
@@ -38,8 +37,6 @@ const merge_labels: Record<'merged' | 'undone', [text: string, tone: Tone]> = {
 }
 
 const when = (milliseconds: number): string => new Date(milliseconds).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-
-const failure = (error: unknown): string => clean_error_message(describe_error(error))
 
 const ARTIST_FIELD = BUILTIN_FIELDS.find((field) => field.id === 'artist')!.field_id!
 
@@ -171,7 +168,7 @@ function restore(version: TrackVersion, on_done: () => void): void {
         toast(`${name} is back as it was`, { tone: 'good' })
         on_done()
       } catch (error) {
-        toast(`Could not restore ${name}: ${failure(error)}`, { tone: 'bad' })
+        toast(`Could not restore ${name}: ${describe_call_error(error)}`, { tone: 'bad' })
       }
     }
   })

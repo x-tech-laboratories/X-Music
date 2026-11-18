@@ -110,13 +110,13 @@ describe('folders view', () => {
     expect(within(filter).getByRole('radio', { name: 'Failed 1' }).getAttribute('aria-checked')).toBe('true')
   })
 
-  it('says why a scan could not start', async () => {
-    install_bridge({ 'list_folders': roots, 'scan_folders': () => { throw new Error('a scan is already running') } })
+  it('says why a scan could not start, without the bridge\'s own wording', async () => {
+    install_bridge({ 'list_folders': roots, 'scan_folders': () => { throw new Error("Error invoking remote method 'scan_folders': Error: a scan is already running") } })
     render(<FoldersView />)
 
     await screen.findByRole('table', { name: 'Music folders' })
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Scan now' })))
 
-    expect(screen.getByRole('alert').textContent).toContain('a scan is already running')
+    expect(screen.getByRole('alert').textContent).toBe('a scan is already running')
   })
 })
