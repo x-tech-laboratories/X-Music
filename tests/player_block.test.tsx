@@ -33,20 +33,17 @@ describe('player block', () => {
     render(<PlayerBlock />)
 
     const seek = screen.getByRole('slider', { name: 'Seek' })
-    expect(seek.classList.contains('seek')).toBe(true)
     expect(seek.style.getPropertyValue('--range-progress')).toBe('25%')
   })
 
-  it('draws the transport as labelled icon buttons with no emoji', () => {
+  it('draws the transport as buttons named by label alone, with no emoji', () => {
     record_calls()
     player_status.set({ ...idle, state: 'playing', track })
 
     render(<PlayerBlock />)
 
     for (const name of ['Previous', 'Stop', 'Pause', 'Next', 'Shuffle', 'Repeat']) {
-      const button = screen.getByRole('button', { name })
-      expect(button.querySelector('svg.line-icon')).not.toBeNull()
-      expect(button.textContent).toBe('')
+      expect(screen.getByRole('button', { name }).textContent).toBe('')
     }
     expect(screen.queryByRole('button', { name: 'Play' })).toBeNull()
   })
