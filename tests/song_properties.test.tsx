@@ -38,7 +38,7 @@ afterEach(cleanup)
 
 describe('song properties', () => {
   it('lays the overview out as facts under section headings', async () => {
-    record_calls({ 'get_track': details, 'get_cover_url': { url: null, source: 'none' } })
+    record_calls({ 'get_track': details, 'cache_cover': { url: null, source: 'none' } })
 
     render(<SongProperties track_id="track-7" on_close={() => undefined} />)
 

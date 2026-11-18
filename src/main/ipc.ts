@@ -244,7 +244,7 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
       return { revealed: true }
     },
 
-    get_cover_url: async (track_id, size) => {
+    cache_cover: async (track_id, size) => {
       const art_options = { cache_dir: art_cache_dir(), resize: resize_image }
       const art = await resolve_artwork(db, track_id, art_options)
       const path = size ? thumbnail(art_options, art, size) : art.path

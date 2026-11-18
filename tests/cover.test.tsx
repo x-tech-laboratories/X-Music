@@ -12,7 +12,7 @@ afterEach(cleanup)
 describe('track cover', () => {
   it('holds its place while the art loads, then shows the picture', async () => {
     let answer: (art: { url: string | null; source: string }) => void = () => undefined
-    const calls = record_calls({ 'get_cover_url': () => new Promise((resolve) => { answer = resolve }) })
+    const calls = record_calls({ 'cache_cover': () => new Promise((resolve) => { answer = resolve }) })
 
     const { container } = render(<TrackCover track_id="track-7" size={88} />)
 
@@ -21,11 +21,11 @@ describe('track cover', () => {
     expect(cover.querySelector('svg')).toBeNull()
     answer({ url: 'x-music-art://7', source: 'embedded' })
     await waitFor(() => expect(cover.querySelector('img')?.getAttribute('src')).toBe('x-music-art://7'))
-    expect(calls.find((call) => call.channel === 'get_cover_url')?.args).toEqual(['track-7', 88])
+    expect(calls.find((call) => call.channel === 'cache_cover')?.args).toEqual(['track-7', 88])
   })
 
   it('shows the music placeholder for a track with no art', async () => {
-    record_calls({ 'get_cover_url': { url: null, source: 'none' } })
+    record_calls({ 'cache_cover': { url: null, source: 'none' } })
 
     const { container } = render(<TrackCover track_id="track-7" size={88} />)
 
@@ -39,6 +39,6 @@ describe('track cover', () => {
     const { container } = render(<TrackCover track_id={null} size={88} />)
 
     expect(container.querySelector('.cover svg.line-icon')).not.toBeNull()
-    expect(calls.some((call) => call.channel === 'get_cover_url')).toBe(false)
+    expect(calls.some((call) => call.channel === 'cache_cover')).toBe(false)
   })
 })

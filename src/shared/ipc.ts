@@ -219,14 +219,14 @@ export interface XMusicPageApi {
   pick_folder: () => string | null
   pick_gmbrc_file: () => string | null
   show_in_folder: (uri: string) => { revealed: boolean }
-  // An x-music-art:// url, or null when the track has no cover.
-  get_cover_url: (track_id: string, size?: number) => { url: string | null; source: string }
+  // Finds a track's cover and caches it, so it writes; gives an x-music-art:// url, or null when the track has none.
+  cache_cover: (track_id: string, size?: number) => { url: string | null; source: string }
   write_log: (record: LogRecord) => { logged: boolean }
   get_log_config: () => { spec: string | undefined }
 }
 
 export const page_method_names = [
-  'pick_folder', 'pick_gmbrc_file', 'show_in_folder', 'get_cover_url', 'write_log', 'get_log_config'
+  'pick_folder', 'pick_gmbrc_file', 'show_in_folder', 'cache_cover', 'write_log', 'get_log_config'
 ] as const satisfies readonly (keyof XMusicPageApi)[]
 
 // Pushed from the main process; the renderer subscribes rather than polling.

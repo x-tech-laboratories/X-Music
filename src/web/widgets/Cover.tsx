@@ -10,7 +10,7 @@ import s from './Cover.module.css'
 // Fills the width it is given; size is the picture's resolution in pixels.
 export function TrackCover({ track_id, size }: { track_id: string | null; size: number }) {
   const art = use_resource(
-    async () => (track_id === null ? null : (await page_ipc('get_cover_url', track_id, size)).url),
+    async () => (track_id === null ? null : (await page_ipc('cache_cover', track_id, size)).url),
     [track_id, size],
     { enabled: track_id !== null }
   )
