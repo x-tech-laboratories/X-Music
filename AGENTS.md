@@ -1,7 +1,8 @@
 # Instructions for AI agents
 
 X-Music is an Electron music player written in TypeScript. Read `README.md` first; the full design is
-in `docs/DESIGN-SPEC.md`, and every feature should match it.
+in `docs/DESIGN-SPEC.md`, and every feature should match it. Where the design spec disagrees with the
+Application Standard or the Design Guidelines (below), the standards win; fix the spec to match.
 
 ## Setup and checks
 
@@ -13,7 +14,7 @@ in `docs/DESIGN-SPEC.md`, and every feature should match it.
 ## Rules
 
 - Code in `src/shared/` stays framework-free and DOM-free; it is imported by both main and renderer.
-- Tests reach SQLite through `node:sqlite`, never `better-sqlite3`.
+- The app and the tests reach SQLite through Node's own `node:sqlite`; add no native SQLite module.
 - The library store lives in `src/shared/library/` and imports nothing from `node:`. A schema change is made in
   `schema.ts` and written with `npm run db:generate`; a released migration is never edited. Rows get ids from
   `new_id()`, never an auto-incrementing number.
