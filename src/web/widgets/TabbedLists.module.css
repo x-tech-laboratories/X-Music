@@ -3,5 +3,3 @@
 .body { display: grid; min-height: 0; overflow-y: auto; padding: var(--space-2); }
 
 .queue { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--space-2); min-height: 0; }
-
-.queue td { white-space: nowrap; }

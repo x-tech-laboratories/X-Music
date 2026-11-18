@@ -1,6 +1,6 @@
 // The library's tracks in the X-Libs table, every one of them drawn only where it shows: the library sorts them, the table shows the sort, and the list adds keyboard selection and playing.
 
-import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { Chip, Chips } from '@x-tech-laboratories/x-libs/web/react/badges'
 import { SearchBox } from '@x-tech-laboratories/x-libs/web/react/controls'
 import { SelectionBar } from '@x-tech-laboratories/x-libs/web/react/layout'
@@ -12,7 +12,6 @@ import { Empty, Skeleton } from '@x-tech-laboratories/x-libs/web/react/states'
 import { use_store } from '@x-tech-laboratories/x-libs/web/react/store'
 import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
-import { cx } from '@x-tech-laboratories/x-libs/web/dom'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import { row_after_key } from '@x-tech-laboratories/x-libs/web/selection'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
@@ -23,7 +22,6 @@ import { player } from '../stores/player.ts'
 import { logger } from '../lib/log.ts'
 import { MergeView } from './MergeView.tsx'
 import { SongProperties } from './SongProperties.tsx'
-import s from './SongList.module.css'
 
 const log = logger('songlist')
 
@@ -54,10 +52,12 @@ const columns: TableColumn<TrackRow>[] = [
   column('play_count', 60, (track) => track.play_count, true)
 ]
 
-// A first guess at a row's height, until a drawn row is measured.
-const FIRST_ROW_HEIGHT = 41
-
 type Modifiers = { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }
+
+// How tall a drawn row is, for how far Page Up and Page Down move.
+function drawn_row_height(body: HTMLElement | null): number {
+  return body?.querySelector('tbody tr:not(.virtual-spacer)')?.getBoundingClientRect().height || 32
+}
 
 // ============================================================================
 // Search
@@ -86,7 +86,6 @@ export function SongList() {
   // The keyboard cursor: which row arrow keys move from.
   const [cursor, set_cursor] = useState(0)
   const body = useRef<HTMLDivElement>(null)
-  const [row_height, set_row_height] = useState(FIRST_ROW_HEIGHT)
 
   // Column layout is remembered per column id, so adding or reordering columns keeps the rest.
   const [widths, set_widths] = use_pref<Record<string, number>>('x-music.pref.songlist.widths', {})
@@ -97,13 +96,6 @@ export function SongList() {
 
   const positions = useMemo(() => new Map(order.map((id, index) => [id, index])), [order])
   const index_of = (track: TrackRow): number => positions.get(track.id) ?? 0
-
-  // The virtual rows, or a phone's cards, are spaced by a drawn one's height, which the density, font and width decide.
-  useLayoutEffect(() => {
-    const drawn = body.current?.querySelector('tbody tr:not(.virtual-spacer)')
-    const height = drawn?.getBoundingClientRect().height ?? 0
-    if (height > 0 && Math.abs(height - row_height) > 0.25) set_row_height(height)
-  })
 
   function select_row(index: number, event: Modifiers): void {
     const modifiers = { shift: event.shiftKey, ctrl: event.ctrlKey || event.metaKey }
@@ -160,7 +152,7 @@ export function SongList() {
       return
     }
 
-    const rows_per_page = Math.max(1, Math.floor((body.current?.clientHeight ?? 400) / row_height) - 1)
+    const rows_per_page = Math.max(1, Math.floor((body.current?.clientHeight ?? 400) / drawn_row_height(body.current)) - 1)
     const next = row_after_key(event.key, index, order.length - 1, rows_per_page)
     if (next === null) return
     event.preventDefault()
@@ -183,8 +175,9 @@ export function SongList() {
     content = (
       <DataTable
         caption="Tracks"
-        wrap_class={cx('fit', s.single_line)}
-        virtual={{ row_height, card_height: row_height }}
+        wrap_class="fit"
+        single_line
+        virtual={{}}
         columns={columns}
         rows={tracks}
         row_key={(track) => track.id}

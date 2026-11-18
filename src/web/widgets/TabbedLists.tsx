@@ -58,6 +58,7 @@ function Queue({ queue }: { queue: TrackId[] }) {
       <DataTable
         caption="Queue"
         wrap_class="scroll fit"
+        single_line
         columns={columns}
         rows={rows}
         row_key={(row) => row.position}
