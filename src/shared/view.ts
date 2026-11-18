@@ -13,21 +13,18 @@ export interface FilterChip {
 // The visible query, expressed as a stack of removable chips. The stack IS the filter AST, which is what lets any browse state be saved as a smart playlist unchanged.
 export class FilterStack {
   private chips: FilterChip[] = []
-  version = 0
 
   list(): readonly FilterChip[] { return this.chips }
 
   push(chip: FilterChip): void {
     this.chips = [...this.chips.filter((c) => c.id !== chip.id), chip]
-    this.version++
   }
 
   remove(id: string): void {
     this.chips = this.chips.filter((c) => c.id !== id)
-    this.version++
   }
 
-  clear(): void { this.chips = this.chips.filter((c) => !c.removable); this.version++ }
+  clear(): void { this.chips = this.chips.filter((c) => !c.removable) }
 
   // Collapses the stack into a single AST; an empty stack means the whole library.
   to_filter(): FilterNode {

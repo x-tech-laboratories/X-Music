@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App } from '../src/web/App.tsx'
 import { view_of } from '../src/web/views/Navigation.tsx'
-import { library } from '../src/web/stores/library.ts'
+import { results } from '../src/web/stores/library.ts'
 import { emit_event, install_bridge } from './bridge.ts'
 
 // ============================================================================
@@ -29,8 +29,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
-  library.stats = null
-  library.error = null
+  results.update((before) => ({ ...before, stats: null, error: null }))
 })
 
 // ============================================================================
@@ -108,8 +107,7 @@ describe('navigation', () => {
   })
 
   it('puts the cursor in the library\'s search on /', async () => {
-    library.stats = { tracks: 1, media: 1, albums: 1, missing: 0, totalMs: 1000, schemaVersion: 1, path: '/tmp/x.db' }
-    install_bridge({ get_library_stats: library.stats })
+    install_bridge({ get_library_stats: { tracks: 1, media: 1, albums: 1, missing: 0, totalMs: 1000, schemaVersion: 1, path: '/tmp/x.db' } })
     render(<App />)
     const search = await screen.findByRole('searchbox', { name: 'Search the library' })
 
@@ -119,8 +117,7 @@ describe('navigation', () => {
   })
 
   it('shows no placeholder tabs for features still to come', async () => {
-    library.stats = { tracks: 1, media: 1, albums: 1, missing: 0, totalMs: 1000, schemaVersion: 1, path: '/tmp/x.db' }
-    install_bridge({ 'get_library_stats': library.stats })
+    install_bridge({ get_library_stats: { tracks: 1, media: 1, albums: 1, missing: 0, totalMs: 1000, schemaVersion: 1, path: '/tmp/x.db' } })
     render(<App />)
 
     await screen.findByRole('heading', { level: 1, name: 'Library' })

@@ -19,7 +19,7 @@ export default defineConfig({
     root: resolve('src/web'),
     plugins: [react()],
     resolve: {
-      alias: { '@shared': shared, '@web': resolve('src/web') }
+      alias: { '@shared': shared }
     },
     build: { rollupOptions: { input: { index: resolve('src/web/index.html') } } }
   }

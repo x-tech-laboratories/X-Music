@@ -176,9 +176,7 @@ export const library = {
   selection_changes,
 
   get stats(): LibraryStats | null { return results.get().stats },
-  set stats(stats: LibraryStats | null) { results.update((before) => ({ ...before, stats })) },
   get error(): string | null { return results.get().error },
-  set error(error: string | null) { results.update((before) => ({ ...before, error })) },
   get tracks(): TrackRow[] { return results.get().tracks },
 
   refresh,

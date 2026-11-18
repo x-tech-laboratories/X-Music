@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Dialogs } from '@x-tech-laboratories/x-libs/web/react/dialog'
 import { SettingsView } from '../src/web/views/SettingsView.tsx'
-import { library } from '../src/web/stores/library.ts'
+import { results } from '../src/web/stores/library.ts'
 import { install_bridge, type Call } from './bridge.ts'
 
 const info = { version: '0.1.2', electron: '43.0.0', chrome: '140.0', node: '24.0.0', platform: 'linux' }
@@ -15,7 +15,7 @@ beforeEach(() => install_bridge())
 
 afterEach(() => {
   cleanup()
-  library.stats = null
+  results.update((before) => ({ ...before, stats: null }))
 })
 
 describe('settings view', () => {
@@ -40,7 +40,7 @@ describe('settings view', () => {
   })
 
   it('shows the library database and the version', () => {
-    library.stats = { tracks: 1200, media: 1300, albums: 90, missing: 0, totalMs: 3_600_000, schemaVersion: 1, path: '/tmp/x-music-test.db' }
+    results.update((before) => ({ ...before, stats: { tracks: 1200, media: 1300, albums: 90, missing: 0, totalMs: 3_600_000, schemaVersion: 1, path: '/tmp/x-music-test.db' } }))
     render(<SettingsView info={info} density="normal" on_density={() => undefined} />)
 
     expect(screen.getByText('/tmp/x-music-test.db')).toBeTruthy()

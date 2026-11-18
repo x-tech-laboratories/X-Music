@@ -7,6 +7,6 @@
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "types": ["node", "vite/client"],
     "jsx": "react-jsx",
-    "paths": { "@main/*": ["./src/main/*"], "@shared/*": ["./src/shared/*"], "@web/*": ["./src/web/*"] }
+    "paths": { "@main/*": ["./src/main/*"], "@shared/*": ["./src/shared/*"] }
   }
 }
