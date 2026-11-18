@@ -8,6 +8,7 @@
 // track history records each merge as well, but only this journal holds the plays and playlist
 // places that an exact undo needs, all tracks at once.
 
+import { check_known_ids } from '@x-tech-laboratories/x-libs/api_spec'
 import { and, asc, count, desc, eq, inArray, min, notInArray, sql } from '@x-tech-laboratories/x-libs/drizzle'
 import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
@@ -190,7 +191,7 @@ export function merge_preview(database: SqlDatabase, ids: readonly string[]): Me
   if (ids.length < 2) throw new Error('a merge needs at least two tracks')
 
   const rows = load_tracks(database, ids)
-  if (rows.length !== ids.length) throw new Error('one or more tracks no longer exist')
+  check_known_ids(ids, new Set(rows.map((row) => row.id)), 'track')
 
   const sets = load_sets(database, ids)
   const extras = load_extras(database, ids)
