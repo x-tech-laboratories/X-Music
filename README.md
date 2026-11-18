@@ -208,6 +208,9 @@ is marked so, and a client asks before running it: `add_folder`, `remove_folder`
 `clear_library` and the player's `play_track`, `toggle_playback`, `play_next`, `play_previous`,
 `stop_playback`, `seek`, `set_volume`, `queue_tracks`, `remove_from_queue`, `move_in_queue`, `clear_queue`, `set_repeat` and
 `set_shuffle`.
+Of those, the ones that delete or overwrite data are marked destructive as well: `clear_library`,
+`merge_tracks`, `undo_merge`, `restore_version`, `import_gmbrc` (it replaces ratings and plays with
+gmusicbrowser's) and `set_history_keep_days` (a shorter time deletes older versions for good).
 
 The tools that remove or replace data can be undone as they are in the window: `clear_library` backs the
 library up first and is refused if that fails, `undo_merge` puts a merge back, and every change to a track,

@@ -23,6 +23,11 @@ describe('api spec', () => {
     }
   })
 
+  it('marks the calls that delete or overwrite data as destructive, and only those', () => {
+    const destructive = Object.entries(x_music_api).filter(([, spec]) => spec.destructive).map(([name]) => name).sort()
+    expect(destructive).toEqual(['clear_library', 'import_gmbrc', 'merge_tracks', 'restore_version', 'set_history_keep_days', 'undo_merge'])
+  })
+
   it('moves a queued track by its place and the place to go to', () => {
     expect(input_schema(x_music_api.move_in_queue)).toMatchObject({ required: ['index', 'to_index'] })
     expect(positional_args(x_music_api.move_in_queue, { to_index: 0, index: 2 })).toEqual([2, 0])
