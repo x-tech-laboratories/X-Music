@@ -197,6 +197,7 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
     },
 
     remove_from_queue: (index) => { player.dequeue(index); return player.status() },
+    move_in_queue: (index, to_index) => { player.move_in_queue(index, to_index); return player.status() },
     clear_queue: () => { player.clear_queue(); return player.status() },
     set_repeat: (mode) => { player.set_repeat(mode); return player.status() },
     set_shuffle: (on) => { player.set_shuffle(on); return player.status() },

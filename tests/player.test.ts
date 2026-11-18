@@ -287,6 +287,38 @@ describe('queue and context', () => {
     player.dequeue(1)
     expect(player.status().queue).toEqual([a, c])
   })
+
+  it('moves a queued track to another place in the queue', async () => {
+    const [a, b, c, d] = [make_track(), make_track(), make_track(), make_track()]
+    player.enqueue([a, b, c, d])
+
+    player.move_in_queue(0, 2)
+    expect(player.status().queue).toEqual([b, c, a, d])
+
+    player.move_in_queue(3, 0)
+    expect(player.status().queue).toEqual([d, b, c, a])
+
+    player.move_in_queue(1, 99)
+    expect(player.status().queue).toEqual([d, c, a, b])
+  })
+
+  it('refuses to move a place the queue does not have', async () => {
+    player.enqueue([make_track()])
+
+    expect(() => player.move_in_queue(1, 0)).toThrow('no queued track at 1')
+    expect(() => player.move_in_queue(-1, 0)).toThrow('no queued track at -1')
+  })
+
+  it('plays a moved track in its new place', async () => {
+    const [a, b, c] = [make_track(), make_track(), make_track()]
+    player.enqueue([a, b, c])
+    player.move_in_queue(2, 0)
+
+    await player.next(true)
+
+    expect(player.status().track?.id).toBe(c)
+    expect(player.status().queue).toEqual([a, b])
+  })
 })
 
 describe('shuffle', () => {

@@ -23,6 +23,12 @@ describe('api spec', () => {
     }
   })
 
+  it('moves a queued track by its place and the place to go to', () => {
+    expect(input_schema(x_music_api.move_in_queue)).toMatchObject({ required: ['index', 'to_index'] })
+    expect(positional_args(x_music_api.move_in_queue, { to_index: 0, index: 2 })).toEqual([2, 0])
+    expect(is_read_only('move_in_queue')).toBe(false)
+  })
+
   it('takes a call\'s arguments by name, in the order the call takes them', () => {
     const merge = x_music_api.merge_tracks
 

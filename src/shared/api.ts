@@ -184,6 +184,13 @@ export const x_music_api: ApiSpec<XMusicApi & XMusicHistoryApi> = {
     ]
   },
   remove_from_queue: { description: 'Takes one track out of the queue.', params: [{ name: 'index', schema: { type: 'integer', minimum: 0, description: 'Its place in the queue, from 0.' } }] },
+  move_in_queue: {
+    description: 'Moves one track to another place in the queue.',
+    params: [
+      { name: 'index', schema: { type: 'integer', minimum: 0, description: 'Its place in the queue now, from 0.' } },
+      { name: 'to_index', schema: { type: 'integer', minimum: 0, description: 'The place it moves to, from 0; past the end puts it last.' } }
+    ]
+  },
   clear_queue: { description: 'Empties the queue.', params: [] },
   set_repeat: { description: 'Sets whether the list or the track repeats.', params: [{ name: 'mode', schema: { type: 'string', enum: ['off', 'all', 'one'] } }] },
   set_shuffle: { description: 'Turns shuffle on or off.', params: [{ name: 'on', schema: { type: 'boolean' } }] },

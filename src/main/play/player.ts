@@ -227,6 +227,15 @@ export class Player {
     this.publish()
   }
 
+  // Takes the queued track at index out and puts it at to_index, or at the end when to_index is past it.
+  move_in_queue(index: number, to_index: number): void {
+    if (!Number.isInteger(index) || index < 0 || index >= this.queue.length) throw new Error(`no queued track at ${index}`)
+    const rest = this.queue.filter((_, place) => place !== index)
+    const to = Math.min(Math.max(0, Math.trunc(to_index)), rest.length)
+    this.queue = [...rest.slice(0, to), this.queue[index]!, ...rest.slice(to)]
+    this.publish()
+  }
+
   clear_queue(): void {
     this.queue = []
     this.publish()

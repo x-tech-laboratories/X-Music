@@ -192,7 +192,7 @@ Every call the window makes on the library and the player is a tool, described o
 is marked so, and a client asks before running it: `add_folder`, `remove_folder`, `scan_folders`,
 `cancel_scan`, `import_gmbrc`, `merge_tracks`, `undo_merge`, `restore_version`, `set_history_keep_days`,
 `clear_library` and the player's `play_track`, `toggle_playback`, `play_next`, `play_previous`,
-`stop_playback`, `seek`, `set_volume`, `queue_tracks`, `remove_from_queue`, `clear_queue`, `set_repeat` and
+`stop_playback`, `seek`, `set_volume`, `queue_tracks`, `remove_from_queue`, `move_in_queue`, `clear_queue`, `set_repeat` and
 `set_shuffle`.
 
 The tools that remove or replace data can be undone as they are in the window: `clear_library` backs the

@@ -194,6 +194,7 @@ export interface XMusicApi {
   set_volume: (volume: number) => PlayerStatus
   queue_tracks: (track_ids: string[], position?: 'end' | 'next') => PlayerStatus
   remove_from_queue: (index: number) => PlayerStatus
+  move_in_queue: (index: number, to_index: number) => PlayerStatus
   clear_queue: () => PlayerStatus
   set_repeat: (mode: RepeatMode) => PlayerStatus
   set_shuffle: (on: boolean) => PlayerStatus
@@ -205,7 +206,7 @@ export const api_method_names = [
   'list_folders', 'add_folder', 'remove_folder', 'scan_folders', 'cancel_scan',
   'get_default_gmbrc_path', 'get_gmbrc_preview', 'import_gmbrc', 'clear_library',
   'get_player_status', 'play_track', 'toggle_playback', 'play_next', 'play_previous', 'stop_playback',
-  'seek', 'set_volume', 'queue_tracks', 'remove_from_queue', 'clear_queue', 'set_repeat', 'set_shuffle'
+  'seek', 'set_volume', 'queue_tracks', 'remove_from_queue', 'move_in_queue', 'clear_queue', 'set_repeat', 'set_shuffle'
 ] as const satisfies readonly (keyof XMusicApi)[]
 
 // Calls only X-Music's own window makes: dialogs, the file manager and cover images, none of them for other programs.
