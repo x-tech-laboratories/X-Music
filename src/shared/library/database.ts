@@ -3,8 +3,10 @@
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { open_drizzle, type Drizzle } from '@x-tech-laboratories/x-libs/drizzle'
+import { open_drizzle, sql, type Drizzle } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase, SqlValue } from '@x-tech-laboratories/x-libs/sql'
+
+import { albums, tracks } from './schema.ts'
 
 // ── Ids ──────────────────────────────────────────────────────────────────────
 
@@ -23,6 +25,12 @@ export function drizzle_of(database: SqlDatabase): Drizzle {
   if (!drizzle) drizzles.set(database, (drizzle = open_drizzle(database)))
   return drizzle
 }
+
+// The name of a track's album, as a column beside the track's own.
+export const album_name = sql<string | null>`(SELECT ${albums.name} FROM ${albums} WHERE ${albums.id} = ${tracks.album_id})`
+
+// How many rows a write changed.
+export const changes = (result: { changes: number | bigint }): number => Number(result.changes)
 
 // One question mark per value, for an IN list.
 export function placeholders(values: readonly unknown[]): string {
