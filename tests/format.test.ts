@@ -40,6 +40,8 @@ describe('format strings', () => {
   it('formats durations', () => {
     expect(format_record('{length:m:ss}', row)).toBe('9:22')
     expect(format_record('{length:h:mm:ss}', row)).toBe('0:09:22')
+    expect(format_record('{length:m:ss}', { length: 3_725_000 })).toBe('1:02:05')
+    expect(format_record('{length:h:mm:ss}', { length: 3_725_000 })).toBe('1:02:05')
   })
 
   it('renders ratings as stars', () => {

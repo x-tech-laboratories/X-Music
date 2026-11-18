@@ -7,6 +7,7 @@ import { define_bridge } from '@x-tech-laboratories/x-libs/electron/bridge'
 import { define_events } from '@x-tech-laboratories/x-libs/electron/events'
 import { history_method_names, type HistoryMethods } from '@x-tech-laboratories/x-libs/history'
 import { local_mcp_method_names, type LocalMcpMethods } from '@x-tech-laboratories/x-libs/local_mcp_protocol'
+import { page_log_method_names, type PageLogMethods } from '@x-tech-laboratories/x-libs/log_protocol'
 import type { FilterNode, SortKey, Limit } from './filter.ts'
 import type { TrackDetails } from './library/details.ts'
 import type { DuplicateGroup, DuplicateReason } from './library/duplicates.ts'
@@ -207,26 +208,17 @@ export const api_method_names = [
   'seek', 'set_volume', 'queue_tracks', 'remove_from_queue', 'clear_queue', 'set_repeat', 'set_shuffle'
 ] as const satisfies readonly (keyof XMusicApi)[]
 
-export interface LogRecord {
-  level: 'critical' | 'error' | 'warn' | 'info' | 'debug'
-  scope: string
-  message: string
-  data?: unknown
-}
-
-// Calls only X-Music's own window makes: dialogs, the file manager, cover images and its log, none of them for other programs.
+// Calls only X-Music's own window makes: dialogs, the file manager and cover images, none of them for other programs.
 export interface XMusicPageApi {
   pick_folder: () => string | null
   pick_gmbrc_file: () => string | null
   show_in_folder: (uri: string) => { revealed: boolean }
   // Finds a track's cover and caches it, so it writes; gives an x-music-art:// url, or null when the track has none.
   cache_cover: (track_id: string, size?: number) => { url: string | null; source: string }
-  write_log: (record: LogRecord) => { logged: boolean }
-  get_log_config: () => { spec: string | undefined }
 }
 
 export const page_method_names = [
-  'pick_folder', 'pick_gmbrc_file', 'show_in_folder', 'cache_cover', 'write_log', 'get_log_config'
+  'pick_folder', 'pick_gmbrc_file', 'show_in_folder', 'cache_cover'
 ] as const satisfies readonly (keyof XMusicPageApi)[]
 
 // Pushed from the main process; the renderer subscribes rather than polling.
@@ -253,6 +245,8 @@ export const x_music_page_bridge = define_bridge<XMusicPageApi>('xMusicPage', pa
 export const x_music_events = define_events<XMusicEvents>('xMusicEvents')
 // The library database's backups, for Settings, as window.xMusicBackups.
 export const x_music_backups_bridge = define_bridge<BackupMethods>('xMusicBackups', backup_method_names)
+// The page's log, joining the main process's, as window.xMusicLog.
+export const x_music_log_bridge = define_bridge<PageLogMethods>('xMusicLog', page_log_method_names)
 // The local MCP server's settings, for Settings, as window.xMusicMcp.
 export const x_music_mcp_bridge = define_bridge<LocalMcpMethods>('xMusicMcp', local_mcp_method_names)
 

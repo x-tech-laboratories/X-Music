@@ -25,7 +25,7 @@ import { art_cache_dir, resize_image } from './artcache.ts'
 import { clear_library_backed_up, type LibraryBackups } from './backups.ts'
 import { resolve_artwork, thumbnail } from './library/artwork.ts'
 import { scan_roots } from './library/scan.ts'
-import { log_from_renderer, logger } from './log.ts'
+import { logger } from './log.ts'
 import { Player } from './play/player.ts'
 import { MpvEngine, find_mpv } from './play/mpv.ts'
 import { NullEngine } from './play/engine.ts'
@@ -249,14 +249,7 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
       const art = await resolve_artwork(db, track_id, art_options)
       const path = size ? thumbnail(art_options, art, size) : art.path
       return { url: path ? `x-music-art://local${encodeURI(path)}` : null, source: art.source }
-    },
-
-    write_log: (record) => {
-      log_from_renderer(record.level, record.scope, record.message, record.data)
-      return { logged: true }
-    },
-
-    get_log_config: () => ({ spec: process.env.X_MUSIC_LOG })
+    }
   }
 
   const recorded = recording(db, handlers)

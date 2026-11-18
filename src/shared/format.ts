@@ -2,6 +2,8 @@
 // tooltips, tray text, notifications, column formats and the file renamer.
 // It lives in shared/ and touches no DOM, so it is unchanged by any UI-framework decision.
 
+import { format_clock } from '@x-tech-laboratories/x-libs/durations'
+
 export type FormatValue = string | number | null | undefined | readonly string[]
 export type FormatSource = (field_id: string) => FormatValue
 
@@ -62,18 +64,6 @@ export function parse_format(input: string): Token[] {
 const is_empty = (v: FormatValue): boolean =>
   v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0)
 
-function format_duration(ms: number, spec: string): string {
-  const total = Math.round(ms / 1000)
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = total % 60
-  const pad = (n: number): string => String(n).padStart(2, '0')
-
-  if (spec === 'h:mm:ss') return `${h}:${pad(m)}:${pad(s)}`
-  if (spec === 'm:ss') return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
-  return `${m}:${pad(s)}`
-}
-
 function apply_spec(value: FormatValue, spec: string | undefined): string {
   if (is_empty(value)) return ''
 
@@ -98,7 +88,7 @@ function apply_spec(value: FormatValue, spec: string | undefined): string {
     return '★'.repeat(Math.floor(stars)) + '☆'.repeat(5 - Math.floor(stars))
   }
 
-  if (spec === 'm:ss' || spec === 'h:mm:ss') return format_duration(n, spec)
+  if (spec === 'm:ss' || spec === 'h:mm:ss') return format_clock(n, { hours: spec === 'h:mm:ss' ? 'always' : 'auto' })
 
   const printf = /^%0?(\d+)d$/.exec(spec)
   if (printf && Number.isFinite(n)) return String(Math.trunc(n)).padStart(Number(printf[1]), '0')

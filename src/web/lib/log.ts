@@ -1,25 +1,13 @@
-// The renderer's logger. Records are forwarded to the main process so everything lands in one
-// stream, in order, with one configuration; a renderer-only console is invisible from a terminal.
+// The page's log on X-Libs: records join the main process's log at the levels it sets, uncaught errors included.
 
-import { create_logger, parse_level_spec, type Level, type Logger } from '@x-tech-laboratories/x-libs/log'
-import { page_ipc } from './ipc.ts'
+import { create_page_log } from '@x-tech-laboratories/x-libs/web/page_log'
 
-// The renderer cannot read the environment, so the main process states the level at start-up.
-let spec = parse_level_spec(undefined)
+// Read from the window at each call, so a test's stand-in bridge is the one used.
+export const page_log = create_page_log({
+  write_log: (record) => window.xMusicLog.write_log(record),
+  get_log_levels: () => window.xMusicLog.get_log_levels()
+})
 
-export function configure_logging(level_spec: string | undefined): void {
-  spec = parse_level_spec(level_spec)
-}
+export const logger = page_log.logger
 
-const sink = (record: { level: Level; scope: string; message: string; data?: unknown }): void => {
-  void page_ipc('write_log', {
-    level: record.level,
-    scope: record.scope,
-    message: record.message,
-    data: record.data
-  })
-}
-
-// Read through a function, so loggers made before configureLogging still pick up the real level.
-export const logger = (scope: string): Logger => create_logger(scope, () => spec, sink)
 export const log = logger('renderer')

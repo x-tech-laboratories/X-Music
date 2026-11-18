@@ -11,8 +11,8 @@ import { format_duration } from '@x-tech-laboratories/x-libs/durations'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { AppInfo } from '@shared/ipc'
 import app_icon from '../../resources/icon.svg'
-import { ipc, page_ipc } from './lib/ipc.ts'
-import { configure_logging, log } from './lib/log.ts'
+import { ipc } from './lib/ipc.ts'
+import { log, page_log } from './lib/log.ts'
 import { theme } from './lib/theme.ts'
 import { library } from './stores/library.ts'
 import { player } from './stores/player.ts'
@@ -70,27 +70,20 @@ export function App() {
   const view = view_of(route.parts)
 
   useEffect(() => {
-    // Renderer failures are invisible from the terminal otherwise, so they go to the main log.
-    const on_error = (event: ErrorEvent): void => log.error(event.message, { source: event.filename, line: event.lineno })
-    const on_rejection = (event: PromiseRejectionEvent): void => log.error('unhandled rejection', { reason: String(event.reason) })
-    window.addEventListener('error', on_error)
-    window.addEventListener('unhandledrejection', on_rejection)
-
     const stop_player = player.init()
     // A change an AI client made through the MCP server shows as if made here.
     const stop_changes = window.xMusicEvents.on('changed', () => void library.refresh())
     void boot()
 
     return () => {
-      window.removeEventListener('error', on_error)
-      window.removeEventListener('unhandledrejection', on_rejection)
+      page_log.stop()
       stop_player()
       stop_changes()
     }
   }, [])
 
   async function boot(): Promise<void> {
-    configure_logging((await page_ipc('get_log_config')).spec)
+    await page_log.start()
     log.debug('renderer booting')
     set_info(await ipc('get_app_info'))
     await library.refresh()

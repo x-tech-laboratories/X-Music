@@ -94,6 +94,16 @@ describe('navigation', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Library' })).toBeTruthy()
   })
 
+  it('sends an uncaught error in the page to the main log', async () => {
+    const calls = install_bridge({ get_log_levels: { default: 'warn', scopes: {} } })
+    render(<App />)
+    await waitFor(() => expect(calls.some((call) => call.channel === 'get_log_levels')).toBe(true))
+
+    act(() => void window.dispatchEvent(new ErrorEvent('error', { message: 'the page broke' })))
+
+    await waitFor(() => expect(calls.find((call) => call.channel === 'write_log')?.args[0]).toMatchObject({ level: 'error', scope: 'uncaught', message: 'the page broke' }))
+  })
+
   it('loads the library again when the MCP server changed it', async () => {
     const calls = install_bridge()
     render(<App />)

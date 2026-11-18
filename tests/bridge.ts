@@ -1,5 +1,6 @@
 // A stand-in for the preload bridge, so a rendered test can mount the whole window without a main process.
 
+import { page_log_method_names } from '@x-tech-laboratories/x-libs/log_protocol'
 import { api_method_names, history_channels, page_method_names, type LibraryStats, type PlayerStatus } from '@shared/ipc'
 
 export const empty_stats: LibraryStats = { tracks: 0, media: 0, albums: 0, missing: 0, totalMs: 0, schemaVersion: 1, path: '/tmp/x-music-test.db' }
@@ -11,9 +12,9 @@ const idle_status: PlayerStatus = {
 
 // What each call answers unless a test overrides it; a function answer gets the call's arguments and may throw to make the call fail.
 const defaults: Record<string, unknown> = {
-  get_log_config: { spec: 'critical' },
   get_app_info: { version: '0.1.2', electron: '43.0.0', chrome: '140.0', node: '24.0.0', platform: 'linux' },
-  write_log: { logged: true },
+  write_log: undefined,
+  get_log_levels: { default: 'critical', scopes: {} },
   get_library_stats: empty_stats,
   list_tracks: [],
   list_track_groups: [],
@@ -57,6 +58,7 @@ export function install_bridge(answers: Record<string, unknown> = {}): Call[] {
     xMusicPage: client(page_method_names),
     xMusicHistory: client(history_channels),
     xMusicMcp: client(['get_local_mcp_settings', 'set_local_mcp_settings', 'get_local_mcp_status']),
+    xMusicLog: client(page_log_method_names),
     xMusicEvents: {
       on: (event: string, listener: Listener) => {
         const set = listeners.get(event) ?? new Set<Listener>()
