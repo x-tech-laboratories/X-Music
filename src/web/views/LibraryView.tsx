@@ -31,8 +31,8 @@ function Browser() {
     <Split
       storage_key="x-music.split.vpright"
       axis="vertical"
-      specs={[{ min: 90, max: 480 }, { min: 160, grow: true }]}
-      preferred={[190, undefined]}
+      specs={[{ min: 92, max: 480 }, { min: 160, grow: true }]}
+      preferred={[192, undefined]}
       panes={[panes_row, <SongList key="songs" />]}
     />
   )

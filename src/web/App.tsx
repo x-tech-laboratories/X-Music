@@ -112,7 +112,7 @@ export function App() {
       <Split
         storage_key="x-music.split.vbleft"
         axis="vertical"
-        specs={[{ min: 150, max: 320 }, { min: 120, grow: true }]}
+        specs={[{ min: 152, max: 320 }, { min: 120, grow: true }]}
         preferred={[196, undefined]}
         panes={[<PlayerBlock key="player" />, <TabbedLists key="lists" />]}
       />
