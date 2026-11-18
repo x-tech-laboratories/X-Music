@@ -11,7 +11,7 @@ import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge'
 import { format_duration } from '@x-tech-laboratories/x-libs/durations'
-import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { Theme } from '@x-tech-laboratories/x-libs/web/theme'
 import type { AppInfo } from '@shared/ipc'
 import { ipc } from '../lib/ipc.ts'
@@ -59,7 +59,7 @@ function LibraryDatabase() {
     plural(stats.media, 'file'),
     plural(stats.albums, 'album'),
     format_duration(stats.total_ms / 1000, { largest_unit: 'days' }),
-    ...(stats.missing > 0 ? [`${stats.missing.toLocaleString()} missing`] : [])
+    ...(stats.missing > 0 ? [`${format_count(stats.missing)} missing`] : [])
   ].join(' · ')
 
   return (

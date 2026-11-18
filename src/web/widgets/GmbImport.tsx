@@ -6,7 +6,7 @@ import { Facts, FormRow, Section, SettingRow, Tile, Tiles } from '@x-tech-labora
 import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
-import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { GmbPreview, ImportReport } from '@shared/ipc'
 import { ipc, page_ipc } from '../lib/ipc.ts'
 import { library } from '../stores/library.ts'
@@ -39,10 +39,10 @@ function Preview({ found }: { found: GmbPreview }) {
   return (
     <>
       <Tiles>
-        <Tile label="Tracks" value={found.songs.toLocaleString()} value_first />
-        <Tile label="Play events" value={found.play_history_entries.toLocaleString()} value_first />
-        <Tile label="Saved lists" value={found.saved_lists.toLocaleString()} value_first />
-        <Tile label="Saved filters" value={found.saved_filters.toLocaleString()} value_first />
+        <Tile label="Tracks" value={format_count(found.songs)} value_first />
+        <Tile label="Play events" value={format_count(found.play_history_entries)} value_first />
+        <Tile label="Saved lists" value={format_count(found.saved_lists)} value_first />
+        <Tile label="Saved filters" value={format_count(found.saved_filters)} value_first />
       </Tiles>
       <Facts layout="rows" rows={[
         found.base_folder ? ['Music folder', <span className="path">{found.base_folder}</span>] : null,

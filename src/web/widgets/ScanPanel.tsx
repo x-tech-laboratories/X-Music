@@ -10,7 +10,7 @@ import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/rea
 import { Age } from '@x-tech-laboratories/x-libs/web/react/time'
 import { format_duration } from '@x-tech-laboratories/x-libs/durations'
 import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
-import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { FileOutcome, FileResult, Root, ScanProgress, ScanReport } from '@shared/ipc'
 import { ipc, page_ipc } from '../lib/ipc.ts'
 import { library } from '../stores/library.ts'
@@ -32,7 +32,7 @@ const OUTCOMES: Record<FileOutcome, [text: string, tone: Tone]> = {
 function progress_detail(progress: ScanProgress): string {
   if (progress.phase === 'walking') return `Finding files… ${plural(progress.found, 'file')} so far`
   if (progress.phase === 'finishing') return 'Checking for files that disappeared…'
-  return `${progress.processed.toLocaleString()} of ${plural(progress.found, 'file')}`
+  return `${format_count(progress.processed)} of ${plural(progress.found, 'file')}`
 }
 
 // ============================================================================
@@ -75,10 +75,10 @@ function ScanSummary({ report, on_show_failed }: { report: ScanReport; on_show_f
   return (
     <>
       <Tiles>
-        <Tile label="Files read" value={report.files_found.toLocaleString()} value_first />
-        <Tile label="New tracks" value={report.tracks_created.toLocaleString()} value_first />
-        <Tile label="Already known" value={report.tracks_matched.toLocaleString()} value_first />
-        <Tile label="Unchanged" value={report.files_skipped.toLocaleString()} value_first />
+        <Tile label="Files read" value={format_count(report.files_found)} value_first />
+        <Tile label="New tracks" value={format_count(report.tracks_created)} value_first />
+        <Tile label="Already known" value={format_count(report.tracks_matched)} value_first />
+        <Tile label="Unchanged" value={format_count(report.files_skipped)} value_first />
         <Tile label="Took" value={took(report.duration_ms)} value_first />
       </Tiles>
       {notes.length > 0 && (

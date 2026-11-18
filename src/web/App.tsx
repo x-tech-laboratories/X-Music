@@ -8,7 +8,7 @@ import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
 import { one_of } from '@x-tech-laboratories/x-libs/web/prefs'
 import { format_duration } from '@x-tech-laboratories/x-libs/durations'
-import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { AppInfo } from '@shared/ipc'
 import app_icon from '../../resources/icon.svg'
 import { ipc } from './lib/ipc.ts'
@@ -53,7 +53,7 @@ function StatusBar() {
       <span>{plural(stats.tracks, 'track')}</span>
       <span>{plural(stats.media, 'file')}</span>
       <span>{plural(stats.albums, 'album')}</span>
-      {stats.missing > 0 && <span className="tone-warn">{stats.missing.toLocaleString()} missing</span>}
+      {stats.missing > 0 && <span className="tone-warn">{format_count(stats.missing)} missing</span>}
       <span>{format_duration(stats.total_ms / 1000, { largest_unit: 'days' })}</span>
     </>
   )

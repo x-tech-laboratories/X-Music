@@ -12,7 +12,7 @@ import { Empty, Skeleton } from '@x-tech-laboratories/x-libs/web/react/states'
 import { use_store } from '@x-tech-laboratories/x-libs/web/react/store'
 import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
-import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import { row_after_key } from '@x-tech-laboratories/x-libs/web/selection'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import type { TrackRow } from '@shared/ipc'
@@ -223,7 +223,7 @@ export function SongList() {
           {keys('arrowup')} {keys('arrowdown')} move, {keys('shift+arrowdown')} picks, {keys('enter')} plays, right-click for more
         </span>
         <span className="muted small">
-          {narrowed ? `${tracks.length.toLocaleString()} of ${plural(stats.tracks, 'track')}` : plural(tracks.length, 'track')}
+          {narrowed ? `${format_count(tracks.length)} of ${plural(stats.tracks, 'track')}` : plural(tracks.length, 'track')}
         </span>
       </div>
 

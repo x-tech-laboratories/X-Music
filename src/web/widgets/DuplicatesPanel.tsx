@@ -12,7 +12,7 @@ import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
 import { is_number_in } from '@x-tech-laboratories/x-libs/web/prefs'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
-import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import { rating_to_stars } from '@shared/fields'
 import type { DuplicateGroup, DuplicateMember, DuplicateReason, MergeResult } from '@shared/ipc'
 import { ipc } from '../lib/ipc.ts'
@@ -59,8 +59,8 @@ const MEMBER_COLUMNS: TableColumn<DuplicateMember>[] = [
   { label: 'Album', sort: (member) => member.album, cell: (member) => member.album ?? '—' },
   { label: 'Length', class: 'number', sort: (member) => member.length_ms, cell: (member) => format_clock(member.length_ms, { empty: '—' }) },
   { label: 'Rating', sort: (member) => member.rating, cell: (member) => <Rating value={rating_to_stars(member.rating)} /> },
-  { label: 'Plays', class: 'number', sort: (member) => member.play_count, cell: (member) => member.play_count.toLocaleString() },
-  { label: 'Files', class: 'number', sort: (member) => member.media_count, cell: (member) => member.media_count.toLocaleString() },
+  { label: 'Plays', class: 'number', sort: (member) => member.play_count, cell: (member) => format_count(member.play_count) },
+  { label: 'Files', class: 'number', sort: (member) => member.media_count, cell: (member) => format_count(member.media_count) },
   { label: 'Formats', sort: (member) => member.codecs, cell: (member) => member.codecs || '—' }
 ]
 
@@ -175,7 +175,7 @@ export function DuplicatesPanel() {
         <>
           <p className="muted">
             {plural(found.length, 'group')} · {plural(found.reduce((count, group) => count + group.members.length, 0), 'track')}
-            {found.length >= MAX_SHOWN && ` (the first ${MAX_SHOWN.toLocaleString()} shown)`}
+            {found.length >= MAX_SHOWN && ` (the first ${format_count(MAX_SHOWN)} shown)`}
           </p>
           {found.map((group) => (
             <GroupPanel
