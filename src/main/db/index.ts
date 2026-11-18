@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { app } from 'electron'
 
-import { regexp_matches } from '@shared/query/compile'
+import { regexp_matches } from '@x-tech-laboratories/x-libs/filter_sql'
 
 export function library_path(): string {
   return process.env.X_MUSIC_DB ?? join(app.getPath('userData'), 'library.db')

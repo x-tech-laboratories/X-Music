@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import { input_schema, positional_args } from '@x-tech-laboratories/x-libs/api_spec'
 import { is_read_only, mcp_instructions, x_music_api } from '@shared/api'
-import type { FilterNode } from '@shared/filter'
+import type { FilterNode } from '@x-tech-laboratories/x-libs/filter'
 import { api_method_names, history_channels, page_method_names, x_music_bridge, type TrackRow } from '@shared/ipc'
 import { query_tracks } from '@shared/library/store'
 import { add_track, fresh_db } from './sqlite.ts'

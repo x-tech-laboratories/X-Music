@@ -2,7 +2,7 @@
 // from the schema without any typecheck noticing. This test is what catches that.
 
 import { describe, expect, it } from 'vitest'
-import { and, leaf } from '@shared/filter'
+import { and, leaf } from '@x-tech-laboratories/x-libs/filter'
 import { group_tracks, query_tracks } from '@shared/library/store'
 import { make_corpus } from './corpus.ts'
 import { fresh_db, load_corpus } from './sqlite.ts'
@@ -16,7 +16,7 @@ describe('song list row projection', () => {
     const rows = query_tracks(db, {
       filter: and(),
       sort: [{ field: 'album' }, { field: 'track_number' }],
-      limit: { count: 10 }
+      limit: 10
     })
     expect(rows.length).toBeGreaterThan(0)
 
@@ -46,12 +46,12 @@ describe('song list row projection', () => {
     load_corpus(db, corpus)
 
     const all = query_tracks(db, { filter: and(), sort: [{ field: 'title' }] })
-    const page = query_tracks(db, { filter: and(), sort: [{ field: 'title' }], limit: { count: 5 }, offset: 5 })
+    const page = query_tracks(db, { filter: and(), sort: [{ field: 'title' }], limit: 5, offset: 5 })
     const groups = group_tracks(db, { filter: and(), field: 'genre' })
 
     expect(page.map((row) => row.id)).toEqual(all.slice(5, 10).map((row) => row.id))
     expect(groups.map((group) => group.label)).toContain('Jazz')
-    expect(typeof groups[0]!.gid).toBe('string')
+    expect(typeof groups[0]!.group_id).toBe('string')
     db.close()
   })
 })

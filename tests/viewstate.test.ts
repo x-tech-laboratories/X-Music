@@ -7,22 +7,27 @@ import { sanitize_pane_field, sanitize_pane_values, sanitize_sort_keys } from '@
 
 describe('sanitizeSortKeys', () => {
   it('keeps valid keys and normalises direction', () => {
-    expect(sanitize_sort_keys([{ field: 'album', dir: 'desc' }, { field: 'year' }]))
-      .toEqual([{ field: 'album', dir: 'desc' }, { field: 'year', dir: 'asc' }])
+    expect(sanitize_sort_keys([{ field: 'album', descending: true }, { field: 'year' }]))
+      .toEqual([{ field: 'album', descending: true }, { field: 'year', descending: false }])
+  })
+
+  it('reads keys an earlier version saved with dir and seed', () => {
+    expect(sanitize_sort_keys([{ field: 'album', dir: 'desc' }, { field: 'year', dir: 'asc' }, { field: 'random', seed: 'x' }]))
+      .toEqual([{ field: 'album', descending: true }, { field: 'year', descending: false }, { field: 'random', descending: false }])
   })
 
   it('drops keys naming a field that no longer exists', () => {
     expect(sanitize_sort_keys([{ field: 'album' }, { field: 'a_deleted_user_field' }]))
-      .toEqual([{ field: 'album', dir: 'asc' }])
+      .toEqual([{ field: 'album', descending: false }])
   })
 
   it('keeps the random pseudo-field, which the catalogue does not contain', () => {
-    expect(sanitize_sort_keys([{ field: 'random' }])).toEqual([{ field: 'random', dir: 'asc' }])
+    expect(sanitize_sort_keys([{ field: 'random' }])).toEqual([{ field: 'random', descending: false }])
   })
 
   it('drops duplicates, which would make sort priority ambiguous', () => {
-    expect(sanitize_sort_keys([{ field: 'album' }, { field: 'album', dir: 'desc' }]))
-      .toEqual([{ field: 'album', dir: 'asc' }])
+    expect(sanitize_sort_keys([{ field: 'album' }, { field: 'album', descending: true }]))
+      .toEqual([{ field: 'album', descending: false }])
   })
 
   it('returns nothing for a value of the wrong shape', () => {

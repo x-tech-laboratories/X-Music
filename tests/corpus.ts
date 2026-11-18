@@ -1,9 +1,19 @@
 // A deterministic synthetic library. Every test that needs data builds it from here so that a
 // failure is reproducible from its seed alone.
 
-import type { IndexedTrack } from '@shared/query/evaluate'
+import type { FilterRecord, FilterScalar } from '@x-tech-laboratories/x-libs/filter'
 
-export type CorpusTrack = IndexedTrack & { album_name: string | null }
+import { BUILTIN_FIELDS } from '@shared/fields'
+
+// One track as the corpus makes it: its own columns, its files, its multi-value fields and extras by field id.
+export interface CorpusTrack {
+  id: string
+  scalars: Record<string, string | number | null>
+  media: readonly Record<string, string | number | null>[]
+  sets: Record<number, readonly string[]>
+  extras: Record<number, string | null>
+  album_name: string | null
+}
 
 export interface Corpus {
   tracks: CorpusTrack[]
@@ -90,4 +100,16 @@ export function make_corpus(n: number, seed = 42): Corpus {
   }
 
   return { tracks, now: FIXED_NOW }
+}
+
+// A track as X-Libs' filter holds a record in memory: each field's value, a file property's value in each file.
+export function record_of(track: CorpusTrack): FilterRecord {
+  const values: Record<string, FilterScalar | readonly FilterScalar[]> = {}
+  for (const field of BUILTIN_FIELDS) {
+    if (field.storage === 'multi') values[field.id] = track.sets[field.field_id!] ?? []
+    else if (field.storage === 'extra') values[field.id] = track.extras[field.field_id!] ?? null
+    else if (field.storage === 'media') values[field.id] = track.media.map((file) => file[field.column ?? field.id] ?? null)
+    else values[field.id] = track.scalars[field.id] ?? null
+  }
+  return { id: track.id, values }
 }

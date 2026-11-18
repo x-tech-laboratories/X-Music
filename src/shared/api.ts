@@ -31,8 +31,8 @@ const leaf: JsonSchema = {
         'in_playlist', 'in_filter', 'matches'
       ]
     },
-    value: { description: 'A text, number, true or false, a list of texts or numbers, or a span such as {"n": 30, "unit": "day"} for in_last; left out for empty and defined.' },
-    cs: { type: 'boolean', description: 'Whether text compares case by case; false unless set.' }
+    value: { description: 'A text, number, true or false, a list of texts or numbers, or a span such as {"count": 30, "unit": "day"} for in_last; left out for empty and defined.' },
+    case_sensitive: { type: 'boolean', description: 'Whether text compares case by case; false unless set.' }
   },
   required: ['field', 'op'],
   additionalProperties: false
@@ -56,19 +56,13 @@ const sort: JsonSchema = {
   description: 'The order, first key first.',
   items: {
     type: 'object',
-    properties: { field: { type: 'string', enum: [...field_ids, 'random'] }, dir: { type: 'string', enum: ['asc', 'desc'] }, seed: { type: 'string' } },
+    properties: { field: { type: 'string', enum: [...field_ids, 'random'] }, descending: { type: 'boolean', description: 'Whether the key runs from high to low; low to high unless set.' } },
     required: ['field'],
     additionalProperties: false
   }
 }
 
-const limit: JsonSchema = {
-  type: 'object',
-  description: 'At most this many tracks, or tracks adding up to this many milliseconds or bytes.',
-  properties: { count: { type: 'integer', minimum: 1 }, by: { type: 'string', enum: ['tracks', 'duration', 'filesize'] } },
-  required: ['count'],
-  additionalProperties: false
-}
+const limit: JsonSchema = { type: 'integer', minimum: 1, description: 'At most this many tracks.' }
 
 const resolutions: JsonSchema = {
   type: 'object',

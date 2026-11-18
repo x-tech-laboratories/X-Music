@@ -5,30 +5,23 @@
 // nothing with no visible cause, so everything restored is checked against the current catalogue
 // and anything unrecognised is dropped.
 
+import { random_field, type SortKey } from '@x-tech-laboratories/x-libs/filter'
+
 import { FIELDS_BY_ID } from './fields.ts'
-import type { SortKey } from './filter.ts'
+import { upgrade_sort } from './filter_shapes.ts'
 
 const known = (field_id: unknown): field_id is string =>
   typeof field_id === 'string' && FIELDS_BY_ID.has(field_id)
 
+// Sort keys in today's shape from either saved shape, each field once and only fields that still exist.
 export function sanitize_sort_keys(value: unknown): SortKey[] {
-  if (!Array.isArray(value)) return []
-
   const out: SortKey[] = []
-  const seen = new Set<string>()
-
-  for (const entry of value) {
-    if (entry === null || typeof entry !== 'object') continue
-    const { field, dir } = entry as { field?: unknown; dir?: unknown }
-
+  for (const key of upgrade_sort(value)) {
     // `random` is a pseudo-field the catalogue does not contain but sorting understands.
-    if (!known(field) && field !== 'random') continue
-    if (seen.has(field as string)) continue
-
-    seen.add(field as string)
-    out.push({ field: field as string, dir: dir === 'desc' ? 'desc' : 'asc' })
+    if (!known(key.field) && key.field !== random_field) continue
+    if (out.some((kept) => kept.field === key.field)) continue
+    out.push(key)
   }
-
   return out
 }
 

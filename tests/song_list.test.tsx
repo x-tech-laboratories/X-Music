@@ -153,7 +153,7 @@ describe('song list', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Title/ }))
 
-    await vi.waitFor(() => expect(calls.get('list_tracks')).toHaveBeenCalledWith(expect.anything(), [{ field: 'title', dir: 'asc' }]))
+    await vi.waitFor(() => expect(calls.get('list_tracks')).toHaveBeenCalledWith(expect.anything(), [{ field: 'title', descending: false }]))
   })
 
   it('marks the playing track with Halon\'s now-playing row', () => {

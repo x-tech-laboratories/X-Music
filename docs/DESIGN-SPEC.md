@@ -577,7 +577,7 @@ panes. It has exactly two node kinds.
 { "op": "and", "children": [
     { "field": "rating",     "op": ">=",       "value": 80 },
     { "field": "genre",      "op": "any",      "value": ["Jazz", "Blues"] },
-    { "field": "last_played","op": "not_in_last", "value": { "n": 30, "unit": "day" } },
+    { "field": "last_played","op": "not_in_last", "value": { "count": 30, "unit": "day" } },
     { "op": "or", "children": [
         { "field": "year",   "op": "between",  "value": [1955, 1969] },
         { "field": "tags",   "op": "any",      "value": ["essential"] }
@@ -633,16 +633,16 @@ A smart playlist = filter AST + sort spec + optional limit + refresh policy.
   "name": "Neglected Gems",
   "filter":  { "op": "and", "children": [
       { "field": "rating", "op": ">=", "value": 80 },
-      { "field": "last_played", "op": "not_in_last", "value": { "n": 6, "unit": "month" } }
+      { "field": "last_played", "op": "not_in_last", "value": { "count": 6, "unit": "month" } }
   ]},
-  "sort":  [ { "field": "rating", "dir": "desc" }, { "field": "random", "seed": "session" } ],
-  "limit": { "count": 100, "by": "tracks" },   // or by: "duration" / "filesize"
+  "sort":  [ { "field": "rating", "descending": true }, { "field": "random" } ],
+  "limit": 100,                                 // at most this many tracks
   "refresh": "live",                            // live | on_open | manual
   "dedupe": { "by": "mb_recording_id", "keep": "highest_bitrate" }
 }
 ```
 
-`sort` supports a `random` pseudo-field with a seed policy (`session`, `daily`, `fixed:<n>`), and a
+`sort` supports a `random` pseudo-field, shuffled each time the list is read, and a
 `weighted_random` pseudo-field taking a weight expression — this is how gmusicbrowser's excellent
 "play what I like but haven't heard lately" shuffle gets reproduced:
 
@@ -670,9 +670,9 @@ what the remembered view settings already store (§5.3.1) and what a smart playl
 
 ```jsonc
 "sort": [
-  { "field": "rating",      "dir": "desc" },
-  { "field": "play_count",  "dir": "desc" },
-  { "field": "last_played", "dir": "asc" },
+  { "field": "rating",      "descending": true },
+  { "field": "play_count",  "descending": true },
+  { "field": "last_played" },
   { "field": "album" }, { "field": "disc_number" }, { "field": "track_number" }
 ]
 ```
