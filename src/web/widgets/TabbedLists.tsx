@@ -10,7 +10,6 @@ import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import { row_after_key } from '@x-tech-laboratories/x-libs/web/selection'
 import { player } from '../stores/player.ts'
 import { library, type TrackId, type TrackName } from '../stores/library.ts'
-import s from './TabbedLists.module.css'
 
 const tabs = [
   { id: 'queue', label: 'Queue' },
@@ -91,7 +90,7 @@ function Queue({ queue }: { queue: TrackId[] }) {
   ]
 
   return (
-    <div className={s.queue}>
+    <div className="scroll-pane">
       <div className="panel-head">
         <span className="muted small">{plural(queue.length, 'track')} queued</span>
         <button type="button" onClick={() => void player.clear_queue()}>Clear queue</button>
@@ -152,9 +151,9 @@ export function TabbedLists() {
   }
 
   return (
-    <section className={s.tabbed}>
+    <section className="scroll-pane">
       <Tabs label="Lists" items={[...tabs]} active={tab} on_select={set_tab} />
-      <div className={s.body}>{body}</div>
+      <div className="scroll-pane-body">{body}</div>
     </section>
   )
 }

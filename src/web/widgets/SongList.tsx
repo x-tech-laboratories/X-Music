@@ -209,7 +209,7 @@ export function SongList() {
   }
 
   return (
-    <section className="song-list" aria-label="Tracks">
+    <section className="scroll-pane" aria-label="Tracks">
       <div className="song-list-tools">
         <span ref={(element) => { search_area = element }}>
           <SearchBox label="Search the library" value={state.search} on_input={(text) => void library.set_search(text)} />

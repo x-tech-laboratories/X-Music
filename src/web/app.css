@@ -1,16 +1,12 @@
 /* X-Music's own layout; the frame, colours and widget looks come from the contained Shell and Halon. */
 
-/* ── Sidebar: the views over the player and its lists ───────────────────────── */
-
+/* The player and its lists fill the sidebar below the views. */
 .player-column { display: grid; flex: 1; min-height: 0; }
 
-/* ── Library: the panes fill main and scroll on their own ───────────────────── */
-
+/* The library's heading over its panes, which fill main and scroll on their own. */
 .library-view { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--space-5); min-height: 0; }
 
-/* ── Song list ──────────────────────────────────────────────────────────────── */
-
-.song-list { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--space-2); min-height: 0; }
+/* The song list's search, chips and hints over its table. */
 .song-list-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .song-list-spacer { flex: 1; }
 .song-list-body { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; overflow: hidden; }

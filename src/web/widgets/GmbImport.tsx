@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { PathInput, Switch } from '@x-tech-laboratories/x-libs/web/react/controls'
-import { Facts, FormRow, Section, SettingRow, Tile, Tiles } from '@x-tech-laboratories/x-libs/web/react/layout'
+import { Facts, FormRow, Section, SettingRow, Tile, Tiles, Toolbar } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
@@ -131,11 +131,11 @@ export function GmbImport() {
                 </SettingRow>
               ))}
             </div>
-            <div className="toolbar">
+            <Toolbar>
               <button type="button" className="accent solid" disabled={busy || found.songs === 0} onClick={() => void run()}>
                 {busy ? 'Importing…' : `Import ${plural(found.songs, 'track')}`}
               </button>
-            </div>
+            </Toolbar>
             <p className="muted">
               Your music files are only read. To start afresh rather than add to the library, clear it
               under <a href={view_href('settings')}>Settings</a> first.
