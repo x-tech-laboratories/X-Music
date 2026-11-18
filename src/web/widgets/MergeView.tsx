@@ -105,8 +105,8 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
     <Stack>
       {preview.pinned_sources.length > 0 && (
         <p className="tone-warn">
-          {plural(preview.pinned_sources.length, 'source')} of these was merged or split by hand before. Merging replaces
-          that decision.
+          {plural(preview.pinned_sources.length, 'source')} of these {preview.pinned_sources.length === 1 ? 'was' : 'were'} merged
+          or split by hand before. Merging replaces that decision.
         </p>
       )}
 

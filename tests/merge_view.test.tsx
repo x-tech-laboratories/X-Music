@@ -55,6 +55,17 @@ describe('merge view', () => {
     expect(only_differences.closest('label')?.textContent).toBe('Only differences')
   })
 
+  it('warns that merging replaces an earlier decision made by hand', async () => {
+    record_calls({ 'get_merge_preview': { ...preview, pinned_sources: ['track-11', 'track-12'] } })
+    render(<MergeView ids={['track-11', 'track-12']} />)
+    expect(await screen.findByText(/^2 sources of these were merged or split by hand before\./)).toBeTruthy()
+    cleanup()
+
+    record_calls({ 'get_merge_preview': { ...preview, pinned_sources: ['track-12'] } })
+    render(<MergeView ids={['track-11', 'track-12']} />)
+    expect(await screen.findByText(/^1 source of these was merged or split by hand before\./)).toBeTruthy()
+  })
+
   it('sends the winners the grid shows, then offers Undo in a toast', async () => {
     const calls = record_calls({ 'get_merge_preview': preview, 'merge_tracks': result, 'undo_merge': { restored: 1 } })
     const on_close = vi.fn()
