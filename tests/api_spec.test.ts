@@ -2,8 +2,11 @@
 
 import { describe, expect, it } from 'vitest'
 import { input_schema, positional_args } from '@x-tech-laboratories/x-libs/api_spec'
-import { is_read_only, x_music_api } from '@shared/api'
-import { api_method_names, history_channels, page_method_names } from '@shared/ipc'
+import { is_read_only, mcp_instructions, x_music_api } from '@shared/api'
+import type { FilterNode } from '@shared/filter'
+import { api_method_names, history_channels, page_method_names, x_music_bridge, type TrackRow } from '@shared/ipc'
+import { query_tracks } from '@shared/library/store'
+import { add_track, fresh_db } from './sqlite.ts'
 
 describe('api spec', () => {
   it('describes every call other programs may make, and none only the window makes', () => {
@@ -26,5 +29,28 @@ describe('api spec', () => {
     expect(input_schema(merge)).toMatchObject({ required: ['track_ids', 'survivor_id'] })
     expect(positional_args(merge, { survivor_id: 'track-2', track_ids: ['track-1', 'track-2'] })).toEqual([['track-1', 'track-2'], 'track-2'])
     expect(positional_args(x_music_api.import_gmbrc, { path: '/tmp/gmbrc', playlists: false })).toEqual(['/tmp/gmbrc', undefined, undefined, false])
+  })
+})
+
+describe('dates on the api', () => {
+  it('says dates are Unix milliseconds, as the library stores them', () => {
+    expect(mcp_instructions).toMatch(/dates Unix milliseconds/)
+    expect(JSON.stringify(input_schema(x_music_api.list_tracks))).toMatch(/dates Unix milliseconds/)
+    expect(`${mcp_instructions} ${JSON.stringify(x_music_api)}`).not.toMatch(/Unix seconds/)
+  })
+
+  it('lets a client filter by when a track was added, in the unit the spec states', async () => {
+    const db = fresh_db()
+    const day = 24 * 60 * 60 * 1000
+    const now = Date.now()
+    const old_track = add_track(db, { title: 'Old', added: now - 30 * day })
+    const new_track = add_track(db, { title: 'New', added: now - day })
+    const api = { list_tracks: (filter: FilterNode) => query_tracks(db, { filter }) }
+
+    const added_after = (cutoff: number) => x_music_bridge.dispatch(api as never, 'list_tracks',
+      positional_args(x_music_api.list_tracks, { filter: { field: 'added', op: 'after', value: cutoff } })) as Promise<TrackRow[]>
+
+    expect((await added_after(now - 7 * day)).map((track) => track.id)).toEqual([new_track])
+    expect((await added_after(now - 60 * day)).map((track) => track.id).sort()).toEqual([old_track, new_track].sort())
   })
 })

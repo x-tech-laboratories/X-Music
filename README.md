@@ -198,7 +198,7 @@ is marked so, and a client asks before running it: `add_folder`, `remove_folder`
 The tools that remove or replace data can be undone as they are in the window: `clear_library` backs the
 library up first and is refused if that fails, `undo_merge` puts a merge back, and every change to a track,
 `restore_version` included, is a version in the history. A change made through MCP shows in the open window
-at once. Lengths are in milliseconds, ratings and the volume 0 to 100, dates Unix seconds, and ids are opaque
+at once. Lengths are in milliseconds, ratings and the volume 0 to 100, dates Unix milliseconds, and ids are opaque
 strings from the `list_` and `get_` tools. The dialogs, the file manager and the window's log are not
 offered.
 
