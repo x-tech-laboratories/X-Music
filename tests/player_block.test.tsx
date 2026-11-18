@@ -5,6 +5,7 @@ import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Toasts } from '@x-tech-laboratories/x-libs/web/react/toasts'
+import { describe_keys } from '@x-tech-laboratories/x-libs/web/react/shortcuts'
 import type { PlayerStatus } from '@shared/ipc'
 import { player, player_position, player_status } from '../src/web/stores/player.ts'
 import { PlayerBlock } from '../src/web/widgets/PlayerBlock.tsx'
@@ -48,6 +49,17 @@ describe('player block', () => {
       expect(button.textContent).toBe('')
     }
     expect(screen.queryByRole('button', { name: 'Play' })).toBeNull()
+  })
+
+  it('names each transport button\'s shortcut as X-Libs writes keys', () => {
+    record_calls()
+    player_status.set({ ...idle, state: 'playing', track })
+
+    render(<PlayerBlock />)
+
+    expect(screen.getByRole('button', { name: 'Previous' }).getAttribute('title')).toBe(`Previous (${describe_keys('alt+arrowleft')})`)
+    expect(screen.getByRole('button', { name: 'Pause' }).getAttribute('title')).toBe(`Pause (${describe_keys('ctrl+space')})`)
+    expect(screen.getByRole('button', { name: 'Next' }).getAttribute('title')).toBe(`Next (${describe_keys('alt+arrowright')})`)
   })
 
   it('shows shuffle and repeat as pressed toggles and cycles repeat', async () => {
