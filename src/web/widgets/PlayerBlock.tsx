@@ -100,7 +100,7 @@ export function PlayerBlock() {
             <VolumeButton volume={status?.volume ?? 80} on_change={(volume) => void player.set_volume(volume)} />
           </div>
 
-          <div className={cx(s.line, s.title)} title={track?.title ?? ''}>{track?.title ?? 'Nothing playing'}</div>
+          <div className={cx(s.line, s.title)} title={track?.title ?? ''}>{track ? track.title ?? 'Untitled track' : 'Nothing playing'}</div>
           <div className={cx(s.line, s.artist)} title={track?.artist ?? ''}>{track?.artist ?? '—'}</div>
           <div className={cx(s.line, s.album)} title={track?.album ?? ''}>{track?.album ?? '—'}</div>
 

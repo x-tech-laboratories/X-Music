@@ -104,6 +104,16 @@ describe('player block', () => {
     expect(screen.getByText('Nothing playing')).toBeTruthy()
   })
 
+  it('calls a playing track with no title an untitled track, not nothing playing', () => {
+    record_calls()
+    player_status.set({ ...idle, state: 'playing', track: { ...track, title: null } })
+
+    render(<PlayerBlock />)
+
+    expect(screen.getByText('Untitled track')).toBeTruthy()
+    expect(screen.queryByText('Nothing playing')).toBeNull()
+  })
+
   it('keeps the store readable through the player module', () => {
     player_status.set({ ...idle, state: 'playing', track })
 
