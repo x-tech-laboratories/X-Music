@@ -5,10 +5,10 @@ import { describe, expect, it } from 'vitest'
 import { existsSync } from 'node:fs'
 import { has_live_library, open_live_copy } from './live.ts'
 
-import { MpvEngine, find_mpv } from '@main/play/mpv'
+import { MpvEngine, find_mpv } from '@x-tech-laboratories/x-libs/mpv'
 import { Player } from '@main/play/player'
 
-const mpv = (await find_mpv()) ?? undefined
+const mpv = (await find_mpv(process.env.X_MUSIC_MPV)) ?? undefined
 
 describe.runIf(has_live_library() && mpv)('playback against the real library', () => {
   it('loads a real track and the position advances', async () => {
@@ -71,7 +71,7 @@ describe.runIf(has_live_library() && mpv)('playback against the real library', (
       { uri: string }).uri
 
     // Options go in mpv's options slot, not its index slot; the wrong slot is 'invalid parameter'.
-    await engine.load(uri, { start_ms: 5000, gain_db: -6 })
+    await engine.load(uri, { start_in_milliseconds: 5000, gain_in_decibels: -6 })
     await new Promise((r) => setTimeout(r, 800))
 
     expect(seen).toContain('playing')

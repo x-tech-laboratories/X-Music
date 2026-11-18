@@ -2,7 +2,7 @@
 // against a fake engine, so none of this depends on an audio backend being present.
 
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
-import { NullEngine } from '@main/play/engine'
+import { NullEngine } from '@x-tech-laboratories/x-libs/mpv'
 import { Player, counts_as_play, shuffle_order } from '@main/play/player'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -279,6 +279,41 @@ describe('queue and context', () => {
 
     await player.previous()
     expect(player.status().track?.id).toBe(a)
+  })
+
+  it('starts the track again after mpv quits by itself, and has nothing to pause meanwhile', async () => {
+    const [a, b] = [make_track(), make_track()]
+    player.set_context([a, b], 0)
+    await player.play_track(a, 0)
+
+    // The engine going idle on its own is how a clean quit of mpv shows.
+    await engine.stop()
+    expect(player.status().state).toBe('idle')
+    expect(player.status().track?.id).toBe(a)
+
+    await player.pause()
+    expect(engine.state).toBe('idle')
+
+    await player.toggle()
+    expect(player.status().state).toBe('playing')
+    expect(engine.loaded).toEqual([engine.uri, engine.uri])
+  })
+
+  it('hands the engine the file\'s part and loudness change', async () => {
+    const options: unknown[] = []
+    const recording = new (class extends NullEngine {
+      override async load(uri: string, load_options?: unknown): Promise<void> {
+        options.push(load_options)
+        await super.load(uri)
+      }
+    })()
+    const id = make_track({ track_gain: -6 })
+    db.prepare('UPDATE media SET start_ms = 1000, end_ms = 5000 WHERE track_id = ?').run(id)
+    const gained = new Player(db, recording, { replay_gain: 'track', preamp_db: 2 })
+
+    await gained.play_track(id)
+    expect(options).toEqual([{ start_in_milliseconds: 1000, end_in_milliseconds: 5000, gain_in_decibels: -4 }])
+    await gained.dispose()
   })
 
   it('removes a queued track by position', async () => {
