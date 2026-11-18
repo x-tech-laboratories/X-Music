@@ -34,7 +34,10 @@ jobs:
             PR NUMBER: ${{ github.event.pull_request.number }}
 
             Review this pull request against the rules in AGENTS.md. Focus on:
-            - Bugs, and anything that breaks DESIGN-SPEC or the rules in AGENTS.md.
+            - Bugs, and anything that breaks the X-Tech Application Standard
+              (https://x-tech-laboratories.github.io/standards/application/), the Design Guidelines
+              (https://x-tech-laboratories.github.io/standards/design/), docs/DESIGN-SPEC.md or the rules
+              in AGENTS.md. Where the design spec disagrees with the standards, the standards win.
             - Missing or weak tests for changed behaviour.
 
             Use inline comments for specific problems and one short summary comment.
