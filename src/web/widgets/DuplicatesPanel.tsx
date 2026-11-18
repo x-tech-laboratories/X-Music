@@ -9,6 +9,7 @@ import { Empty, Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/rea
 import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
+import { use_route } from '@x-tech-laboratories/x-libs/web/react/shell'
 import { is_number_in } from '@x-tech-laboratories/x-libs/web/prefs'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
@@ -18,8 +19,7 @@ import type { DuplicateGroup, DuplicateMember, DuplicateReason, MergeResult } fr
 import { ipc } from '../lib/ipc.ts'
 import { library } from '../stores/library.ts'
 import { MergeView } from './MergeView.tsx'
-
-type TrackId = DuplicateMember['track_id']
+import { close_overlay, open_overlay, overlay_of } from '../views/routes.ts'
 
 const MAX_SHOWN = 200
 
@@ -108,7 +108,8 @@ export function DuplicatesPanel() {
   )
   const [merges, set_merges] = useState<Record<string, MergeResult>>({})
   const [working, set_working] = useState<Record<string, boolean>>({})
-  const [reviewing, set_reviewing] = useState<TrackId[] | null>(null)
+  // A reviewed merge opens at its own address, so Back closes it and a reload returns to it.
+  const overlay = overlay_of(use_route().parts)
 
   const reasons = REASONS.map((reason) => reason.id).filter((id) => enabled[id])
 
@@ -184,17 +185,18 @@ export function DuplicatesPanel() {
               merged={merges[group.key] !== undefined}
               working={working[group.key] ?? false}
               on_quick_merge={() => void quick_merge(group)}
-              on_review={() => set_reviewing(group.members.map((member) => member.track_id))}
+              on_review={() => open_overlay('duplicates', { kind: 'merge', track_ids: group.members.map((member) => member.track_id) })}
             />
           ))}
         </>
       )}</Loaded>
 
-      {reviewing && (
+      {overlay?.kind === 'merge' && (
         <MergeView
-          ids={reviewing}
+          key={overlay.track_ids.join('/')}
+          ids={overlay.track_ids}
           on_close={(merged) => {
-            set_reviewing(null)
+            close_overlay()
             if (merged) {
               void library.refresh()
               void groups.reload()

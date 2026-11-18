@@ -6,6 +6,7 @@ import { SearchBox } from '@x-tech-laboratories/x-libs/web/react/controls'
 import { SelectionBar } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { open_context_menu } from '@x-tech-laboratories/x-libs/web/react/menus'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
+import { use_route } from '@x-tech-laboratories/x-libs/web/react/shell'
 import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { describe_keys } from '@x-tech-laboratories/x-libs/web/react/shortcuts'
 import { Empty, Skeleton } from '@x-tech-laboratories/x-libs/web/react/states'
@@ -22,6 +23,7 @@ import { player } from '../stores/player.ts'
 import { logger } from '../lib/log.ts'
 import { MergeView } from './MergeView.tsx'
 import { SongProperties } from './SongProperties.tsx'
+import { close_overlay, open_overlay, overlay_of } from '../views/routes.ts'
 
 const log = logger('songlist')
 
@@ -81,8 +83,10 @@ export function SongList() {
   use_watch(library.selection_changes)
   use_watch(player.status_changes)
 
-  const [merging, set_merging] = useState<TrackId[] | null>(null)
-  const [inspecting, set_inspecting] = useState<TrackId | null>(null)
+  // Properties and Merge open at their own address, so Back closes them and a reload returns to them.
+  const overlay = overlay_of(use_route().parts)
+  const inspect = (track_id: TrackId): void => open_overlay('library', { kind: 'properties', track_id })
+  const merge = (track_ids: TrackId[]): void => open_overlay('library', { kind: 'merge', track_ids })
   // The keyboard cursor: which row arrow keys move from.
   const [cursor, set_cursor] = useState(0)
   const body = useRef<HTMLDivElement>(null)
@@ -121,8 +125,8 @@ export function SongList() {
       { label: 'Play', hint: describe_keys('enter'), run: () => play_from(index) },
       { label: many ? `Play ${ids.length} next` : 'Play next', run: () => void player.enqueue(ids, 'next') },
       { label: many ? `Add ${ids.length} to queue` : 'Add to queue', run: () => void player.enqueue(ids, 'end') },
-      { label: 'Properties', hint: describe_keys('alt+enter'), separator_before: true, disabled: many, run: () => set_inspecting(track.id) },
-      { label: `Merge ${ids.length} tracks…`, disabled: !many, run: () => set_merging(ids) }
+      { label: 'Properties', hint: describe_keys('alt+enter'), separator_before: true, disabled: many, run: () => inspect(track.id) },
+      { label: `Merge ${ids.length} tracks…`, disabled: !many, run: () => merge(ids) }
     ])
   }
 
@@ -133,7 +137,7 @@ export function SongList() {
 
     if (event.key === 'Enter') {
       event.preventDefault()
-      if (event.altKey) set_inspecting(track.id)
+      if (event.altKey) inspect(track.id)
       else play_from(index)
       return
     }
@@ -233,17 +237,18 @@ export function SongList() {
         <SelectionBar count={selected_count} total={order.length} on_clear={() => library.clear_selection()} on_select_all={() => library.select_all()}>
           <button type="button" onClick={() => void player.enqueue(library.selected_ids(), 'next')}>Play next</button>
           <button type="button" onClick={() => void player.enqueue(library.selected_ids(), 'end')}>Add to queue</button>
-          {selected_count > 1 && <button type="button" onClick={() => set_merging(library.selected_ids())}>Merge…</button>}
+          {selected_count > 1 && <button type="button" onClick={() => merge(library.selected_ids())}>Merge…</button>}
         </SelectionBar>
       )}
 
-      {inspecting !== null && <SongProperties track_id={inspecting} on_close={() => set_inspecting(null)} />}
+      {overlay?.kind === 'properties' && <SongProperties track_id={overlay.track_id} on_close={close_overlay} />}
 
-      {merging && (
+      {overlay?.kind === 'merge' && (
         <MergeView
-          ids={merging}
+          key={overlay.track_ids.join('/')}
+          ids={overlay.track_ids}
           on_close={(merged) => {
-            set_merging(null)
+            close_overlay()
             if (merged) library.clear_selection()
           }}
         />
