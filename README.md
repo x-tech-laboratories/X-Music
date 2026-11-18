@@ -4,11 +4,14 @@
 
 <a href="https://liberapay.com/BeatLink/donate"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a> <a href="https://ko-fi.com/I4V52ANK6N"><img alt="Support me on Ko-fi" src="https://ko-fi.com/img/githubbutton_sm.svg"></a>
 
-A desktop music player with gmusicbrowser's data model and power, a web-technology UI that users can
-re-layout and re-skin, drawn with the shared X-Libs widgets and the Halon theme (`@x-tech-laboratories/halon`).
+A desktop music player with gmusicbrowser's data model and power, drawn with the shared X-Libs widgets
+(`@x-tech-laboratories/x-libs`) and styled by Halon (`@x-tech-laboratories/halon`), the theme every X-app
+shares, with its light, dark and density choices.
 
-The design is specified in full in [DESIGN-SPEC.md](docs/DESIGN-SPEC.md). This README covers only how to
-run what exists.
+The design is specified in full in [DESIGN-SPEC.md](docs/DESIGN-SPEC.md); where it disagrees with the
+X-Tech [Application Standard](https://x-tech-laboratories.github.io/standards/application/) or
+[Design Guidelines](https://x-tech-laboratories.github.io/standards/design/), the standards win. This README
+covers only how to run what exists.
 
 ## Status
 
@@ -27,8 +30,9 @@ implemented yet. See the roadmap in DESIGN-SPEC §15.
 | Field descriptor system | working |
 | Format-string engine | working |
 | View state (selection, sort, virtualization, on X-Libs) | working |
-| Halon theming | working |
+| Halon styling, with light, dark and three densities | working |
 | Renderer shell (React on the X-Libs widgets and Halon) | working |
+| Rearranging the window and rebinding keys, on X-Libs' plugin host and settings | planned (DESIGN-SPEC §5) |
 | Playback (mpv, queue, repeat/shuffle, play counting) | working |
 | MPRIS, media keys, crossfade | not started |
 | Tag writing | not started |
@@ -53,6 +57,13 @@ and the limit that forces it:
   server, nothing syncs between devices.
 - **Desktop scripts.** With no server or web page there is nothing for `dev:server`, `dev:web` or `start` to
   run, so X-Music has none of them; `build` runs `build:desktop`, and `start:desktop` runs the built app.
+
+What follows from being desktop-only, and is not a further deviation: with no server there are no accounts
+to sign in to, no HTTP API or OpenAPI document (other programs use the [MCP server](#mcp-server) instead),
+and no sync. X-Music has no theming of its own; it is styled by Halon, with the theme and density chosen
+under Settings → Appearance. Rearranging the window and rebinding keys are planned on X-Libs' plugin host
+and settings, not on layout or keymap files of X-Music's own; none of it is built yet, and X-Music has no
+plugins yet either.
 
 ## The one idea worth knowing
 
@@ -88,12 +99,14 @@ otherwise makes Electron run as bare node and die on the ESM entry point.
 | `npm run build:desktop` | Typecheck and build to `out/` |
 | `npm run start:desktop` | Run the built app |
 | `npm test` | Full suite |
+| `npm run test:coverage` | Full suite with a coverage report |
+| `npm run check` | Typecheck, then the full suite |
 | `npm run test:watch` | Watch mode |
 | `npm run bench` | Performance budget benchmarks |
 | `npm run typecheck` | `tsc -b` for main/preload, for the page and for the tests |
 | `npm run lint` | `oxlint` |
 | `npm run icons` | Generate `resources/icon.png` from `resources/icon.svg` |
-| `npm run app` | Build if needed and launch |
+| `npm run app` | Build if needed and launch, on a scratch library unless asked for the real one |
 | `npm run upgrade:dry-run -- <library.db>` | Try the upgrade of an older library on a copy and report on it |
 | `npm run db:generate` | Write a migration for a change to `src/shared/library/schema.ts` and bundle the migrations |
 
@@ -111,25 +124,25 @@ X_MUSIC_LOG=warn,play:debug npm run app    # quiet, except playback
 X_MUSIC_LOG_FILE=/tmp/x-music.log npm run app
 ```
 
-Levels are `critical`, `error`, `warn`, `info` (default) and `debug`; `warning`, `err`, `verbose`
+Levels are `critical`, `error`, `warn`, `info` (default) and `debug`; `crit`, `warning`, `err`, `verbose`
 and `trace` are accepted as aliases. A scope can be raised or lowered on its own with
-`scope:level`, and `*:level` sets the default. Scopes in use: `app`, `play`, and `ui:*` for anything
-originating in the renderer.
+`scope:level`, and `*:level` sets the default. Scopes in use: `app`, `play`, and `page.*` for anything
+originating in the renderer (`page.renderer`, `page.songlist`); `page:debug` turns all of those up.
 
-**Renderer records go to the same stream**, forwarded to the main process, so a UI failure is
-visible from the terminal rather than trapped in a devtools console nobody has open. Uncaught errors
-and unhandled rejections are reported automatically.
+**Renderer records go to the same stream**, forwarded to the main process through X-Libs' page log, so
+a UI failure is visible from the terminal rather than trapped in a devtools console nobody has open.
+Uncaught errors and unhandled rejections are reported automatically.
 
 A malformed `X_MUSIC_LOG` falls back to the default rather than silencing logging.
 
 ### Getting your library in
 
-Settings → Import reads a gmusicbrowser `gmbrc`, defaulting to the standard location for your
+The Import view, a row of the sidebar, reads a gmusicbrowser `gmbrc`, defaulting to the standard location for your
 platform. It imports ratings, play counts, skip counts, full play history, genres, groupings,
 labels and saved lists. A preview parses the file without writing anything, so you see the counts
 first.
 
-Settings → Folders adds music directories and scans them. Scanning reads tags only; it never
+The Folders view adds music directories and scans them. Scanning reads tags only; it never
 overwrites X-Music's own ratings or play counts, recognises moved and renamed files by audio content,
 and flags files that have disappeared rather than deleting their tracks.
 
@@ -221,11 +234,18 @@ with a row of every kind and checks that the upgrade keeps all of it.
 
 ```
 src/
-├── main/        Electron main: opens the database, scanner, artwork, playback, backups, IPC
+├── main/        Electron main: opens the database, scanner, artwork, playback, backups, IPC, MCP server
 ├── preload/     The typed IPC bridge, exposing only the declared contract
-├── web/         UI. Deliberately thin — see below.
+├── web/         UI: views, widgets, stores and layout CSS. Deliberately thin — see below.
 └── shared/      Imported by BOTH sides: field descriptors, filter AST, format strings, view state,
-                 and the library store (Drizzle schema, migrations, query compiler, history) in library/
+                 the IPC contract and api_spec, the gmusicbrowser importer in import/, and the
+                 library store (Drizzle schema, migrations, query compiler, history) in library/
+tests/           One *.test.ts or *.test.tsx per behaviour
+bench/           Performance budget benchmarks
+docs/            The design spec and the to-do list
+nix/             The Nix package; flake.nix and shell.nix sit at the top
+scripts/         run.sh behind npm run app, and the upgrade dry run
+resources/       icon.svg and the icons made from it
 ```
 
 `shared/` is where the leverage is. The filter AST, field descriptors, format-string engine and the

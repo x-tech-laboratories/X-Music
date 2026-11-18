@@ -1,8 +1,13 @@
 # X-Music — Design Specification
 
 **Status:** v0.3 · skeleton implemented · see README.md for what runs today
-**One line:** a desktop music player with gmusicbrowser's data model and power, a web-technology UI
-that users can re-layout and re-skin, and Halon as its reference theme.
+**One line:** a desktop music player with gmusicbrowser's data model and power, drawn with the X-Libs
+widgets and styled by Halon, in a window the user can rearrange.
+
+X-Music is an X-Tech application. The [Application Standard](https://x-tech-laboratories.github.io/standards/application/)
+and the [Design Guidelines](https://x-tech-laboratories.github.io/standards/design/) decide how it is built: its
+stack, its shared code in X-Libs and Halon, its settings, history, backups, API and tests. This spec says what
+X-Music does and why; where it and the standards disagree, the standards win, and the spec is corrected.
 
 ---
 
@@ -17,18 +22,19 @@ X-Music keeps the model and replaces the substrate:
 
 | gmusicbrowser | X-Music |
 |---|---|
-| Perl + GTK2 | Rust core + web UI in a native shell |
-| In-memory Perl column store | SQLite (source of truth) + in-memory columnar index |
-| `.layout` DSL, GTK widgets | JSON layout documents, web component registry |
-| GTK theme + per-widget hacks | CSS custom properties from a design-token file |
+| Perl + GTK2 | TypeScript on Electron, with a React page (§2) |
+| In-memory Perl column store | SQLite as the source of truth, with no in-memory index at the 50k target (§3.5.3) |
+| `.layout` DSL, GTK widgets | The X-Libs widgets, arranged through X-Libs' plugin slots and settings (§5) |
+| GTK theme + per-widget hacks | Halon, the X-apps' shared theme, with its light, dark and density choices (§5.4) |
 | Field defs hardcoded in `gmusicbrowser_songs.pm` | Field defs as data, user fields first-class |
 | Filter strings (`rating:>:60`) | Filter AST (JSON), compiles to SQL *and* to a native predicate |
 
 ### 1.1 Non-goals for v1
 
 - Not a streaming client. Local files (and network mounts) only. Streaming is a plugin surface later.
-- Not a mobile app. Desktop first; the UI being web tech makes a remote-control web view cheap later,
-  but it is not v1 scope.
+- Not a mobile or web app. X-Music is desktop-only, a deviation from the standard written in the
+  README: it plays through mpv on the computer it runs on and reads the music files from that
+  computer's disks.
 - Not a DJ tool, not a tag *database* (MusicBrainz Picard's job) — X-Music writes tags well but does
   not try to out-Picard Picard on acoustic fingerprinting.
 
@@ -36,9 +42,10 @@ X-Music keeps the model and replaces the substrate:
 
 1. 50,000-track library: cold start to interactive under 3 seconds; any filter, sort or group under
    100 ms. Larger libraries must degrade gracefully, not fall over (§12.1).
-2. Every gmusicbrowser filter operator has an X-Music equivalent, and an importer converts existing
-   gmusicbrowser filters and layouts.
-3. A user can move a panel, add a column, and restyle the whole app without recompiling anything.
+2. Every gmusicbrowser filter operator has an X-Music equivalent, an importer converts existing
+   gmusicbrowser filters, and gmusicbrowser's default layout has an X-Music arrangement.
+3. A user can move a panel, add a column, rebind a key, and switch between light, dark and the three
+   densities without recompiling anything.
 4. Tag edits round-trip losslessly across MP3/FLAC/Ogg/Opus/M4A/WavPack/APE.
 
 ---
@@ -51,8 +58,8 @@ X-Music keeps the model and replaces the substrate:
 │  Deliberately thin: it maps state to pixels and nothing else.       │
 │                                                                     │
 │  ┌───────────────┐  ┌──────────────┐  ┌────────────────────────┐    │
-│  │ Layout engine │  │ Widget       │  │ Theme runtime          │    │
-│  │ (JSON → tree) │  │ registry     │  │ (tokens → CSS vars)    │    │
+│  │ Views on the  │  │ X-Libs       │  │ Halon tokens and       │    │
+│  │ X-Libs Shell  │  │ stores       │  │ widget styles          │    │
 │  └───────────────┘  └──────────────┘  └────────────────────────┘    │
 └──────────────────────────────┬──────────────────────────────────────┘
               contextBridge IPC, typed by src/shared/ipc.ts
@@ -60,21 +67,21 @@ X-Music keeps the model and replaces the substrate:
 │  src/shared/  —  imported by BOTH sides, framework-free, no DOM     │
 │                                                                     │
 │  field descriptors · filter AST · format strings · view state       │
-│  filter stack · IPC types; selection, sort, panes, prefs from X-Libs │
+│  filter stack · IPC types · api_spec · the library store            │
 └──────────────────────────────┬──────────────────────────────────────┘
 ┌──────────────────────────────┴──────────────────────────────────────┐
 │  Main process (Node)                                                │
 │                                                                     │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐   │
 │  │ Library  │ │ Query    │ │ Tag I/O  │ │ Playback │ │ Services │   │
-│  │ index    │ │ AST→SQL  │ │ TagIO    │ │ Engine   │ │ MPRIS,   │   │
-│  │ scanner  │ │ AST→pred │ │ iface    │ │ iface    │ │ scrobble │   │
-│  │ hashing  │ │          │ │ (taglib) │ │ (mpv)    │ │ hotkeys  │   │
+│  │ scanner  │ │ AST→SQL  │ │ TagIO    │ │ Engine   │ │ local    │   │
+│  │ hashing  │ │ AST→pred │ │ iface    │ │ iface    │ │ MCP,     │   │
+│  │ artwork  │ │          │ │ (planned)│ │ (mpv)    │ │ backups  │   │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └──────────┘   │
 │       └────────────┴────────────┴────────────┘                      │
 │  SQLite (WAL) + FTS5 through node:sqlite, store in src/shared       │
 │                                                                     │
-│  worker_threads: scan · hash · replaygain                           │
+│  Scanning and hashing run on the main thread in batches (§9.1)      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -83,12 +90,12 @@ X-Music keeps the model and replaces the substrate:
 Chosen over Tauri after the evaluation in Appendix A. The short version: mpv neutralizes the
 playback argument, SQLite neutralizes most of the query argument, and scanning speed is background
 work — which strips Rust's advantage down to memory footprint and headroom above ~250k tracks. That
-is not worth a 2–3× slowdown in every UI iteration on a project whose two headline features (§5
-layout, §5.4 theming) are both UI work.
+is not worth a 2–3× slowdown in every UI iteration on a project whose headline feature, a window
+the user arranges (§5), is UI work. Electron is also what the Application Standard sets for a desktop
+app, wrapping the same React page as every other X-app.
 
 One rendering engine instead of three is a real secondary win: `:has()`, container queries and
-subgrid are all available, and the CSS baseline restrictions that a WebView-per-platform shell would
-impose (§6.4) do not apply.
+subgrid are all available (§6.4).
 
 The honest cost: ~150 MB install and ~350–500 MB resident for an app people leave running for weeks.
 
@@ -99,31 +106,46 @@ benefit), pure web/PWA (no tag writing, no gapless, no filesystem watch).
 ### 2.2 Renderer: TypeScript + React + Vite
 
 React 19, as the X-Tech Application Standard sets for every app, so X-Music shares its widgets with
-the other X-apps. The view-model stores are plain classes that bump a change counter, and a component
-watches one through `useSyncExternalStore`, so only the components that read a store re-render when
-it changes. That keeps the two hot paths — the song list and the playback position tick — from
-re-rendering the tree above them: the position has its own counter, which only the time bar watches.
+the other X-apps. The page lives in `src/web` and is drawn with the X-Libs widgets: the `Shell`, the
+`DataTable`, `FacetPane`, splits, dialogs, `PageView` and `SettingsPage`.
 
-Styles are CSS Modules: each component has a `Foo.module.css` beside it, with class names scoped at
-build time. Element selectors are not scoped by CSS Modules, so component stylesheets select on
-classes only.
+Shared state is a small module per concern built on the X-Libs stores, as the standard asks (no
+classes for UI): `src/web/stores/library.ts` and `src/web/stores/player.ts` hold their values in
+`create_store` and `create_watch`, and a component reads one through `use_store` or `use_watch`, so
+only the components that read a store re-render when it changes. That keeps the two hot paths — the
+song list and the playback position tick — from re-rendering the tree above them: the position is a
+store of its own, which only the time bar reads, coalesced to a steady pace.
+
+The look comes from Halon (§5.4). `src/web/app.css` and the few `*.module.css` files beside the
+widgets hold layout only and use Halon's tokens, never raw colours, and never restyle an X-Libs
+widget. Element selectors are not scoped by CSS Modules, so those stylesheets select on classes only.
 
 **This choice is deliberately made cheap to reverse.** See §2.4: everything that is expensive to
 rewrite lives outside the renderer.
 
 ### 2.3 Process model
 
-Three execution contexts, and the split is not optional:
+Two execution contexts, with mpv as a third process beside them:
 
-- **Main** — library, query engine, tag I/O, playback supervision, services. Owns the SQLite
-  connection; nothing else may open the database.
-- **`worker_threads` pool** — scanning, hashing, ReplayGain analysis. Mandatory,
-  not an optimization: a blocked main thread stalls playback *control* and the UI simultaneously.
+- **Main** — library, query engine, scanning and hashing, playback supervision, backups and the
+  local MCP server. Owns the SQLite connection; nothing else may open the database.
 - **Renderer** — presentation. No Node integration, `contextIsolation` on, and a strict CSP.
+
+Scanning and hashing run on the main thread, a batch of files at a time with one transaction per
+batch, which keeps the window answering at the §12 target. A blocked main thread stalls playback
+*control* and the UI together, so moving the scan, hashing and a future ReplayGain analysis into a
+worker thread is planned for very large first scans (§9.1); it is not built.
 
 IPC is `contextBridge` over the contract in `src/shared/ipc.ts`, built by the X-Libs `define_bridge` and
 `define_events` from one method table. Because both sides import the same
-module, the boundary is typechecked end to end with no codegen step.
+module, the boundary is typechecked end to end with no codegen step. The calls are named in
+snake_case by the standard's rule: a call that only reads starts with `list_` or `get_`
+(`list_tracks`, `get_track`), and every other call changes something (`merge_tracks`, `scan_folders`).
+The page reaches them as `window.xMusic` (the library and the player), `window.xMusicPage` (dialogs,
+the file manager and cover images, for the window alone), `window.xMusicHistory`,
+`window.xMusicBackups`, `window.xMusicLog` and `window.xMusicMcp`, and hears the main process's events
+through `window.xMusicEvents`. Field names on the wire are snake_case too (`total_ms`, `batch_id`,
+`position_ms`).
 
 **One hazard is worth writing down, because it cost a wrong fix.** `contextBridge` clones
 arguments as they cross from the page's world into the preload's isolated world — a clone that
@@ -152,9 +174,11 @@ Two decisions worth recording:
   the default forever — which is exactly the bug that made the first version silently drop every
   renderer debug line.
 
-The parsing lives in the X-Libs `log` module, apart from any transport, because the behaviour worth
-testing is what a malformed specification does: it falls back rather than silencing logging, and one
-bad entry does not discard the rest.
+Both sides are X-Libs: `create_main_log` (`electron/log`) in the main process and `create_page_log`
+(`web/page_log`) in the page, joined by the `window.xMusicLog` bridge, so the page's records arrive
+under `page.<scope>`. The parsing lives in the X-Libs `log` module, apart from any transport, because
+the behaviour worth testing is what a malformed specification does: it falls back rather than
+silencing logging, and one bad entry does not discard the rest.
 
 ### 2.4 The UI-agnostic boundary
 
@@ -170,7 +194,12 @@ access. It holds:
 | `filter.ts` | The filter AST, its operators, composition and cycle detection |
 | `format.ts` | The format-string language (§5.5) — labels, tray text, the file renamer |
 | `view.ts` | The filter stack |
+| `viewstate.ts` | Checking remembered browse state against the field catalogue (§5.3.1) |
 | `ipc.ts` | The IPC contract |
+| `api.ts` | Every call described once in an X-Libs `api_spec`, for the local MCP server (§10) |
+| `library/` | The store: Drizzle schema, migrations, identity, albums, merge, duplicates, history |
+| `query/` | The filter compilers: `compile.ts` (AST → SQL) and `evaluate.ts` (AST → predicate) |
+| `import/` | Reading and importing gmusicbrowser's `gmbrc` |
 
 Anchored range selection, multi-key sort with shift-click semantics and the arithmetic deciding
 which rows a viewport needs are framework-neutral logic every list widget shares, and every X-app
@@ -178,8 +207,8 @@ too, so they live in X-Libs (`web/selection`, `web/tables`, `web/virtual`) besid
 panes, prefs and logging. The filter stack that collapses to an AST is X-Music's own and stays in
 `shared/`. Either way a framework change, or a second front end, re-does the hours, not the days.
 
-The renderer is therefore expected to stay small: a widget registry, a layout tree renderer, thin
-reactive wrappers over `shared/` classes, and CSS.
+The renderer is therefore expected to stay small: views built from the X-Libs widgets, thin stores
+over the IPC calls and `shared/` modules, and layout CSS.
 
 ## 3. Data model
 
@@ -191,7 +220,7 @@ why adding a user field there gives you filtering, sorting, grouping, column dis
 round-tripping for free. X-Music keeps this and makes it data instead of Perl.
 
 ```jsonc
-// fields/rating.json — a built-in field descriptor
+// a built-in field descriptor, shown as JSON; the catalogue is BUILTIN_FIELDS in src/shared/fields.ts
 {
   "id": "rating",
   "name": "Rating",
@@ -417,8 +446,9 @@ The store follows the X-Tech Application Standard: the tables are a Drizzle sche
 `src/shared/library/schema.ts`, `drizzle-kit generate` writes each change as a migration under
 `src/shared/library/migrations/` (`npm run db:generate`, which also bundles them), and X-Libs'
 `migrate_drizzle` runs them under the owner `library` on X-Libs' `SqlDatabase`, which the main
-process meets with Node's `node:sqlite`. Queries go through Drizzle where it can express them; the
-filter compiler, grouping and the joins of the read-only views stay raw SQL.
+process meets with Node's `node:sqlite`. Queries go through Drizzle (`drizzle_of`), as the standard asks;
+raw SQL is kept only where Drizzle cannot express it — the SQL the filter compiler writes, full-text
+search, PRAGMAs and the one-time conversion of older libraries — each with a comment saying why.
 
 **Every row's id is a UUID** made where the row is made (`new_id()`), never an auto-incrementing
 number, so a library could one day be kept on more than one device without two of them handing out
@@ -599,7 +629,7 @@ A smart playlist = filter AST + sort spec + optional limit + refresh policy.
 
 ```jsonc
 {
-  "id": "sp_neglected_gems",
+  "id": "3f6c1e2a-8b4d-4c9e-a1f7-5d2b9e0c4a61",   // a UUID, as every row's id
   "name": "Neglected Gems",
   "filter":  { "op": "and", "children": [
       { "field": "rating", "op": ">=", "value": 80 },
@@ -635,8 +665,8 @@ What follows is the part still to build.
 Column-clicking is fine for two keys and awkward for four. The sort order should also be editable
 directly: a small panel listing the active keys in order, each row draggable, with a direction
 toggle and a remove control, plus an add-key picker over every sortable field. The same object is
-what a layout document already stores (§5.1) and what a smart playlist already carries (§4.3), so
-this is one editor serving three places.
+what the remembered view settings already store (§5.3.1) and what a smart playlist already carries
+(§4.3), so this is one editor serving three places.
 
 ```jsonc
 "sort": [
@@ -680,8 +710,9 @@ expressible without a second concept, and a grouped view saves to a playlist ide
 #### 4.3.1.4 What is needed
 
 1. Per-key `nulls: 'first' | 'last'` in `SortKey`, honoured by `compile_filter` and `evaluate`.
-2. A sort editor component driven by `SortState`, with drag reordering.
-3. `saveAsSmartPlaylist(filter, sort, limit, name)` plus its IPC channel and dialog.
+2. A sort editor component driven by the library store's sort keys, with drag reordering.
+3. A `save_smart_playlist(filter, sort, limit, name)` call in the IPC contract and the `api_spec`,
+   and its dialog.
 4. Tests: multi-key ordering against real data, NULL placement in both directions, and a round-trip
    asserting a saved playlist returns exactly the rows the view showed.
 
@@ -711,80 +742,69 @@ degrades to a plain FTS term.
 
 ### 5.1 The premise
 
-gmusicbrowser's real superpower is that the window is a document, not a program. X-Music keeps that
-and puts it in a format people already know how to edit.
+gmusicbrowser's real superpower is that the window is a document, not a program: the user decides
+which widgets it holds and where. X-Music keeps that goal. The window can be rearranged — panels
+moved, split, tabbed and resized, widgets added and taken away — and every key binding can be
+changed, without recompiling anything.
 
-A layout is a JSON document describing a tree of nodes. Nodes are either **containers** (split, tabs,
-stack, grid, toolbar, overlay) or **widgets** from the registry. Every node has an `id`, a `type`,
-`props`, and optional `style`.
+**How it is built is set by the Application Standard, and it is a direction, not yet built.** An
+X-app does not write its own layout format, widget registry, plugin manager or settings store, so
+X-Music's arrangement is built on X-Libs, and what X-Libs lacks for it is added to X-Libs first, where
+every X-app gains it:
 
-```jsonc
-{
-  "id": "halon-default",
-  "name": "Halon",
-  "extends": null,
-  "window": { "min": [900, 560], "default": [1400, 900] },
-  "root": {
-    "type": "split", "dir": "vertical", "sizes": [1, "auto"],
-    "children": [
-      { "type": "split", "dir": "horizontal", "sizes": ["260px", 1],
-        "children": [
-          { "type": "sidebar", "id": "nav",
-            "props": { "sections": ["library", "playlists", "smart", "filters", "queue"] } },
-          { "type": "split", "dir": "vertical", "sizes": ["auto", 1],
-            "children": [
-              { "type": "filterpanes", "id": "browser",
-                "props": { "panes": [
-                    { "field": "genre",       "width": 200 },
-                    { "field": "album_artist","width": 260 },
-                    { "field": "album",       "width": 260, "art": true }
-                ]}},
-              { "type": "songlist", "id": "main",
-                "props": {
-                  "columns": ["track_number", "title", "artist", "album", "year",
-                              "length", "rating", "play_count"],
-                  "group_by": null, "sort": [{ "field": "album" }, { "field": "disc_number" },
-                                             { "field": "track_number" }]
-                }}
-            ]}
-        ]},
-      { "type": "toolbar", "id": "player", "props": { "items": [
-          "prev", "playpause", "next", "stop",
-          { "type": "cover", "size": 56 },
-          { "type": "nowplaying", "format": "{title}\n{artist} — {album}" },
-          { "type": "seekbar", "props": { "waveform": false } },
-          { "type": "stars" }, "spacer", "volume", "queuebutton", "menu"
-      ]}}
-    ]
-  }
-}
-```
+- **The places a widget can go are plugin slots.** X-Music names its widgets once, in its shared
+  types, as the `slots` of the X-Libs plugin host (`plugins`, drawn with `PluginSlot` from
+  `web/react/plugins`). X-Music's own widgets are bundled plugins added with `host.add`, so a widget
+  a folder plugin brings is placed exactly like a built-in one, and one that throws is left out
+  without taking the window down.
+- **The arrangement is a setting.** Which widget sits in which split or tab, the splits' sizes and the
+  open tabs are kept through X-Libs' settings and prefs and changed on the Settings page or in place,
+  never in a layout file of X-Music's own. The tree of splits and tabs whose leaves are slots is a
+  feature any X-app could use, so it is written in X-Libs beside its split panes and tabs.
+- **Key bindings are commands with default keys.** Every action is a command with an id and default
+  keys, bound with X-Libs' `use_shortcuts` and, for plugins, `use_plugin_shortcuts`. Rebinding a key
+  is a setting on the Settings page, written in X-Libs so every app's commands can be rebound the same
+  way; X-Music keeps no keymap file of its own.
 
-### 5.2 Widget registry
+### 5.2 The window today, and the widgets it is meant to hold
 
-Every widget declares a manifest: id, display name, accepted props (JSON Schema), the data channels
-it subscribes to, and its default size constraints. The layout editor is generated from these
-manifests — no widget is special-cased in the editor.
+The window is drawn today by the X-Libs `Shell`, after gmusicbrowser's default layout, "Lists,
+Library & Context":
 
-**v1 widgets:** `songlist`, `songtree` (grouped/nested list with album headers), `filterpanes`,
-`albumgrid`, `artistgrid`, `queue`, `playlistlist`, `sidebar`, `toolbar`, `seekbar`, `volume`,
-`cover`, `artistimage`, `nowplaying`, `stars`, `lyrics`, `taginfo`, `statusbar`, `searchbar`,
-`filterchips`, `visualizer`, `contextpanel` (tabbed: lyrics / artist bio / related / album tracks),
-`buttonbox`, `spacer`, `label` (with the format-string language, §5.5).
+- **The sidebar** holds the views as rows — Library, Folders, Import, Duplicates and History — and
+  below them the player (cover, transport, seek bar, volume) over the lists beside it, split
+  vertically. The lists are tabs: **Queue** and **Now playing**. Settings is the last row of the
+  sidebar's foot, as in every X-app.
+- **The main area** shows the current view. The library view is the filter panes over the song list,
+  in splits whose sizes are remembered (§5.3.1).
 
-### 5.3 Layout editing
+Still to build, and kept as the plan: gmusicbrowser's **Playlist** and **Pictures** tabs beside the
+Queue (the standing list that playback walks, and the cover and artist images of what is playing),
+and a **Context** tab beside the library view (lyrics, artist bio, related tracks and the album's
+other tracks). They were drawn as empty tabs once and are hidden until they are built.
 
-Three levels, all reaching the same document:
+The widgets the arrangement is meant to place, each a slot of the plugin host once §5.1 is built:
+`songlist`, `songtree` (grouped/nested list with album headers), `filterpanes`, `albumgrid`,
+`artistgrid`, `queue`, `playlistlist`, `seekbar`, `volume`, `cover`, `artistimage`, `nowplaying`,
+`stars`, `lyrics`, `taginfo`, `statusbar`, `searchbar`, `filterchips`, `visualizer`, `contextpanel`
+(tabbed: lyrics / artist bio / related / album tracks), `buttonbox`, `spacer`, `label` (with the
+format-string language, §5.5). Each declares, through its plugin manifest, its name and the settings
+fields it takes, so whatever edits an arrangement is generated from them and no widget is
+special-cased.
 
-1. **Direct manipulation** — drag panel edges, drag widgets between containers, right-click a column
-   header to add/remove/reorder columns. Changes write straight to the layout JSON.
-2. **Layout inspector** — a tree view of the document with a property grid generated from the widget
-   manifest. Shows the JSON alongside, editable, with live validation.
-3. **The file** — layouts live at `~/.config/x-music/layouts/*.json` and hot-reload on save. This is
-   the escape hatch that makes power users happy and makes layouts shareable as a gist.
+### 5.3 Arranging the window
 
-Layouts support `extends`: a layout may inherit another and patch nodes by id (RFC 6902-style
-patches). Shipping a "Halon + big album art" variant is then a 10-line file.
+Three ways in, all changing the same setting:
+
+1. **Direct manipulation** — drag panel edges, drag widgets between splits and tabs, right-click a
+   column header to add, remove or reorder columns.
+2. **An arrangement editor** — the tree of splits, tabs and widgets, with each widget's settings
+   fields drawn as controls, on the Settings page.
+3. **Arrangements to start from** — X-Music ships a few, such as "Lists, Library & Context", a mini
+   player and a full-screen now playing, and the user picks one and changes it from there.
+
+Sharing an arrangement with another person, which gmusicbrowser users did by passing `.layout` files
+around, waits for X-Libs to offer settings export; X-Music does not invent a file format for it.
 
 ### 5.3.1 Remembered view settings
 
@@ -812,40 +832,23 @@ belong. Settings that describe the library, such as its watched roots, do live i
 
 ### 5.4 Theming
 
-Themes are **token documents**, not stylesheets. Halon's tokens, from `@x-tech-laboratories/halon`
-(`halon-tokens.css`, with `halon.css` styling the shared widgets), are the reference and their
-schema is X-Music's schema — same names, same light/dark split:
+X-Music is styled by Halon (`@x-tech-laboratories/halon`), like every X-app, and has no theming of
+its own: no token documents, no theme folders, no theme loader or editor. The page imports
+`halon-tokens.css` and `halon.css` once; the widgets X-Music draws come from X-Libs and take their
+look from Halon, and `src/web/app.css` holds layout only, using Halon's tokens.
 
-```
-accent · border-{control,default,focus,hover} · focus-ring
-shadow-{base,card,floating,item,modal,tab}
-status-{danger,success,warning,warning-text}
-surface-{default,navigation,navigation-hover,overlay,root,secondary}
-text-{body,heading,on-fill,on-light,on-navigation,secondary,tertiary}
-```
+The user chooses two things, both on Settings → Appearance and both remembered per machine:
 
-X-Music adds a small player-specific layer on top, derived by default but overridable:
+- **Theme** — System, Light or Dark, through the X-Libs `web/theme` choice, which the sidebar's foot
+  shows too. System follows the desktop's light or dark setting.
+- **Density** — Compact, Normal or Comfortable, Halon's three densities set with `data-density` on the
+  page. They set the row heights of every list and table, the song list's included.
 
-```
-media-progress · media-progress-track · media-buffer
-rating-on · rating-off · rating-hover
-waveform-played · waveform-unplayed
-row-{even,odd,hover,selected,selected-inactive,playing}
-column-header · column-separator · drag-indicator
-```
-
-At runtime the token document becomes CSS custom properties on `:root`, with `data-theme` switching
-light/dark and `prefers-color-scheme` as the default signal. Every widget styles itself from tokens
-only — a lint rule (borrowed in spirit from Halon's `scripts/lint-gtk.mjs`) fails CI on any raw hex
-in a component stylesheet.
-
-Themes ship as a directory: `theme.json` (tokens) + optional `theme.css` (overrides) + optional
-assets. Halon's light and dark come from the package, and the player layer above is derived from
-them in `src/web/app.css`.
-
-Metric tokens (spacing scale, radii, control heights, density modes) follow Halon's
-`THEME-DESIGN-GUIDE.md` §4 rather than being reinvented — including its three density levels, which
-map cleanly onto compact/normal/comfortable row heights in the song list.
+The player's own looks — stars, the playing row, covers, the volume — are X-Libs widgets (`Rating`,
+`DataTable`, `Cover`, `VolumeButton`) drawn in Halon's styles, and the seek bar is a range input in
+Halon's `seek` style. A look X-Music needs that Halon does not
+have yet is added to Halon first, then used; X-Music does not restyle a widget. Colours follow the
+Design Guidelines through Halon's tokens.
 
 ### 5.5 Format strings
 
@@ -890,7 +893,7 @@ Virtualized, 250k rows, 60 fps scroll. Non-negotiable behaviours:
 - Inline rating (click the star position), inline field edit on slow double-click for editable
   string fields.
 - Drag to queue, to playlist, to another app (URI list), from the filesystem in.
-- Row context menu is user-configurable (an action list in the layout document).
+- Row context menu is user-configurable: an action list kept as a setting, like the arrangement (§5.1).
 
 ### 6.2 Filter panes
 
@@ -937,11 +940,13 @@ have nowhere to live.
 files?", "which copy plays?", "is this one track or two?", "did my rating survive?") is answered by
 this one view. It is also read-only, so it carries none of the risk of the tag editor.
 
-`src/shared/library/details.ts` gathers it; `SongProperties.tsx` renders it as a full-screen view
-reached from the song list (select one track, then Properties, or Alt+Enter).
+`src/shared/library/details.ts` gathers it (the `get_track` call); `src/web/widgets/SongProperties.tsx`
+renders it as a full-window X-Libs `PageView` reached from the song list (select one track, then
+Properties, or Alt+Enter).
 
-Four sections: **Overview** (metadata, identity, statistics, loudness, merge provenance),
-**Sources**, **Raw tags** per source, and **History**.
+Four sections: **Overview** (the cover, metadata, identity, statistics, loudness, merge provenance),
+**Sources**, **Raw tags** per source, and **Plays and skips**. A **History** button beside Close
+opens the track's versions (§9.4.6).
 
 Two things it does that a plain field dump would not:
 
@@ -951,14 +956,14 @@ Two things it does that a plain field dump would not:
 - **It marks which source actually plays**, using the same ordering the player uses, so "which copy
   am I hearing?" has an answer rather than an inference.
 
-Still to do: album and artist artwork (§7.3), which is not implemented anywhere yet.
+Still to do: artist images (§7.3). The album's cover is shown on the Overview and beside the player.
 
 ### 6.4 CSS baseline
 
-Because three WebView engines: no `:has()` in load-bearing positions (WebKitGTK lag), no container
-queries in v1, `content-visibility` behind a capability check, subgrid avoided. Virtualization is
-transform-based (`translate3d` on a spacer), not `position: absolute` per row. Scrollbar styling via
-`scrollbar-width`/`scrollbar-color` with a `::-webkit-scrollbar` fallback.
+Electron is one engine, current Chromium, so `:has()`, container queries, subgrid and
+`content-visibility` are all available without capability checks. X-Music's own stylesheets hold
+layout only (§5.4); scrollbars, row heights and the virtual rows of long lists come from Halon and the
+X-Libs `DataTable` and `FacetPane`.
 
 ---
 
@@ -966,8 +971,10 @@ transform-based (`translate3d` on a spacer), not `position: absolute` per row. S
 
 ### 7.1 Reading and writing
 
-`lofty-rs` is the tag layer: ID3v1/v2.2–2.4, Vorbis comments (FLAC/Ogg/Opus), MP4 `ilst`, APE,
-WavPack, WAV/AIFF chunks, plus MP3/AAC/FLAC/Opus/Vorbis/ALAC/WavPack/APE/AIFF/WAV properties.
+All tag I/O sits behind the `TagIO` interface (Appendix A.5). Reading is `music-metadata` today;
+writing is planned on `node-taglib-sharp`. Between them the tag layer covers ID3v1/v2.2–2.4, Vorbis
+comments (FLAC/Ogg/Opus), MP4 `ilst`, APE, WavPack, WAV/AIFF chunks, plus
+MP3/AAC/FLAC/Opus/Vorbis/ALAC/WavPack/APE/AIFF/WAV properties.
 Module formats (`.mod`, `.xm`, `.it`, `.s3m`) get metadata via a small dedicated reader.
 
 Writing rules:
@@ -1057,8 +1064,9 @@ remote fetch is a later plugin (§11).
 - **Resolution is lazy.** Nothing is extracted until something wants to display it, which keeps a
   scan fast and avoids decoding images nobody will see.
 - **A miss is recorded**, with source `none`. Without that, a coverless track would be searched —
-  folder listing included — on every single play. `art:rescan` clears only the misses, so a newly
-  added cover is picked up without discarding real entries.
+  folder listing included — on every single play. `forget_misses` clears only the misses, so a
+  newly added cover is picked up without discarding real entries; no call offers it in the window
+  yet.
 - **The cache is content addressed** by the image's own hash, so an album art file duplicated across
   a hundred folders is stored once.
 - **Folder matching is deliberately loose**: `cover`, `folder`, `front`, `album`, `albumart`,
@@ -1070,7 +1078,8 @@ remote fetch is a later plugin (§11).
 **Serving it to the renderer** needed its own scheme. The renderer runs under a strict CSP and
 cannot load `file://`, so cached art is served over `x-music-art://`, registered as a privileged
 scheme and restricted to paths inside the cache directory — a url pointing anywhere else is refused
-rather than read.
+rather than read. The page asks for a cover with `cache_cover`, named as a change because it may
+write the image into the cache, and gets back that url.
 
 **Thumbnails** are generated on demand at 64, 128, 256 and 512 px, and a request is served by the
 smallest size that is large enough. An image already no bigger than what was asked for is served as
@@ -1159,8 +1168,10 @@ gmusicbrowser eventually added an mpv backend: it already solves gapless, format
 output backend selection (PipeWire/PulseAudio/ALSA/CoreAudio/WASAPI) — problems that are unglamorous
 and enormous to re-solve.
 
-A second implementation — `symphonia` decode + `cpal` output — is planned for a dependency-free build
-and for platforms where bundling mpv is awkward. The trait keeps this a swap, not a rewrite. Format
+The mpv played with is the one on `PATH`, or the one `X_MUSIC_MPV` names.
+
+A second implementation — Web Audio in the page — is planned for a build without mpv and for
+platforms where bundling mpv is awkward. The interface keeps this a swap, not a rewrite. Format
 coverage differences are surfaced in the UI, not hidden.
 
 ### 8.2 Features
@@ -1183,9 +1194,11 @@ coverage differences are surfaced in the UI, not hidden.
 
 ### 8.3 Events
 
-The core emits a typed event stream to the renderer: `state`, `position` (throttled to 10 Hz,
-interpolated in the UI to avoid a 60 Hz IPC firehose), `track_changed`, `queue_changed`,
-`library_changed(delta)`, `scan_progress`, `error`. The renderer never polls.
+The main process pushes typed events to the page through X-Libs `define_events`, heard as
+`window.xMusicEvents`: `player_status` (the state, the track and the queue), `player_position`
+(throttled, interpolated in the UI to avoid a 60 Hz IPC firehose), `scan_progress`, `scan_files`
+(batched, one message per batch rather than per file), `scan_done`, and `changed` when the library
+was changed outside the window, through the MCP server. The renderer never polls.
 
 ---
 
@@ -1198,7 +1211,7 @@ the scanner writes to the music tree.
 
 What works today:
 
-- Multiple roots, added through Settings → Folders, with a progress-reporting scan.
+- Multiple roots, added on the Folders view, with a progress-reporting scan.
 - Tag reading via `music-metadata`, which is **read-only by construction**, so it defers the
   tag-writer decision (Appendix A.3) entirely.
 - **Unchanged files take a cheap path**: a matching `uri` + `mtime` + `filesize` skips parsing and
@@ -1220,11 +1233,11 @@ Still to do:
   scan.
 
 Original design notes, still applicable:
-- Initial scan: parallel walk (`ignore` crate), per-file tag read on a rayon pool, batched inserts in
-  one transaction per 5,000 files. Target: 100k files in under 4 minutes on an NVMe SSD.
-- Incremental: `notify`-based filesystem watching with debounce; on startup, an mtime/size sweep
-  catches changes made while closed.
-- Moved-file detection via `content_hash` — a moved file keeps its rating and play count. This is the
+- Initial scan: a walk of every root, tags read file by file, batched inserts. Target: 100k files in
+  under 4 minutes on an NVMe SSD.
+- Incremental: filesystem watching with debounce; on startup, an mtime/size sweep catches changes made
+  while closed.
+- Moved-file detection via `audio_hash` — a moved file keeps its rating and play count. This is the
   single most valuable thing a library manager can get right.
 - Missing files are flagged, not deleted; a "missing tracks" view offers relocate/forget.
 - Network mounts: a per-root "slow" flag that disables hashing and watching, using mtime only.
@@ -1315,10 +1328,11 @@ actually ends up with as choices are made, so the outcome is never inferred.
 - *Only differences* hides the fields that already agree, which on a real merge is most of them.
 - Multi-value fields get a *Keep all* control in the Result column, because union is the default.
 
-Settings uses the same full-screen frame. An earlier iteration made both modal dialogs after a
-full-page settings view stranded a user with no obvious exit — but the problem was the missing exit,
-not the format. The shared `Page` component now owns that: a persistent Close in the header and
-Escape, so no caller can forget.
+The view is the X-Libs `PageView`, a full-window page over the app, as the song properties are. A
+full-page view once stranded a user with no obvious exit — but the problem was the missing exit, not
+the format, and `PageView` owns that: a persistent Close in the header and Escape, so no caller can
+forget. Settings is a view of its own at `#/settings`, the last row of the sidebar's foot, drawn with
+X-Libs' `SettingsPage`.
 
 #### 9.4.2 The preview is the contract
 
@@ -1328,17 +1342,18 @@ same preview can be unit-tested without a DOM.
 
 ```jsonc
 {
-  "survivor": 412,                       // proposed; the user may pick another
+  "ids": ["9a1c…", "4e07…"],             // track ids are UUIDs, shortened here
+  "survivor": "9a1c…",                   // proposed; the user may pick another
   "fields": [
     { "field": "title",  "conflict": false, "value": "So What" },
     { "field": "year",   "conflict": true,
-      "options": [ { "from": 412, "value": 1959 }, { "from": 987, "value": 1997 } ] },
+      "options": [ { "from": "9a1c…", "value": 1959 }, { "from": "4e07…", "value": 1997 } ] },
     { "field": "genre",  "conflict": true, "multi": true,
-      "options": [ { "from": 412, "value": ["Jazz"] }, { "from": 987, "value": ["Jazz", "Modal"] } ],
+      "options": [ { "from": "9a1c…", "value": ["Jazz"] }, { "from": "4e07…", "value": ["Jazz", "Modal"] } ],
       "union": ["Jazz", "Modal"] }
   ],
-  "media": [ { "from": 412, "uri": "…/so-what.flac" }, { "from": 987, "uri": "…/so what.mp3" } ],
-  "statistics": { "playCount": 31, "rating": 100, "note": "summed / highest" }
+  "media": [ { "from": "9a1c…", "uri": "…/so-what.flac" }, { "from": "4e07…", "uri": "…/so what.mp3" } ],
+  "statistics": { "play_count": 31, "rating": 100 }   // summed / highest
 }
 ```
 
@@ -1366,8 +1381,8 @@ undo would be shipping a way to quietly lose ratings and history.
 - **The survivor is pinned** (`pinned = 1`, `identity_source = 'manual'`), so no automated pass
   re-splits what a person joined.
 
-Still to do: a merge-history view listing past merges with an undo control for each. `unmerge` works
-and is tested, but is currently only reachable immediately after merging.
+Past merges are listed on the History page (§9.4.6) beside the track changes, each one not yet
+undone with an Undo merge button, through `list_recent_merges` and `undo_merge`.
 
 #### 9.4.6 Track history
 
@@ -1385,10 +1400,16 @@ deleted, and its undo as those tracks restored.
   version names, which also undoes part of a merge; files it has gained since stay with it.
 - **The merge keeps its own journal.** History restores one track at a time and leaves the play log
   out, while an exact unmerge needs every track at once with its plays and playlist places.
-- Versions older than `history.keep_days` (a setting, a year by default) are pruned, each track
-  keeping its newest. The page reaches the history through `window.xMusicHistory`:
-  `list_versions(track_id)`, `list_recent_versions(limit)`, `restore_version(version_id)`,
-  `get_history_keep_days()` and `set_history_keep_days(days)`. The History page is still to come.
+- Versions older than `history.keep_days` are pruned, each track keeping its newest. How long is a
+  setting, a year by default, under Settings → Data → History. The page reaches the history through
+  `window.xMusicHistory`: X-Libs' `history_methods` (`list_versions(track_id)`,
+  `list_recent_versions(limit)`, `restore_version(version_id)`) and X-Music's
+  `get_history_keep_days()`, `set_history_keep_days(days)` and `list_recent_merges(limit)`. The same
+  calls are MCP tools (§10).
+- **The History page**, a row of the sidebar at `#/history`, lists the latest track changes and
+  merges together, newest first, each version saying field by field what it changed. History on one of
+  the page's rows, or the History button of a track's properties, opens that track's versions, and any
+  earlier one can be restored.
 - Clearing the library backs it up first, then empties the tracks along with their versions and the
   merge journal, since nothing is left for them to bring back.
 
@@ -1400,7 +1421,7 @@ duplicate finder later only has to produce candidate id sets.
 
 ### 9.3 Import / export
 
-- **gmusicbrowser importer — implemented** (`src/main/import/`). Reads `gmbrc` and imports library
+- **gmusicbrowser importer — implemented** (`src/shared/import/`, on the Import view). Reads `gmbrc` and imports library
   entries, ratings, play counts, skip counts, full play history, genres, groupings, labels and saved
   lists. The path defaults to the platform's standard location and can be overridden or browsed to.
   A preview parses without writing, so the user sees the counts before committing.
@@ -1428,32 +1449,51 @@ duplicate finder later only has to produce candidate id sets.
 
 - **MPRIS2** on Linux (full `TrackList` and `Playlists` interfaces, not just the minimum).
 - **SMTC** on Windows, **MPNowPlayingInfoCenter** on macOS.
-- Global media-key hotkeys, plus fully rebindable in-app keybindings (a JSON keymap file, same
-  hot-reload treatment as layouts).
+- Global media-key hotkeys, plus fully rebindable in-app key bindings: every action a command with
+  default keys, rebound on the Settings page through X-Libs (§5.1), with no keymap file of X-Music's
+  own.
 - Tray icon with a configurable menu and scroll-to-change-volume.
 - Desktop notifications on track change, with album art.
 - **Last.fm / ListenBrainz** scrobbling with an offline queue that survives restarts.
 - Every call described once in an X-Libs `api_spec` (`src/shared/api.ts`) and offered as tools by a local MCP
   server through X-Libs `electron/mcp`: off until turned on in Settings, on 127.0.0.1 only.
-- An `x-music-ctl` CLI on the X-Libs `agent` modules over the same calls: `x-music-ctl play`,
-  `x-music-ctl query 'rating:>=4 genre:jazz'`.
+- An `x-music-ctl` CLI, planned, built as the standard sets for a CLI on the X-Libs `agent` modules
+  and reaching the running app through the same `api_spec` calls over its local MCP server, never a
+  server or socket of its own: `x-music-ctl play`, `x-music-ctl query 'rating:>=4 genre:jazz'`.
+
+X-Music has no server, so it offers no HTTP API, OpenAPI document or `/api/mcp`; the local MCP server
+is what the standard asks of a desktop-only app, and the README says what it leaves out (the window's
+dialogs, file manager and log, and the backups). Values cross it in the units the library stores:
+lengths and dates in milliseconds, ratings and the volume 0 to 100, ids as UUID strings.
 
 ---
 
 ## 11. Plugins
 
-Deferred past v1, but the seams are designed now so it is not a rewrite:
+Deferred past v1, but planned on the X-Libs plugin host from the start, as the Application Standard
+requires of any app that can be extended, so it is not a rewrite. X-Music writes no plugin manager,
+registry, manifest format or sandbox of its own:
 
-- **UI plugins**: a widget bundle (manifest + ES module) dropped in `~/.config/x-music/widgets/`,
-  registering into the same registry as built-ins. Sandboxed to the renderer, no filesystem access
-  except through declared IPC permissions.
-- **Core plugins**: WASM components (`wasmtime`) implementing declared host interfaces — metadata
-  provider, artwork provider, scrobbler, audio filter. WASM over native dylibs for the obvious
-  safety and portability reasons.
-- Everything X-Music ships that *could* be a plugin (lyrics fetch, artist bio, artwork fetch) is built
-  as one, to keep the interfaces honest.
-
----
+- **One kind of plugin.** A plugin is an X-Libs plugin: a manifest (`id`, `name`, `version`, the
+  `app` and `app_versions` it is meant for, what it `requires`, its `settings` fields) and a
+  `start(context)`, written with `define_plugin`. X-Music says once, in its shared types, what plugins
+  may reach: its `hooks` (such as `track.played` or `library.scanned`), its `providers`, its `slots`
+  (the places in the window a widget goes, §5.1) and its `services`.
+- **Widgets** are slot contents, drawn with `PluginSlot`, so a widget a plugin brings is placed in
+  the arrangement like a built-in one, and one that throws is left out without taking the window
+  down.
+- **What used to be "core plugins"** — metadata, artwork, lyrics and artist-info sources, scrobblers,
+  audio filters — are providers the app picks one of by id (`host.provider`), and hooks on the
+  player's and the library's events. They run in Node or the page like the rest of the app, with no
+  WebAssembly runtime.
+- **Bundled and folder plugins.** Everything X-Music ships that *could* be a plugin (lyrics fetch,
+  artist bio, artwork fetch) is built as a bundled one, added with `host.add`, to keep the interfaces
+  honest. Plugins the user installs go in a plugins folder read with `load_plugin_folder`, one
+  subfolder each with its `package.json` and `"x-plugin"` entries.
+- **Settings and trust.** The Settings page gains a "Plugins" section, X-Libs' `PluginSettings`, with
+  each plugin's state, an On switch and its settings fields, kept through `json_plugin_storage`.
+  Folder plugins run with the app's full rights and are not sandboxed; the README will say so, and
+  only plugins the user chose to install are loaded.
 
 ## 12. Performance budget
 
@@ -1525,7 +1565,8 @@ The SQL compiler wraps every negation in `COALESCE(..., 0)` to enforce it.
 | `tests/audio_hash.test.ts` | Hash unchanged by ID3v2 growth, ID3v1 addition and rename; FLAC STREAMINFO used when valid and ignored when zero; different audio distinguished |
 | `tests/fields.test.ts` | Field id uniqueness and **numeric id stability** — a reused id silently corrupts every library on disk, so the pins are a compatibility lock |
 | `tests/format.test.ts` | The format-string grammar, including bracketed-group elision and the renamer pattern end to end |
-| `tests/view.test.ts` | Virtualization arithmetic, anchored range selection, filter-stack collapse to an AST, multi-key sort priority |
+| `tests/view.test.ts` | The filter stack: collapse to an AST, replacing a chip, keeping fixed chips when cleared. Virtualization arithmetic, anchored range selection and multi-key sort priority are X-Libs' and tested there |
+| `tests/*.test.tsx` | Each view and widget X-Music adds, rendered in jsdom with `@testing-library/react` and queried by role and text: keyboard paths, accessibility roles and what each control does |
 | `bench/query.bench.ts` | The §12 budgets |
 
 ### 13.3 Planned, not yet written
@@ -1536,9 +1577,15 @@ The SQL compiler wraps every negation in `COALESCE(..., 0)` to enforce it.
   `TagIO` escape hatch in Appendix A.5.
 - **Fuzzing** on the tag reader and the smart-string parser — both eat untrusted input.
 - **Playback state machine** against a null-sink engine, plus a manual gapless checklist per release.
-- **Renderer snapshots** via Playwright. One engine, not three.
+
+There are no markup snapshots or styling tests, as the standard sets: the page is tested through the
+rendered tests above, by role and text, and the real window is checked by hand with the
+`run-x-music` skill.
 
 ## 14. Repository layout
+
+The layout the Application Standard sets for a desktop app: `src/main`, `src/preload`, `src/web` and
+`src/shared`, with `tests/`, `docs/` and `nix/` beside them. Folders marked planned do not exist yet.
 
 ```
 x-music/
@@ -1546,42 +1593,51 @@ x-music/
 │   ├── main/                 # Electron main process
 │   │   ├── db/               # opens the database file through node:sqlite
 │   │   ├── library/          # audio_hash, scanner, artwork files, (planned) watcher
+│   │   ├── play/             # PlaybackEngine interface, mpv backend, the player
 │   │   ├── tags/             # (planned) TagIO interface + implementation + write journal
-│   │   ├── play/             # (planned) PlaybackEngine interface + mpv backend
-│   │   ├── services/         # (planned) MPRIS, scrobble, hotkeys, HTTP API
-│   │   ├── ipc.ts            # channel handlers, typed by the shared contract
-│   │   └── index.ts          # app lifecycle and window
-│   ├── preload/              # contextBridge, exposing only declared channels
-│   ├── web/                  # UI — deliberately thin (§2.4)
-│   │   ├── widgets/          # Sidebar, SongList, FilterPane, Stars, PlayerBar
-│   │   ├── stores/           # thin reactive wrappers over shared/
-│   │   ├── layout/           # (planned) layout engine and inspector
-│   │   └── theme/
-│   ├── shared/               # imported by BOTH sides — the UI-agnostic core
-│   │   ├── fields.ts         # field descriptors
-│   │   ├── filter.ts         # the filter AST
-│   │   ├── format.ts         # the format-string language
-│   │   ├── view.ts           # the filter stack
-│   │   ├── library/          # the store: Drizzle schema, migrations, identity, merge, history
-│   │   ├── query/            # compile.ts (AST→SQL), evaluate.ts (AST→predicate)
-│   │   ├── import/           # gmusicbrowser's gmbrc
-│   │   └── ipc.ts            # the IPC contract
-│   └── workers/              # (planned) scan, hash, replaygain
-├── tests/                    # one *.test.ts per behaviour, and the helpers they share
+│   │   ├── ipc.ts            # the calls' handlers, typed by the shared contract
+│   │   ├── backups.ts        # daily backups of the library through X-Libs
+│   │   ├── log.ts            # the log, on X-Libs
+│   │   └── index.ts          # app lifecycle, window and local MCP server
+│   ├── preload/              # contextBridge, exposing only the declared calls
+│   ├── web/                  # the React page — deliberately thin (§2.4)
+│   │   ├── views/            # Library, Folders, Import, Duplicates, History, Settings, Navigation
+│   │   ├── widgets/          # SongList, FilterPane, PlayerBlock, TabbedLists, SongProperties, MergeView, …
+│   │   ├── stores/           # library and player state on X-Libs stores
+│   │   ├── lib/              # the IPC client, the log and the theme choice
+│   │   └── app.css           # layout only; the look is Halon's
+│   └── shared/               # imported by BOTH sides — the UI-agnostic core
+│       ├── fields.ts         # field descriptors
+│       ├── filter.ts         # the filter AST
+│       ├── format.ts         # the format-string language
+│       ├── view.ts           # the filter stack
+│       ├── viewstate.ts      # checking remembered browse state
+│       ├── ipc.ts            # the IPC contract
+│       ├── api.ts            # the api_spec for the local MCP server
+│       ├── library/          # the store: Drizzle schema, migrations, identity, merge, history
+│       ├── query/            # compile.ts (AST→SQL), evaluate.ts (AST→predicate)
+│       └── import/           # gmusicbrowser's gmbrc
+├── tests/                    # one *.test.ts or *.test.tsx per behaviour, and the helpers they share
 ├── bench/                    # performance budget benchmarks
-├── layouts/  fields/  docs/  cli/
-├── flake.nix                 # pins node, electron and mpv
+├── docs/                     # this spec and the to-do list
+├── nix/                      # package.nix
+├── scripts/                  # run.sh, the upgrade dry run
+├── resources/                # icon.svg and the icons made from it
+├── flake.nix  shell.nix      # pin node, electron and mpv
 └── electron.vite.config.ts
 ```
+
+A CLI (§10) would add a folder of its own under `src/`, and plugins (§11) a plugins folder in the
+profile; neither exists yet. There is no `src/server`: X-Music is desktop-only (§1.1).
 
 ## 15. Roadmap
 
 **M0 — Skeleton. ✅ done.** Electron shell, Vite renderer, typed IPC via a shared contract,
-Halon tokens → CSS variables, Nix dev shell pinning node/electron/mpv. Went further than planned
+Halon's tokens and widget styles, Nix dev shell pinning node/electron/mpv. Went further than planned
 because the entity-model decision arrived early: the schema, both query compilers, audio content
 hashing, the field descriptor system, the format-string engine, framework-free view state, and a
-66-test harness including the AST-agreement property test all landed here. The app launches, migrates
-to schema v1 and opens a WAL database.
+66-test harness including the AST-agreement property test all landed here. The app launches and opens
+a WAL database.
 
 **M1 — Library core (2 wk).** Scanner, watcher, tag reading, move detection via `audio_hash`, and
 the `songlist` widget wired to `shared/view.ts` for real virtualization and column config. Schema,
@@ -1614,16 +1670,19 @@ small and should land first — it covers authoritative tagging without X-Music 
 Also here: the field editor and column picker that make §3.2.1's promise true for user-defined
 fields.
 
-**M7 — Layout system (3 wk).** Layout documents, widget manifests, drag-to-rearrange, layout
-inspector, hot reload, `extends` + patches, shipped alternate layouts.
+**M7 — Arranging the window (3 wk).** The direction in §5.1: the widgets as slots of the X-Libs
+plugin host, the arrangement and key bindings as settings, the tree of splits and tabs, the
+arrangement editor and rebinding written in X-Libs first, drag-to-rearrange, and the shipped
+arrangements to start from; the Playlist, Pictures and Context tabs (§5.2).
 
-**M8 — Theming and polish (2 wk).** Theme loader, theme editor, density modes, keybinding editor,
-accessibility pass (keyboard-complete, focus visible, screen reader labels), tray/notifications.
+**M8 — Polish (2 wk).** Accessibility pass (keyboard-complete, focus visible, screen reader labels),
+tray/notifications. Theme and density are Halon's and already chosen in Settings (§5.4).
 
-**M9 — Migration and 1.0 (2 wk).** iTunes/Rhythmbox import, merge history view,
-`x-music-ctl`, packaging (AppImage, Flatpak, `.deb`, Nix flake, MSI, `.dmg`), documentation.
+**M9 — Migration and 1.0 (2 wk).** iTunes/Rhythmbox import, `x-music-ctl`, packaging (AppImage,
+Flatpak, `.deb`, Nix flake, MSI, `.dmg`), documentation. The merge history landed early, on the
+History page (§9.4.6).
 
-Post-1.0: plugin system, remote web UI, replay-gain scanner UI, lyrics/artist-info providers,
+Post-1.0: plugins on the X-Libs host (§11), replay-gain scanner UI, lyrics/artist-info providers,
 visualizer library, multi-library support.
 
 ---
@@ -1632,15 +1691,15 @@ visualizer library, multi-library support.
 
 | Decision | Reversal trigger |
 |---|---|
-| **Electron + TypeScript** over Tauri + Rust | Idle RSS or million-track performance becomes binding; then Appendix A.4 Stack A, with `shared/` porting as the main cost |
+| **Electron + TypeScript** over Tauri + Rust | Idle RSS or million-track performance becomes binding. The Application Standard allows another stack only for a hard platform limit, written as a deviation in the README; Appendix A.4 Stack A records what that would cost, with `shared/` porting as the main cost |
 | **A track is a piece of music, not a file** (§3.4) | None foreseen. This is the decision everything else hangs off. |
 | **Audio content hash for file identity; AcoustID as a hint only** (§3.5) | None. AcoustID's many-to-many mapping to recordings rules it out as a key regardless of collision rate. |
 | **Two-valued filter logic** (§13.1) | User reports that "not X" excluding unknowns is expected; unlikely |
 | **50k target, and no in-memory index** (§3.5.3, §12) | A real library misses a §12 budget. The trigger is a measurement, not a hunch; `evaluate.ts` already exists to be fed by an index. |
 | React, per the X-Tech Application Standard | The standard changes its UI framework. Cheap by construction (§2.4). |
-| libmpv default engine | Packaging friction on Windows/macOS → promote a Web Audio or native fallback |
+| mpv default engine, over its JSON IPC socket | Packaging friction on Windows/macOS → promote a Web Audio or native fallback |
 | `node-taglib-sharp` for tags | Golden-file failures it cannot fix → swap the `TagIO` implementation for a mutagen sidecar (Appendix A.5) |
-| JSON layouts, not a DSL | Users find JSON hostile → add a friendlier surface *above* JSON, never replace it |
+| Arrangement and key bindings as X-Libs settings and plugin slots, not a layout file or DSL of X-Music's own (§5.1) | The Application Standard changes how apps are extended or keep settings |
 | Stable numeric field ids | Never reversible. Reusing one corrupts every library already on disk. |
 
 ## 17. Open questions
@@ -1716,7 +1775,7 @@ destroying user intent — which turns an irreversible schema decision into a tu
 one-click "merge these" in the album view. Splitting is a smaller annoyance than silently merging two
 masterings and computing one album gain across both.
 
-**Implemented** in `library/albums.ts`. Compilation detection needs every track of an album in view,
+**Implemented** in `src/shared/library/albums.ts`. Compilation detection needs every track of an album in view,
 so it runs as a regroup pass after each import and scan rather than per file; a track tagged as a
 compilation joins the compilation album at once. The same pass deletes album rows no track points
 at, except pinned ones and any an undoable merge would restore. Both the importer and the scanner
@@ -1780,8 +1839,8 @@ the most interesting decisions in the document.
 | Internet radio browser | — | ✓ | **Post-1.0** | Needs a stream engine path and a station DB |
 | Podcast / audio feeds | — | ✓ | **Post-1.0** | Large surface: subscriptions, downloads, resume, unplayed state |
 | Soundcloud browser | — | ✓ | **Reject** | Third-party API that keeps breaking; not local-library work |
-| Cover-art-only "wall" fullscreen mode | ✓ | ✓ | **Decide** | Fullscreen layout, not a separate feature, once §5 exists |
-| Column presets / quick column sets | ✓ | ✓ | **Decide** | Layout `extends` may cover this already |
+| Cover-art-only "wall" fullscreen mode | ✓ | ✓ | **Decide** | A full-window arrangement, not a separate feature, once §5.1 is built |
+| Column presets / quick column sets | ✓ | ✓ | **Decide** | Saved arrangements (§5.3) may cover this |
 | Sticky/pinned filter presets on a toolbar | ✓ | — | **Decide** | gmb's FilterBox widget |
 
 ### 18.2 Query, filtering, playlists
@@ -1790,7 +1849,7 @@ the most interesting decisions in the document.
 |---|---|---|---|---|
 | Full filter algebra over every field | ✓ | ✓ | **In v1** | §4.1 |
 | Text query language in a single box | smart strings | `#(rating > 3)` syntax | **In v1** | §4.4 — X-Music's own syntax, both importable |
-| Regex matching on any field | ✓ | ✓ (Python `re`) | **In v1** | `regex` op; Rust `regex` crate, no backrefs |
+| Regex matching on any field | ✓ | ✓ (Python `re`) | **In v1** | `regex` op; JavaScript `RegExp`, registered as SQLite's `REGEXP` |
 | Numeric comparison with units (`#(length > 4:00)`) | ✓ | ✓ | **In v1** | Duration/date literals in the parser |
 | Relative-date queries (`#(lastplayed < 7 days)`) | ✓ | ✓ | **In v1** | `in_last` |
 | Top-N / bottom-N by field | ✓ | — | **In v1** | `top` / `bottom` |
@@ -1870,21 +1929,21 @@ the most interesting decisions in the document.
 
 | Capability | gmb | QL | Status | Note |
 |---|---|---|---|---|
-| Fully user-composed window layout | ✓ (`.layout`) | — | **In v1** | §5 — X-Music's headline feature |
-| Multiple shipped layouts, switchable at runtime | ✓ | — | **In v1** | §5.3 |
+| Fully user-composed window layout | ✓ (`.layout`) | — | **In v1** | §5 — X-Music's headline feature, on the X-Libs plugin host and settings |
+| Multiple shipped arrangements, switchable at runtime | ✓ | — | **In v1** | §5.3 |
 | Detached/floating panel windows | ✓ | — | **Decide** | Multi-window in a WebView shell is real work |
-| Desktop widget mode (borderless always-on-top) | ✓ (plugin) | — | **Decide** | Falls out of layouts + a window-mode flag |
-| Fullscreen "now playing" mode | ✓ | ✓ | **In v1** | A shipped layout |
-| Mini/compact player mode | ✓ | ✓ | **In v1** | A shipped layout |
+| Desktop widget mode (borderless always-on-top) | ✓ (plugin) | — | **Decide** | Falls out of arrangements + a window-mode flag |
+| Fullscreen "now playing" mode | ✓ | ✓ | **In v1** | A shipped arrangement |
+| Mini/compact player mode | ✓ | ✓ | **In v1** | A shipped arrangement |
 | Tray icon with menu and scroll-volume | ✓ | ✓ | **In v1** | §10 |
 | Title-bar / taskbar now-playing text | ✓ (plugin) | ✓ | **In v1** | Format strings, §5.5 |
 | Desktop notifications with art | ✓ | ✓ | **In v1** | §10 |
 | Configurable context menus | ✓ | ✓ | **In v1** | §6.1 |
-| Rebindable keyboard shortcuts | partial | ✓ | **In v1** | §10 |
+| Rebindable keyboard shortcuts | partial | ✓ | **In v1** | §5.1, §10 — a setting, through X-Libs |
 | Global media keys | ✓ | ✓ | **In v1** | §10 |
-| Theming beyond the toolkit theme | limited | limited | **In v1** | §5.4 — the other headline feature |
-| Density / compact modes | — | ✓ | **In v1** | §5.4, from Halon's density scale |
-| Icon theme override | ✓ | ✓ | **Decide** | Ship one icon set; allow replacement via theme dir |
+| Theming beyond the toolkit theme | limited | limited | **Reject** | X-Music is styled by Halon, like every X-app, with its light, dark and density choices (§5.4) |
+| Density / compact modes | — | ✓ | **In v1** | §5.4, Halon's three densities; done |
+| Icon theme override | ✓ | ✓ | **Reject** | The icons are X-Libs' line icons in Halon's style, the same in every X-app |
 | Localization / translations | ✓ (30+) | ✓ | **Post-1.0** | String extraction from day one, translation after 1.0 |
 | Accessibility: full keyboard + screen reader | weak | weak | **In v1** | §M8 — both references are poor here; not an excuse |
 
@@ -1895,9 +1954,9 @@ the most interesting decisions in the document.
 | MPRIS2 | ✓ | ✓ | **In v1** | §10 |
 | Last.fm scrobbling | ✓ | ✓ | **In v1** | §10 |
 | ListenBrainz | — | ✓ | **In v1** | §10 |
-| Command-line control | ✓ | ✓ (`quodlibet --next`) | **In v1** | `x-music-ctl`, §10 |
-| Named-pipe/FIFO control | ✓ | — | **Reject** | Superseded by the HTTP API + CLI |
-| HTTP remote control / web UI | — | ✓ (plugin) | **In v1** (API) / **Post-1.0** (web UI) | §10 |
+| Command-line control | ✓ | ✓ (`quodlibet --next`) | **In v1** | `x-music-ctl` on the X-Libs `agent` modules, §10 |
+| Named-pipe/FIFO control | ✓ | — | **Reject** | Superseded by the local MCP server and the CLI (§10) |
+| HTTP remote control / web UI | — | ✓ (plugin) | **In v1** (local MCP) / **Reject** (web UI) | §10; the local MCP server offers every library and player call on this computer. A web UI needs a server, and X-Music is desktop-only by a written deviation (§1.1) |
 | "Run a command on track change" hooks | ✓ | ✓ | **Decide** | Powerful and a security surface; needs an explicit opt-in model |
 | Custom user commands on selection (`%f`, `%s`) | ✓ | ✓ | **Decide** | Same decision as above |
 | Squeezebox / MQTT / external device sync | — | ✓ (plugins) | **Reject** | Plugin territory if anyone wants it |
@@ -1913,7 +1972,7 @@ the most interesting decisions in the document.
 | Content-hash move detection | **In v1** | §9.1 |
 | Filter AST as a first-class shareable artifact | **In v1** | §4.1 |
 | Listening-history analytics (year in review, trends) | **Decide** | The data is already there; the UI is the cost |
-| Multi-device library sync (stats only, CRDT) | **Post-1.0** | Big, but the play/skip history model is already append-only |
+| Multi-device library sync | **Reject** for now | X-Music is desktop-only with no server, a deviation written in the README, so nothing syncs. Were that to change, sync goes through the X-Libs sync modules as the standard requires, never a sync or CRDT of X-Music's own; the UUID row ids and the append-only play history already suit it |
 | Rating propagation rules (rate an album → rate its tracks) | **Decide** | Small, opinionated, easy to get wrong |
 | Library health report (missing art, no genre, bad encodings) | **Decide** | A set of shipped smart filters may be enough |
 
@@ -2023,7 +2082,13 @@ testable in M1 rather than being a bet made now.
 polished cross-platform distribution matters more than iteration speed, or idle RSS above 300 MB is
 unacceptable.
 
-### A.6 What changes in the spec under Stack B
+### A.6 What changes in the spec under Stack B (historical)
+
+> **Historical.** This is the proposal as it was written before Stack B was built, kept as the
+> record of the reasoning. It is not the current design and binds nothing: the worker-thread pool,
+> the in-memory index, the HTTP API, the theme runtime and the `renderer/`, `workers/`, `layouts/`
+> and `themes/` folders below were never built or have been replaced. §2, §5, §10, §11, §13 and §14
+> describe X-Music as it is and as the Application Standard sets it.
 
 **§2.1 / §2.2 — Architecture.** Electron with three processes: main (library, query, tag, playback
 supervision), a `worker_threads` pool (scanning, hashing, index building — this is mandatory, not
