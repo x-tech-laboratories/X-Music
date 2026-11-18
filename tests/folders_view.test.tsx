@@ -102,7 +102,7 @@ describe('folders view', () => {
     expect(within(log).getByText('not an audio file')).toBeTruthy()
     const filter = screen.getByRole('radiogroup', { name: 'Show' })
     expect(within(filter).getAllByRole('radio').map((choice) => choice.textContent)).toEqual(['All 3', 'New 1', 'Unchanged 1', 'Failed 1'])
-    expect(screen.getByText('Files read').previousElementSibling?.textContent).toBe('3')
+    expect(screen.getByText('Files read').previousElementSibling?.textContent).toBe('2')
     expect(screen.getByText('Took').previousElementSibling?.textContent).toBe('2 seconds')
     expect(screen.getByText(/1 file could not be read/)).toBeTruthy()
 

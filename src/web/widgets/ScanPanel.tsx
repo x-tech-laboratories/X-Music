@@ -71,7 +71,7 @@ function ScanSummary({ report, on_show_failed }: { report: ScanReport; on_show_f
   return (
     <>
       <Tiles>
-        <Tile label="Files read" value={format_count(report.files_found)} value_first />
+        <Tile label="Files read" value={format_count(report.files_read)} value_first />
         <Tile label="New tracks" value={format_count(report.tracks_created)} value_first />
         <Tile label="Already known" value={format_count(report.tracks_matched)} value_first />
         <Tile label="Unchanged" value={format_count(report.files_skipped)} value_first />
