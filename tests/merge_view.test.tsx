@@ -47,7 +47,10 @@ describe('merge view', () => {
     expect(cell_button('Genre', 'Keep all').getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByText('2 fields disagree; pick which value to keep')).toBeTruthy()
     expect(screen.getAllByText('0:30').length).toBeGreaterThan(0)
-    expect(screen.getByRole('switch', { name: 'Only differences' }).closest('label')?.textContent).toContain('Only differences')
+    // The switch is named once, by the words beside it.
+    const only_differences = screen.getByRole('switch', { name: 'Only differences' })
+    expect(only_differences.getAttribute('aria-label')).toBeNull()
+    expect(only_differences.closest('label')?.textContent).toBe('Only differences')
   })
 
   it('sends the winners the grid shows, then offers Undo in a toast', async () => {

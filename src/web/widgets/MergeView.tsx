@@ -182,9 +182,7 @@ export function MergeView({ ids, on_close, on_undone }: MergeViewProps) {
 
   const actions = preview && (
     <>
-      <label className="check">
-        <Switch label="Only differences" checked={only_differences} on_change={set_only_differences} /> Only differences
-      </label>
+      <Switch label="Only differences" show_label checked={only_differences} on_change={set_only_differences} />
       <button className="accent solid" onClick={() => void merge()} disabled={busy || survivor === null}>
         {busy ? 'Merging…' : 'Merge'}
       </button>
