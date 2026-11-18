@@ -107,6 +107,23 @@ describe('history page', () => {
     expect(history.list_recent_merges).toHaveBeenCalledWith(50)
   })
 
+  it('sorts by a column whose heading is clicked', async () => {
+    show()
+    await rows()
+
+    const when = screen.getByRole('columnheader', { name: /When/ })
+    fireEvent.click(within(when).getByRole('button', { name: /^When/ }))
+
+    expect(when.getAttribute('aria-sort')).toBe('ascending')
+    expect((await rows()).map((row) => row.textContent)).toEqual([
+      expect.stringContaining('Added to the library'),
+      expect.stringContaining('Merge undone'),
+      expect.stringContaining('Blue in Green'),
+      expect.stringContaining('Freddie Freeloader'),
+      expect.stringContaining('So What')
+    ])
+  })
+
   it('says what a version changed, field by field', async () => {
     show()
 

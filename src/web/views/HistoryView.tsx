@@ -213,7 +213,7 @@ function TrackHistoryDialog({ track_id, name, on_close, on_changed }: { track_id
       <Loaded resource={versions}>
         {(list) => (list.length === 0
           ? <Empty title="No history yet." />
-          : <DataTable caption={`History of ${name}`} columns={columns} rows={list} row_key={(version) => version.id} manual_sorting column_hiding={false} />)}
+          : <DataTable caption={`History of ${name}`} columns={columns} rows={list} row_key={(version) => version.id} column_hiding={false} />)}
       </Loaded>
     </Dialog>
   )
@@ -322,7 +322,7 @@ export function HistoryView() {
           const shown = show === 'everything' ? rows : rows.filter((row) => (show === 'merges' ? row.type === 'merge' : row.type === 'version'))
           return shown.length === 0
             ? <Empty title={show === 'merges' ? 'No merges yet.' : 'No changes yet.'} hint="Edits, imports, merges and restores show here as they happen." />
-            : <DataTable caption="Latest changes" columns={columns} rows={shown} row_key={row_key} manual_sorting />
+            : <DataTable caption="Latest changes" columns={columns} rows={shown} row_key={row_key} />
         }}
       </Loaded>
     </div>
