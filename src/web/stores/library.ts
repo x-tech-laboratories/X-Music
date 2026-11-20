@@ -143,21 +143,22 @@ function groups_for(field_id: string): Promise<GroupRow[]> {
 // Track names
 // ============================================================================
 
-export interface TrackName { title: string; artist: string }
+export interface TrackName { title: string | null; artist: string | null }
 
 const names_fetched = new Map<TrackId, TrackName>()
 
-// The title and artist of each id, from the loaded list or else asked of the library once, for tracks the filters hide.
+// The title and artist of each id, from the loaded list or asked of the library once; an id the library no longer has is left out.
 async function names_of(ids: readonly TrackId[]): Promise<Map<TrackId, TrackName>> {
   const loaded = new Map(results.get().tracks.map((track) => [track.id, track]))
   const names = new Map<TrackId, TrackName>()
   await Promise.all(ids.map(async (id) => {
     const track = loaded.get(id)
-    if (track) return void names.set(id, { title: track.title ?? '', artist: track.artist ?? '' })
+    if (track) return void names.set(id, { title: track.title, artist: track.artist })
     if (!names_fetched.has(id)) {
       const details = await ipc('get_track', id)
-      const artist = details?.fields.find((each) => each.field === 'artist')?.value ?? ''
-      names_fetched.set(id, { title: details?.title ?? '', artist })
+      if (!details) return
+      const artist = details.fields.find((each) => each.field === 'artist')?.value ?? null
+      names_fetched.set(id, { title: details.title, artist })
     }
     names.set(id, names_fetched.get(id)!)
   }))

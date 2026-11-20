@@ -41,7 +41,12 @@ function Queue({ queue }: { queue: TrackId[] }) {
     return <Empty title="The queue is empty." hint="Right-click tracks and choose Add to queue; they play before the list goes on." />
   }
 
-  const title_of = (row: Queued): string => row.name?.title || 'Untitled track'
+  // Only a track the library has with no title is untitled; a lookup that failed or found nothing says so instead.
+  function title_of(row: Queued): string {
+    if (row.name) return row.name.title || 'Untitled track'
+    if (names.error) return 'Name could not be loaded'
+    return names.data ? 'Not in the library' : ''
+  }
   const last = queue.length - 1
 
   function move(from: number, to: number): void {

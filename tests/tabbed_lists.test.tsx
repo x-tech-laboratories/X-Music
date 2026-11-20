@@ -49,6 +49,42 @@ describe('queue', () => {
     expect(screen.queryByText('Track 99')).toBeNull()
   })
 
+  it('calls a queued track that has no title an untitled track', async () => {
+    install_bridge({ 'get_track': { ...details, id: '77', title: null } })
+    player_status.set(status(['77']))
+    render(<TabbedLists />)
+
+    expect(await screen.findByText('Untitled track')).toBeTruthy()
+    expect(screen.getByText('Sample Trio')).toBeTruthy()
+  })
+
+  it('says a queued track is not in the library, rather than untitled, when the library cannot find it', async () => {
+    install_bridge({ 'get_track': null })
+    player_status.set(status(['404']))
+    render(<TabbedLists />)
+
+    expect(await screen.findByText('Not in the library')).toBeTruthy()
+    expect(screen.queryByText('Untitled track')).toBeNull()
+  })
+
+  it('says a queued track\'s name could not be loaded, rather than untitled, when the lookup fails', async () => {
+    install_bridge({ 'get_track': () => { throw new Error('the library is closed') } })
+    player_status.set(status(['500']))
+    render(<TabbedLists />)
+
+    expect(await screen.findByText('Name could not be loaded')).toBeTruthy()
+    expect(screen.queryByText('Untitled track')).toBeNull()
+  })
+
+  it('names nothing while the queued tracks\' names are still loading', async () => {
+    install_bridge({ 'get_track': new Promise(() => undefined) })
+    player_status.set(status(['600']))
+    render(<TabbedLists />)
+
+    expect(await screen.findByText('1 track queued')).toBeTruthy()
+    expect(screen.queryByText('Untitled track')).toBeNull()
+  })
+
   it('takes a track out with its remove button, named after it', async () => {
     player_status.set(status(['99']))
     render(<TabbedLists />)
