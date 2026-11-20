@@ -2,6 +2,7 @@
 // every library already on disk, so these tests are a compatibility lock, not a style check.
 
 import { describe, expect, it } from 'vitest'
+import { track_catalogue } from '@shared/query/catalogue'
 import { BUILTIN_FIELDS, field, fields_with, rating_to_stars, stars_to_rating } from '@shared/fields'
 
 describe('field catalogue', () => {
@@ -36,9 +37,9 @@ describe('field catalogue', () => {
     expect(field('lyrics').field_id).toBe(21)
   })
 
-  it('gives every computed field an expression', () => {
+  it('gives every computed field an expression in the filter catalogue', () => {
     for (const d of BUILTIN_FIELDS) {
-      if (d.storage === 'computed') expect(d.expr, `${d.id} needs an expr`).toBeTruthy()
+      if (d.storage === 'computed') expect(track_catalogue.fields[d.id]?.kind, `${d.id} needs an expression`).toBe('expression')
     }
   })
 

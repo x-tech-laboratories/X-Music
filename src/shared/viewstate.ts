@@ -5,39 +5,29 @@
 // nothing with no visible cause, so everything restored is checked against the current catalogue
 // and anything unrecognised is dropped.
 
+import { keep_known_ids } from '@x-tech-laboratories/x-libs/api_spec'
+import { random_field, type SortKey } from '@x-tech-laboratories/x-libs/filter'
+
 import { FIELDS_BY_ID } from './fields.ts'
-import type { SortKey } from './filter.ts'
+import { upgrade_sort } from './filter_shapes.ts'
 
-const known = (field_id: unknown): field_id is string =>
-  typeof field_id === 'string' && FIELDS_BY_ID.has(field_id)
+// `random` is a pseudo-field the catalogue does not contain but sorting understands.
+const sortable = (field_id: string): boolean => FIELDS_BY_ID.has(field_id) || field_id === random_field
 
+// Sort keys in today's shape from either saved shape, each field once and only fields that still exist.
 export function sanitize_sort_keys(value: unknown): SortKey[] {
-  if (!Array.isArray(value)) return []
-
-  const out: SortKey[] = []
-  const seen = new Set<string>()
-
-  for (const entry of value) {
-    if (entry === null || typeof entry !== 'object') continue
-    const { field, dir } = entry as { field?: unknown; dir?: unknown }
-
-    // `random` is a pseudo-field the catalogue does not contain but sorting understands.
-    if (!known(field) && field !== 'random') continue
-    if (seen.has(field as string)) continue
-
-    seen.add(field as string)
-    out.push({ field: field as string, dir: dir === 'desc' ? 'desc' : 'asc' })
-  }
-
-  return out
+  const keys = upgrade_sort(value)
+  const fields = keep_known_ids(keys.map((key) => key.field), sortable)
+  return fields.map((field) => keys.find((key) => key.field === field)!)
 }
 
 export function sanitize_pane_values(value: unknown): Record<string, string[]> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return {}
 
   const out: Record<string, string[]> = {}
+  const known = new Set(keep_known_ids(Object.keys(value), FIELDS_BY_ID))
   for (const [field_id, values] of Object.entries(value as Record<string, unknown>)) {
-    if (!known(field_id)) continue
+    if (!known.has(field_id)) continue
     if (!Array.isArray(values)) continue
 
     const strings = values.filter((v): v is string => typeof v === 'string' && v !== '')
@@ -48,5 +38,5 @@ export function sanitize_pane_values(value: unknown): Record<string, string[]> {
 
 // A pane remembers which field it is showing; an unknown field falls back to the default.
 export function sanitize_pane_field(value: unknown, fallback: string): string {
-  return known(value) ? value : fallback
+  return keep_known_ids([value], FIELDS_BY_ID)[0] ?? fallback
 }

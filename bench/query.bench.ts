@@ -3,10 +3,11 @@
 
 import { test } from 'vitest'
 
-import { compile_filter, compile_group_by } from '@shared/query/compile'
-import { select_ids } from '@shared/query/evaluate'
-import { and, or, leaf, not } from '@shared/filter'
-import { make_corpus, FIXED_NOW } from '../tests/corpus.ts'
+import { and, leaf, not, or, select_ids, type FilterNode } from '@x-tech-laboratories/x-libs/filter'
+import { compile_filter, compile_group_by } from '@x-tech-laboratories/x-libs/filter_sql'
+
+import { group_sums, track_catalogue } from '@shared/query/catalogue'
+import { make_corpus, FIXED_NOW, record_of } from '../tests/corpus.ts'
 import { fresh_db, load_corpus } from '../tests/sqlite.ts'
 
 const SIZE = Number(process.env.X_MUSIC_BENCH_SIZE ?? 50_000)
@@ -14,18 +15,19 @@ const SIZE = Number(process.env.X_MUSIC_BENCH_SIZE ?? 50_000)
 const corpus = make_corpus(SIZE, 2024)
 const db = fresh_db()
 load_corpus(db, corpus)
+const records = corpus.tracks.map(record_of)
 
 const SIMPLE = leaf('rating', '>=', 80)
 const COMPOUND = and(
   leaf('rating', '>=', 60),
   leaf('genre', 'any', ['Jazz', 'Blues']),
-  leaf('last_played', 'not_in_last', { n: 30, unit: 'day' }),
+  leaf('last_played', 'not_in_last', { count: 30, unit: 'day' }),
   or(leaf('year', 'between', [1955, 1975]), leaf('tags', 'any', ['essential'])),
   not(leaf('codec', 'is', 'mp3'))
 )
 
-const run = (node: Parameters<typeof compile_filter>[0]): void => {
-  const { sql, params } = compile_filter(node, { now: FIXED_NOW })
+const run = (node: FilterNode): void => {
+  const { sql, params } = compile_filter(track_catalogue, node, { now: FIXED_NOW })
   db.prepare(sql).all(...params)
 }
 
@@ -41,10 +43,10 @@ test(`SQL filter over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, async ({
 test(`native predicate over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, async ({ bench }) => {
   await bench.compare(
     bench('simple scalar predicate', () => {
-      select_ids(SIMPLE, corpus.tracks, { now: FIXED_NOW })
+      select_ids(track_catalogue, SIMPLE, records, { now: FIXED_NOW })
     }),
     bench('compound predicate with sets, dates and negation', () => {
-      select_ids(COMPOUND, corpus.tracks, { now: FIXED_NOW })
+      select_ids(track_catalogue, COMPOUND, records, { now: FIXED_NOW })
     })
   )
 })
@@ -52,11 +54,11 @@ test(`native predicate over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, as
 test(`group-by over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, async ({ bench }) => {
   await bench.compare(
     bench('group by genre (multi-value)', () => {
-      const { sql, params } = compile_group_by(and(), 'genre', FIXED_NOW)
+      const { sql, params } = compile_group_by(track_catalogue, and(), 'genre', { now: FIXED_NOW, sums: group_sums })
       db.prepare(sql).all(...params)
     }),
     bench('group by year (scalar)', () => {
-      const { sql, params } = compile_group_by(and(), 'year', FIXED_NOW)
+      const { sql, params } = compile_group_by(track_catalogue, and(), 'year', { now: FIXED_NOW, sums: group_sums })
       db.prepare(sql).all(...params)
     })
   )
@@ -64,7 +66,7 @@ test(`group-by over ${SIZE.toLocaleString()} tracks (budget: 100ms)`, async ({ b
 
 test(`sort over ${SIZE.toLocaleString()} tracks (budget: 150ms)`, async ({ bench }) => {
   await bench('sort by album then track number', () => {
-    const { sql, params } = compile_filter(and(), {
+    const { sql, params } = compile_filter(track_catalogue, and(), {
       now: FIXED_NOW,
       sort: [{ field: 'album' }, { field: 'track_number' }]
     })

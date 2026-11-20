@@ -31,8 +31,8 @@ const leaf: JsonSchema = {
         'in_playlist', 'in_filter', 'matches'
       ]
     },
-    value: { description: 'A text, number, true or false, a list of texts or numbers, or a span such as {"n": 30, "unit": "day"} for in_last; left out for empty and defined.' },
-    cs: { type: 'boolean', description: 'Whether text compares case by case; false unless set.' }
+    value: { description: 'A text, number, true or false, a list of texts or numbers, or a span such as {"count": 30, "unit": "day"} for in_last; left out for empty and defined.' },
+    case_sensitive: { type: 'boolean', description: 'Whether text compares case by case; false unless set.' }
   },
   required: ['field', 'op'],
   additionalProperties: false
@@ -56,19 +56,13 @@ const sort: JsonSchema = {
   description: 'The order, first key first.',
   items: {
     type: 'object',
-    properties: { field: { type: 'string', enum: [...field_ids, 'random'] }, dir: { type: 'string', enum: ['asc', 'desc'] }, seed: { type: 'string' } },
+    properties: { field: { type: 'string', enum: [...field_ids, 'random'] }, descending: { type: 'boolean', description: 'Whether the key runs from high to low; low to high unless set.' } },
     required: ['field'],
     additionalProperties: false
   }
 }
 
-const limit: JsonSchema = {
-  type: 'object',
-  description: 'At most this many tracks, or tracks adding up to this many milliseconds or bytes.',
-  properties: { count: { type: 'integer', minimum: 1 }, by: { type: 'string', enum: ['tracks', 'duration', 'filesize'] } },
-  required: ['count'],
-  additionalProperties: false
-}
+const limit: JsonSchema = { type: 'integer', minimum: 1, description: 'At most this many tracks.' }
 
 const resolutions: JsonSchema = {
   type: 'object',
@@ -123,11 +117,13 @@ export const x_music_api: ApiSpec<XMusicApi & XMusicHistoryApi> = {
       { name: 'track_ids', schema: track_ids },
       { name: 'survivor_id', schema: { type: 'string', description: 'The track that stays, one of track_ids.' } },
       { name: 'resolutions', schema: resolutions, optional: true }
-    ]
+    ],
+    destructive: true
   },
   undo_merge: {
     description: 'Puts the tracks of a merge back as they were before it, by the batch id merge_tracks gave.',
-    params: [{ name: 'batch_id', schema: { type: 'string', description: 'The batch id merge_tracks gave.' } }]
+    params: [{ name: 'batch_id', schema: { type: 'string', description: 'The batch id merge_tracks gave.' } }],
+    destructive: true
   },
   list_folders: { description: 'Lists the music folders X-Music scans, each with its id, path, whether it is scanned, and when it was last scanned in Unix milliseconds.', params: [] },
   add_folder: {
@@ -155,11 +151,13 @@ export const x_music_api: ApiSpec<XMusicApi & XMusicHistoryApi> = {
       { name: 'statistics', schema: { type: 'boolean', description: 'Whether to import ratings, play counts and play history; true unless set.' }, optional: true },
       { name: 'labels', schema: { type: 'boolean', description: 'Whether to import labels as tags; true unless set.' }, optional: true },
       { name: 'playlists', schema: { type: 'boolean', description: 'Whether to import saved lists as playlists; true unless set.' }, optional: true }
-    ]
+    ],
+    destructive: true
   },
   clear_library: {
     description: 'Removes every track, album, playlist, rating and play from the library. The library is backed up first, and the call is refused if that fails; the music folders stay listed and the music files are not touched.',
-    params: []
+    params: [],
+    destructive: true
   },
   get_player_status: { description: 'Gives what is playing, where in it in milliseconds, the volume 0 to 100, repeat, shuffle and the queued track ids.', params: [] },
   play_track: {
@@ -205,14 +203,19 @@ export const x_music_api: ApiSpec<XMusicApi & XMusicHistoryApi> = {
   },
   restore_version: {
     description: 'Puts a track back as it was in one of its versions, bringing it back if it was deleted. The restore is itself a version, so it can be undone the same way.',
-    params: [{ name: 'version_id', schema: id_of('version') }]
+    params: [{ name: 'version_id', schema: id_of('version') }],
+    destructive: true
   },
   list_recent_merges: {
     description: 'Lists the latest merges, newest first, undone ones included: each with its batch id, when in Unix milliseconds, the surviving track and the tracks it took in. undo_merge with a batch id puts that merge back.',
     params: [{ name: 'limit', schema: { type: 'integer', minimum: 1, description: 'At most this many.' } }]
   },
   get_history_keep_days: { description: 'Gives how many days versions are kept; each track keeps its newest whatever its age.', params: [] },
-  set_history_keep_days: { description: 'Sets how many days versions are kept.', params: [{ name: 'days', schema: { type: 'integer', minimum: 1 } }] }
+  set_history_keep_days: {
+    description: 'Sets how many days versions are kept; older versions are deleted for good, each track keeping its newest.',
+    params: [{ name: 'days', schema: { type: 'integer', minimum: 1 } }],
+    destructive: true
+  }
 }
 
 // A call that only reads; any other call changes the library or the player.

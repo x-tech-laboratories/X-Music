@@ -8,11 +8,12 @@
 // track history records each merge as well, but only this journal holds the plays and playlist
 // places that an exact undo needs, all tracks at once.
 
-import { and, asc, count, desc, eq, inArray, min, notInArray, sql } from '@x-tech-laboratories/x-libs/drizzle'
+import { check_known_ids } from '@x-tech-laboratories/x-libs/api_spec'
+import { and, asc, count, desc, drizzle_of, eq, inArray, min, notInArray, sql } from '@x-tech-laboratories/x-libs/drizzle'
 import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { BUILTIN_FIELDS, field, type FieldDescriptor } from '../fields.ts'
-import { album_name, changes, drizzle_of, new_id, placeholders, run } from './database.ts'
+import { album_name, changes, new_id, placeholders, run } from './database.ts'
 import { albums, media as media_table, merge_journal, play_history, playlist_tracks, track_extras, track_values, tracks, values_ } from './schema.ts'
 import { intern_value, set_extra } from './values.ts'
 
@@ -190,7 +191,7 @@ export function merge_preview(database: SqlDatabase, ids: readonly string[]): Me
   if (ids.length < 2) throw new Error('a merge needs at least two tracks')
 
   const rows = load_tracks(database, ids)
-  if (rows.length !== ids.length) throw new Error('one or more tracks no longer exist')
+  check_known_ids(ids, new Set(rows.map((row) => row.id)), 'track')
 
   const sets = load_sets(database, ids)
   const extras = load_extras(database, ids)

@@ -6,9 +6,7 @@ import { intent_for, Selection } from '@x-tech-laboratories/x-libs/web/selection
 import { create_store } from '@x-tech-laboratories/x-libs/web/store'
 import type { Sorting } from '@x-tech-laboratories/x-libs/web/tables'
 import { create_watch } from '@x-tech-laboratories/x-libs/web/watch'
-import type { FilterNode, SortKey } from '@shared/filter'
-import { leaf, or } from '@shared/filter'
-import { FilterStack } from '@shared/view'
+import { FilterStack, leaf, or, type FilterNode, type SortKey } from '@x-tech-laboratories/x-libs/filter'
 import type { GroupRow, LibraryStats, TrackRow } from '@shared/ipc'
 import { field } from '@shared/fields'
 import { sanitize_pane_values, sanitize_sort_keys } from '@shared/viewstate'
@@ -201,10 +199,10 @@ export const library = {
 
   // ── Sorting ──
 
-  sorting: (): Sorting[] => browse.get().sort.map((key) => ({ key: key.field, descending: key.dir === 'desc' })),
+  sorting: (): Sorting[] => browse.get().sort.map((key) => ({ key: key.field, descending: key.descending === true })),
 
   set_sorting: (sorting: readonly Sorting[]): Promise<void> =>
-    change_browse((state) => ({ ...state, sort: sorting.map((key) => ({ field: key.key, dir: key.descending ? 'desc' : 'asc' })) })),
+    change_browse((state) => ({ ...state, sort: sorting.map((key) => ({ field: key.key, descending: key.descending })) })),
 
   // ── Picked rows ──
 

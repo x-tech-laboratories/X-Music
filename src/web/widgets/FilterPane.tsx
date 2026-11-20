@@ -30,8 +30,8 @@ export function facet_values(field_id: string, groups: readonly GroupRow[]): Fac
   return groups.flatMap((group): FacetValue[] => {
     if (group.label === null || group.label === '') return []
     const value = String(group.label)
-    if (field_id !== 'rating') return [{ value, count: group.n }]
-    return [{ value, count: group.n, label: <Rating value={rating_to_stars(Number(value))} label={`${rating_to_stars(Number(value))} stars`} /> }]
+    if (field_id !== 'rating') return [{ value, count: group.count }]
+    return [{ value, count: group.count, label: <Rating value={rating_to_stars(Number(value))} label={`${rating_to_stars(Number(value))} stars`} /> }]
   })
 }
 
@@ -56,7 +56,7 @@ export function FilterPane({ field: default_field = 'genre', id = 'pane' }: { fi
       label={field(current).name}
       heading={<Select bare label="Field to browse by" options={groupable} value={current} on_change={remember} />}
       values={values}
-      total={(groups.data ?? []).reduce((sum, group) => sum + group.n, 0)}
+      total={(groups.data ?? []).reduce((sum, group) => sum + group.count, 0)}
       selected={selected}
       on_change={(values) => void library.set_pane(current, values)}
       loading={groups.loading}

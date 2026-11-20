@@ -8,7 +8,7 @@ import { define_events } from '@x-tech-laboratories/x-libs/electron/events'
 import { history_method_names, type HistoryMethods } from '@x-tech-laboratories/x-libs/history'
 import { local_mcp_method_names, type LocalMcpMethods } from '@x-tech-laboratories/x-libs/local_mcp_protocol'
 import { page_log_method_names, type PageLogMethods } from '@x-tech-laboratories/x-libs/log_protocol'
-import type { FilterNode, SortKey, Limit } from './filter.ts'
+import type { FilterNode, SortKey } from '@x-tech-laboratories/x-libs/filter'
 import type { TrackDetails } from './library/details.ts'
 import type { DuplicateGroup, DuplicateReason } from './library/duplicates.ts'
 import type { TrackSnapshot } from './library/history.ts'
@@ -42,17 +42,19 @@ export interface TrackRow {
   play_count: number
 }
 
+// One value of a field among the tracks, with how many tracks hold it and their total length.
 export interface GroupRow {
-  gid: number | string | null
+  group_id: number | string | null
   label: string | null
-  n: number
+  count: number
   total_ms: number
 }
 
 export interface QueryRequest {
   filter: FilterNode
   sort?: readonly SortKey[]
-  limit?: Limit
+  // At most this many tracks, after skipping `offset` of them.
+  limit?: number
   offset?: number
 }
 
@@ -168,7 +170,7 @@ export interface AppInfo {
 export interface XMusicApi {
   get_app_info: () => AppInfo
   get_library_stats: () => LibraryStats
-  list_tracks: (filter: FilterNode, sort?: readonly SortKey[], limit?: Limit, offset?: number) => TrackRow[]
+  list_tracks: (filter: FilterNode, sort?: readonly SortKey[], limit?: number, offset?: number) => TrackRow[]
   list_track_groups: (filter: FilterNode, field: string) => GroupRow[]
   get_track: (track_id: string) => TrackDetails | null
   list_duplicates: (reasons?: DuplicateReason[], length_tolerance_ms?: number, limit?: number) => DuplicateGroup[]

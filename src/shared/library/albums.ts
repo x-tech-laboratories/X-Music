@@ -3,11 +3,11 @@
 // recomputed. The importer and the scanner both key albums through this file, so the same file
 // read by either lands on the same album.
 
-import { eq } from '@x-tech-laboratories/x-libs/drizzle'
+import { drizzle_of, eq } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { field } from '../fields.ts'
-import { all_rows, drizzle_of, new_id, run } from './database.ts'
+import { all_rows, new_id, run } from './database.ts'
 import { albums, tracks } from './schema.ts'
 
 const KEY_SEP = '\x1f'
