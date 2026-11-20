@@ -7,7 +7,7 @@ import { use_store } from '@x-tech-laboratories/x-libs/web/react/store'
 import { library, results } from '../stores/library.ts'
 import { FilterPane } from '../widgets/FilterPane.tsx'
 import { SongList } from '../widgets/SongList.tsx'
-import { view_href } from './Navigation.tsx'
+import { view_href } from './routes.ts'
 
 // ============================================================================
 // Panes
@@ -31,8 +31,8 @@ function Browser() {
     <Split
       storage_key="x-music.split.vpright"
       axis="vertical"
-      specs={[{ min: 90, max: 480 }, { min: 160, grow: true }]}
-      preferred={[190, undefined]}
+      specs={[{ min: 92, max: 480 }, { min: 160, grow: true }]}
+      preferred={[192, undefined]}
       panes={[panes_row, <SongList key="songs" />]}
     />
   )

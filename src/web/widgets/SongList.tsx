@@ -1,19 +1,19 @@
 // The library's tracks in the X-Libs table, every one of them drawn only where it shows: the library sorts them, the table shows the sort, and the list adds keyboard selection and playing.
 
-import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { Chip, Chips } from '@x-tech-laboratories/x-libs/web/react/badges'
 import { SearchBox } from '@x-tech-laboratories/x-libs/web/react/controls'
 import { SelectionBar } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { open_context_menu } from '@x-tech-laboratories/x-libs/web/react/menus'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
+import { use_route } from '@x-tech-laboratories/x-libs/web/react/shell'
 import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { describe_keys } from '@x-tech-laboratories/x-libs/web/react/shortcuts'
 import { Empty, Skeleton } from '@x-tech-laboratories/x-libs/web/react/states'
 import { use_store } from '@x-tech-laboratories/x-libs/web/react/store'
 import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
-import { cx } from '@x-tech-laboratories/x-libs/web/dom'
-import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import { row_after_key } from '@x-tech-laboratories/x-libs/web/selection'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import type { TrackRow } from '@shared/ipc'
@@ -23,7 +23,7 @@ import { player } from '../stores/player.ts'
 import { logger } from '../lib/log.ts'
 import { MergeView } from './MergeView.tsx'
 import { SongProperties } from './SongProperties.tsx'
-import s from './SongList.module.css'
+import { close_overlay, open_overlay, overlay_of } from '../views/routes.ts'
 
 const log = logger('songlist')
 
@@ -54,10 +54,12 @@ const columns: TableColumn<TrackRow>[] = [
   column('play_count', 60, (track) => track.play_count, true)
 ]
 
-// A first guess at a row's height, until a drawn row is measured.
-const FIRST_ROW_HEIGHT = 41
-
 type Modifiers = { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }
+
+// How tall a drawn row is, for how far Page Up and Page Down move.
+function drawn_row_height(body: HTMLElement | null): number {
+  return body?.querySelector('tbody tr:not(.virtual-spacer)')?.getBoundingClientRect().height || 32
+}
 
 // ============================================================================
 // Search
@@ -81,12 +83,13 @@ export function SongList() {
   use_watch(library.selection_changes)
   use_watch(player.status_changes)
 
-  const [merging, set_merging] = useState<TrackId[] | null>(null)
-  const [inspecting, set_inspecting] = useState<TrackId | null>(null)
+  // Properties and Merge open at their own address, so Back closes them and a reload returns to them.
+  const overlay = overlay_of(use_route().parts)
+  const inspect = (track_id: TrackId): void => open_overlay('library', { kind: 'properties', track_id })
+  const merge = (track_ids: TrackId[]): void => open_overlay('library', { kind: 'merge', track_ids })
   // The keyboard cursor: which row arrow keys move from.
   const [cursor, set_cursor] = useState(0)
   const body = useRef<HTMLDivElement>(null)
-  const [row_height, set_row_height] = useState(FIRST_ROW_HEIGHT)
 
   // Column layout is remembered per column id, so adding or reordering columns keeps the rest.
   const [widths, set_widths] = use_pref<Record<string, number>>('x-music.pref.songlist.widths', {})
@@ -97,13 +100,6 @@ export function SongList() {
 
   const positions = useMemo(() => new Map(order.map((id, index) => [id, index])), [order])
   const index_of = (track: TrackRow): number => positions.get(track.id) ?? 0
-
-  // The virtual rows, or a phone's cards, are spaced by a drawn one's height, which the density, font and width decide.
-  useLayoutEffect(() => {
-    const drawn = body.current?.querySelector('tbody tr:not(.virtual-spacer)')
-    const height = drawn?.getBoundingClientRect().height ?? 0
-    if (height > 0 && Math.abs(height - row_height) > 0.25) set_row_height(height)
-  })
 
   function select_row(index: number, event: Modifiers): void {
     const modifiers = { shift: event.shiftKey, ctrl: event.ctrlKey || event.metaKey }
@@ -129,8 +125,8 @@ export function SongList() {
       { label: 'Play', hint: describe_keys('enter'), run: () => play_from(index) },
       { label: many ? `Play ${ids.length} next` : 'Play next', run: () => void player.enqueue(ids, 'next') },
       { label: many ? `Add ${ids.length} to queue` : 'Add to queue', run: () => void player.enqueue(ids, 'end') },
-      { label: 'Properties', hint: describe_keys('alt+enter'), separator_before: true, disabled: many, run: () => set_inspecting(track.id) },
-      { label: `Merge ${ids.length} tracks…`, disabled: !many, run: () => set_merging(ids) }
+      { label: 'Properties', hint: describe_keys('alt+enter'), separator_before: true, disabled: many, run: () => inspect(track.id) },
+      { label: `Merge ${ids.length} tracks…`, disabled: !many, run: () => merge(ids) }
     ])
   }
 
@@ -141,7 +137,7 @@ export function SongList() {
 
     if (event.key === 'Enter') {
       event.preventDefault()
-      if (event.altKey) set_inspecting(track.id)
+      if (event.altKey) inspect(track.id)
       else play_from(index)
       return
     }
@@ -160,7 +156,7 @@ export function SongList() {
       return
     }
 
-    const rows_per_page = Math.max(1, Math.floor((body.current?.clientHeight ?? 400) / row_height) - 1)
+    const rows_per_page = Math.max(1, Math.floor((body.current?.clientHeight ?? 400) / drawn_row_height(body.current)) - 1)
     const next = row_after_key(event.key, index, order.length - 1, rows_per_page)
     if (next === null) return
     event.preventDefault()
@@ -183,8 +179,9 @@ export function SongList() {
     content = (
       <DataTable
         caption="Tracks"
-        wrap_class={cx('fit', s.single_line)}
-        virtual={{ row_height, card_height: row_height }}
+        wrap_class="fit"
+        single_line
+        virtual={{}}
         columns={columns}
         rows={tracks}
         row_key={(track) => track.id}
@@ -212,7 +209,7 @@ export function SongList() {
   }
 
   return (
-    <section className="song-list" aria-label="Tracks">
+    <section className="scroll-pane" aria-label="Tracks">
       <div className="song-list-tools">
         <span ref={(element) => { search_area = element }}>
           <SearchBox label="Search the library" value={state.search} on_input={(text) => void library.set_search(text)} />
@@ -230,7 +227,7 @@ export function SongList() {
           {keys('arrowup')} {keys('arrowdown')} move, {keys('shift+arrowdown')} picks, {keys('enter')} plays, right-click for more
         </span>
         <span className="muted small">
-          {narrowed ? `${tracks.length.toLocaleString()} of ${plural(stats.tracks, 'track')}` : plural(tracks.length, 'track')}
+          {narrowed ? `${format_count(tracks.length)} of ${plural(stats.tracks, 'track')}` : plural(tracks.length, 'track')}
         </span>
       </div>
 
@@ -240,17 +237,18 @@ export function SongList() {
         <SelectionBar count={selected_count} total={order.length} on_clear={() => library.clear_selection()} on_select_all={() => library.select_all()}>
           <button type="button" onClick={() => void player.enqueue(library.selected_ids(), 'next')}>Play next</button>
           <button type="button" onClick={() => void player.enqueue(library.selected_ids(), 'end')}>Add to queue</button>
-          {selected_count > 1 && <button type="button" onClick={() => set_merging(library.selected_ids())}>Merge…</button>}
+          {selected_count > 1 && <button type="button" onClick={() => merge(library.selected_ids())}>Merge…</button>}
         </SelectionBar>
       )}
 
-      {inspecting !== null && <SongProperties track_id={inspecting} on_close={() => set_inspecting(null)} />}
+      {overlay?.kind === 'properties' && <SongProperties track_id={overlay.track_id} on_close={close_overlay} />}
 
-      {merging && (
+      {overlay?.kind === 'merge' && (
         <MergeView
-          ids={merging}
+          key={overlay.track_ids.join('/')}
+          ids={overlay.track_ids}
           on_close={(merged) => {
-            set_merging(null)
+            close_overlay()
             if (merged) library.clear_selection()
           }}
         />

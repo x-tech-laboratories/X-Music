@@ -9,12 +9,12 @@ import { Empty, Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/rea
 import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { Age } from '@x-tech-laboratories/x-libs/web/react/time'
 import { format_duration } from '@x-tech-laboratories/x-libs/durations'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
-import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { FileOutcome, FileResult, Root, ScanProgress, ScanReport } from '@shared/ipc'
 import { ipc, page_ipc } from '../lib/ipc.ts'
 import { library } from '../stores/library.ts'
-import { view_href } from '../views/Navigation.tsx'
+import { view_href } from '../views/routes.ts'
 
 // ============================================================================
 // Outcomes
@@ -32,7 +32,7 @@ const OUTCOMES: Record<FileOutcome, [text: string, tone: Tone]> = {
 function progress_detail(progress: ScanProgress): string {
   if (progress.phase === 'walking') return `Finding files… ${plural(progress.found, 'file')} so far`
   if (progress.phase === 'finishing') return 'Checking for files that disappeared…'
-  return `${progress.processed.toLocaleString()} of ${plural(progress.found, 'file')}`
+  return `${format_count(progress.processed)} of ${plural(progress.found, 'file')}`
 }
 
 // ============================================================================
@@ -61,10 +61,6 @@ function folder_columns(scanning: boolean, remove: (root: Root) => void): TableC
 // Summary
 // ============================================================================
 
-function took(duration_in_milliseconds: number): string {
-  return duration_in_milliseconds < 1000 ? 'Under a second' : format_duration(duration_in_milliseconds / 1000)
-}
-
 function ScanSummary({ report, on_show_failed }: { report: ScanReport; on_show_failed: () => void }) {
   const failed = report.errors.length
   const notes = [
@@ -75,11 +71,11 @@ function ScanSummary({ report, on_show_failed }: { report: ScanReport; on_show_f
   return (
     <>
       <Tiles>
-        <Tile label="Files read" value={report.files_found.toLocaleString()} value_first />
-        <Tile label="New tracks" value={report.tracks_created.toLocaleString()} value_first />
-        <Tile label="Already known" value={report.tracks_matched.toLocaleString()} value_first />
-        <Tile label="Unchanged" value={report.files_skipped.toLocaleString()} value_first />
-        <Tile label="Took" value={took(report.duration_ms)} value_first />
+        <Tile label="Files read" value={format_count(report.files_read)} value_first />
+        <Tile label="New tracks" value={format_count(report.tracks_created)} value_first />
+        <Tile label="Already known" value={format_count(report.tracks_matched)} value_first />
+        <Tile label="Unchanged" value={format_count(report.files_skipped)} value_first />
+        <Tile label="Took" value={format_duration(report.duration_ms / 1000)} value_first />
       </Tiles>
       {notes.length > 0 && (
         <p className={failed > 0 || report.marked_missing > 0 ? 'tone-warn' : 'muted'}>
@@ -131,7 +127,7 @@ export function ScanPanel() {
       await ipc('add_folder', path)
       await roots.reload(true)
     } catch (failure) {
-      set_error(describe_error(failure))
+      set_error(describe_call_error(failure))
     }
   }
 
@@ -141,7 +137,7 @@ export function ScanPanel() {
       await ipc('remove_folder', root.id)
       await roots.reload(true)
     } catch (failure) {
-      set_error(describe_error(failure))
+      set_error(describe_call_error(failure))
     }
   }
 
@@ -154,7 +150,7 @@ export function ScanPanel() {
     try {
       await ipc('scan_folders')
     } catch (failure) {
-      set_error(describe_error(failure))
+      set_error(describe_call_error(failure))
       set_scanning(false)
       set_progress(null)
     }

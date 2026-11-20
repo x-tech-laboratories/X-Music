@@ -5,7 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { field } from '@shared/fields'
 import { new_id } from '@shared/library/database'
 import { open_library } from '@shared/library/store'
-import { regexp_matches } from '@shared/query/compile'
+import { regexp_matches } from '@x-tech-laboratories/x-libs/filter_sql'
 import type { SqlValue } from '@x-tech-laboratories/x-libs/sql'
 import type { Corpus } from './corpus.ts'
 

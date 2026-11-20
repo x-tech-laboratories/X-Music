@@ -25,7 +25,7 @@ implemented yet. See the roadmap in DESIGN-SPEC §15.
 | Identity resolution (idempotent import and scan) | working |
 | Filesystem scanner (read-only, move detection) | working |
 | gmusicbrowser import | working |
-| Filter AST → SQL and → native predicate | working, agreement property-tested |
+| Filter AST → SQL and → native predicate, on X-Libs `filter` | working, agreement property-tested in X-Libs |
 | Audio content hashing (move/rename detection) | working |
 | Field descriptor system | working |
 | Format-string engine | working |
@@ -208,6 +208,9 @@ is marked so, and a client asks before running it: `add_folder`, `remove_folder`
 `clear_library` and the player's `play_track`, `toggle_playback`, `play_next`, `play_previous`,
 `stop_playback`, `seek`, `set_volume`, `queue_tracks`, `remove_from_queue`, `move_in_queue`, `clear_queue`, `set_repeat` and
 `set_shuffle`.
+Of those, the ones that delete or overwrite data are marked destructive as well: `clear_library`,
+`merge_tracks`, `undo_merge`, `restore_version`, `import_gmbrc` (it replaces ratings and plays with
+gmusicbrowser's) and `set_history_keep_days` (a shorter time deletes older versions for good).
 
 The tools that remove or replace data can be undone as they are in the window: `clear_library` backs the
 library up first and is refused if that fails, `undo_merge` puts a merge back, and every change to a track,
@@ -221,10 +224,10 @@ backups are made, restored and scheduled only from Settings.
 
 The suite is described in DESIGN-SPEC §13. The load-bearing one:
 
-**`tests/ast_agreement.test.ts`** asserts that for any generated filter over any generated
-library, the SQL compiler and the native predicate return identical id sets. The fast path exists
-only because this test keeps it honest — it has already caught a three-valued-logic divergence where
-SQL silently dropped tracks with a NULL value from negated filters.
+**`tests/filter_compile.test.ts`** runs filters over a generated library through X-Music's catalogue
+and checks the SQL against the in-memory predicate; X-Libs' own property test holds the two together
+for any generated filter. A missing value fails a test and negation flips that, so a negated filter
+keeps tracks with no value.
 
 Tests reach SQLite through Node's built-in `node:sqlite`, as the app does, and open the library
 through the same store code. `tests/library_upgrade.test.ts` builds a library at the old schema
@@ -248,9 +251,10 @@ scripts/         run.sh behind npm run app, and the upgrade dry run
 resources/       icon.svg and the icons made from it
 ```
 
-`shared/` is where the leverage is. The filter AST, field descriptors, format-string engine and the
-filter stack are plain TypeScript with no framework primitives and no DOM access; the selection,
-sorting, table, panes, prefs and logging come from X-Libs. Replacing the UI framework touches
+`shared/` is where the leverage is. The field descriptors and their filter catalogue are plain
+TypeScript with no framework primitives and no DOM access; the filter AST and stack, format strings,
+selection, sorting, table, panes, prefs and logging come from X-Libs, and so does the mpv engine the
+main process plays through. Replacing the UI framework touches
 `web/` only. The library store in `shared/library/` runs on X-Libs' `SqlDatabase`
 and imports nothing from Node, so the main process only opens the file and hands it over.
 

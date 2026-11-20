@@ -9,10 +9,9 @@ import { PageHeading, Toolbar } from '@x-tech-laboratories/x-libs/web/react/layo
 import { Empty, Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
 import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
-import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
-import { plural } from '@x-tech-laboratories/x-libs/web/format'
+import { plural, stamp } from '@x-tech-laboratories/x-libs/web/format'
 import type { MergeEntry, TrackSnapshot, TrackState, Version, VersionKind } from '@shared/ipc'
 import { BUILTIN_FIELDS, rating_to_stars } from '@shared/fields'
 import { library } from '../stores/library.ts'
@@ -37,9 +36,7 @@ const merge_labels: Record<'merged' | 'undone', [text: string, tone: Tone]> = {
   undone: ['Merge undone', 'none']
 }
 
-const when = (milliseconds: number): string => new Date(milliseconds).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-
-const failure = (error: unknown): string => clean_error_message(describe_error(error))
+const when = (milliseconds: number): string => stamp(milliseconds / 1000)
 
 const ARTIST_FIELD = BUILTIN_FIELDS.find((field) => field.id === 'artist')!.field_id!
 
@@ -171,7 +168,7 @@ function restore(version: TrackVersion, on_done: () => void): void {
         toast(`${name} is back as it was`, { tone: 'good' })
         on_done()
       } catch (error) {
-        toast(`Could not restore ${name}: ${failure(error)}`, { tone: 'bad' })
+        toast(`Could not restore ${name}: ${describe_call_error(error)}`, { tone: 'bad' })
       }
     }
   })
@@ -216,7 +213,7 @@ function TrackHistoryDialog({ track_id, name, on_close, on_changed }: { track_id
       <Loaded resource={versions}>
         {(list) => (list.length === 0
           ? <Empty title="No history yet." />
-          : <DataTable caption={`History of ${name}`} columns={columns} rows={list} row_key={(version) => version.id} manual_sorting column_hiding={false} />)}
+          : <DataTable caption={`History of ${name}`} columns={columns} rows={list} row_key={(version) => version.id} column_hiding={false} />)}
       </Loaded>
     </Dialog>
   )
@@ -325,7 +322,7 @@ export function HistoryView() {
           const shown = show === 'everything' ? rows : rows.filter((row) => (show === 'merges' ? row.type === 'merge' : row.type === 'version'))
           return shown.length === 0
             ? <Empty title={show === 'merges' ? 'No merges yet.' : 'No changes yet.'} hint="Edits, imports, merges and restores show here as they happen." />
-            : <DataTable caption="Latest changes" columns={columns} rows={shown} row_key={row_key} manual_sorting />
+            : <DataTable caption="Latest changes" columns={columns} rows={shown} row_key={row_key} />
         }}
       </Loaded>
     </div>

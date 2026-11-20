@@ -9,14 +9,14 @@ import { Section, Stack, Tile, Tiles } from '@x-tech-laboratories/x-libs/web/rea
 import { MergeGrid, is_conflict, winner_of, type MergeChoices, type MergeField } from '@x-tech-laboratories/x-libs/web/react/merge_grid'
 import { PageView } from '@x-tech-laboratories/x-libs/web/react/page_view'
 import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
+import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
 import { use_pref } from '@x-tech-laboratories/x-libs/web/react/prefs'
 import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { is_boolean } from '@x-tech-laboratories/x-libs/web/prefs'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
-import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge'
+import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { rating_to_stars } from '@shared/fields'
 import { ipc } from '../lib/ipc.ts'
 import { library } from '../stores/library.ts'
@@ -58,8 +58,6 @@ function resolutions_for(preview: MergePreview, survivor: string, choices: Merge
   return resolutions
 }
 
-const failure = (error: unknown): string => clean_error_message(describe_error(error))
-
 // ============================================================================
 // Undo
 // ============================================================================
@@ -71,7 +69,7 @@ export async function undo_merge(batch_id: string, on_undone?: () => void): Prom
     on_undone?.()
     toast('Merge undone', { tone: 'good' })
   } catch (error) {
-    toast(`Could not undo the merge: ${failure(error)}`, { tone: 'bad' })
+    toast(`Could not undo the merge: ${describe_call_error(error)}`, { tone: 'bad' })
   }
 }
 
@@ -97,13 +95,18 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
 }) {
   const files_of = (id: TrackId): number => preview.media.filter((media) => media.from === id).length
   const source_name = (id: TrackId): string => `Source ${preview.ids.indexOf(id) + 1}`
+  const file_columns: TableColumn<MergePreview['media'][number]>[] = [
+    { label: 'Format', cell: (media) => (media.codec ?? 'Unknown').toUpperCase() },
+    { label: 'File', cell: (media) => <><code className="path">{media.uri}</code>{!media.present && <> <Badge tone="bad">Missing</Badge></>}</>, text: (media) => media.uri },
+    { label: 'From', cell: (media) => source_name(media.from), sort: (media) => preview.ids.indexOf(media.from) }
+  ]
 
   return (
     <Stack>
       {preview.pinned_sources.length > 0 && (
         <p className="tone-warn">
-          {plural(preview.pinned_sources.length, 'source')} of these was merged or split by hand before. Merging replaces
-          that decision.
+          {plural(preview.pinned_sources.length, 'source')} of these {preview.pinned_sources.length === 1 ? 'was' : 'were'} merged
+          or split by hand before. Merging replaces that decision.
         </p>
       )}
 
@@ -121,7 +124,7 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
         only_differences={only_differences}
       />
 
-      <Section title="Combined statistics">
+      <Section level={3} title="Combined statistics">
         <p className="muted small">
           These are not a choice: plays and skips are summed, the highest rating wins, and play
           history is merged and deduplicated.
@@ -133,19 +136,8 @@ function MergeBody({ preview, survivor, set_survivor, choices, set_choices, only
         </Tiles>
       </Section>
 
-      <Section title="Files the surviving track will hold">
-        <table>
-          <thead><tr><th scope="col">Format</th><th scope="col">File</th><th scope="col">From</th></tr></thead>
-          <tbody>
-            {preview.media.map((media) => (
-              <tr key={media.id}>
-                <td>{(media.codec ?? 'Unknown').toUpperCase()}</td>
-                <td><code title={media.uri}>{media.uri}</code> {!media.present && <Badge tone="bad">Missing</Badge>}</td>
-                <td>{source_name(media.from)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <Section level={3} title="Files the surviving track will hold">
+        <DataTable caption="Files the surviving track will hold" columns={file_columns} rows={preview.media} row_key={(media) => media.id} column_hiding={false} />
       </Section>
     </Stack>
   )
@@ -178,16 +170,14 @@ export function MergeView({ ids, on_close, on_undone }: MergeViewProps) {
       })
       on_close?.(true)
     } catch (error) {
-      toast(`Could not merge: ${failure(error)}`, { tone: 'bad' })
+      toast(`Could not merge: ${describe_call_error(error)}`, { tone: 'bad' })
       set_busy(false)
     }
   }
 
   const actions = preview && (
     <>
-      <label className="check">
-        <Switch label="Only differences" checked={only_differences} on_change={set_only_differences} /> Only differences
-      </label>
+      <Switch label="Only differences" show_label checked={only_differences} on_change={set_only_differences} />
       <button className="accent solid" onClick={() => void merge()} disabled={busy || survivor === null}>
         {busy ? 'Merging…' : 'Merge'}
       </button>

@@ -2,8 +2,7 @@
 // interpolates the position between ticks so the seek bar moves smoothly without a 60 Hz IPC feed.
 
 import { create_store } from '@x-tech-laboratories/x-libs/web/store'
-import { clean_error_message } from '@x-tech-laboratories/x-libs/electron/bridge'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import type { PlayerStatus, RepeatMode } from '@shared/ipc'
 import { ipc } from '../lib/ipc.ts'
@@ -29,7 +28,7 @@ async function act(work: () => Promise<PlayerStatus>): Promise<void> {
   try {
     apply(await work())
   } catch (error) {
-    toast(`Playback failed: ${clean_error_message(describe_error(error))}`, { tone: 'bad' })
+    toast(`Playback failed: ${describe_call_error(error)}`, { tone: 'bad' })
   }
 }
 
@@ -93,6 +92,7 @@ export const player = {
   set_volume: (volume: number) => act(() => ipc('set_volume', volume)),
   enqueue: (track_ids: string[], position: 'end' | 'next' = 'end') => act(() => ipc('queue_tracks', track_ids, position)),
   dequeue: (index: number) => act(() => ipc('remove_from_queue', index)),
+  move_in_queue: (index: number, to_index: number) => act(() => ipc('move_in_queue', index, to_index)),
   clear_queue: () => act(() => ipc('clear_queue')),
   set_repeat: (mode: RepeatMode) => act(() => ipc('set_repeat', mode)),
   set_shuffle: (on: boolean) => act(() => ipc('set_shuffle', on)),

@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 
 import type { Implementation, IpcMainEventLike } from '@x-tech-laboratories/x-libs/electron/bridge'
+import { find_mpv, MpvEngine, NullEngine } from '@x-tech-laboratories/x-libs/mpv'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { default_gmbrc_path, parse_gmbrc } from '@shared/import/gmbrc'
@@ -27,8 +28,6 @@ import { resolve_artwork, thumbnail } from './library/artwork.ts'
 import { scan_roots } from './library/scan.ts'
 import { logger } from './log.ts'
 import { Player } from './play/player.ts'
-import { MpvEngine, find_mpv } from './play/mpv.ts'
-import { NullEngine } from './play/engine.ts'
 
 // Every call other programs may make too, answered on the library and the player.
 export type ApiImplementation = Implementation<XMusicApi> & Implementation<XMusicHistoryApi>
@@ -62,14 +61,14 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
 
   // Without mpv the app still runs and the library still works; only audio is unavailable, and the player reports that plainly rather than failing at the first click.
   const play_log = logger('play')
-  const mpv_path = await find_mpv()
+  const mpv_path = await find_mpv(process.env.X_MUSIC_MPV)
   if (!mpv_path) play_log.warn('mpv not found; playback is disabled', { hint: 'set X_MUSIC_MPV' })
   else play_log.info('using mpv', { path: mpv_path })
 
   const player = new Player(
     db,
     mpv_path
-      ? new MpvEngine({ binary: mpv_path, on_log: (line) => play_log.debug(`mpv: ${line}`) })
+      ? new MpvEngine({ binary: mpv_path, socket_name: 'x-music-mpv', on_log: (line) => play_log.debug(`mpv: ${line}`) })
       : new NullEngine(),
     { replay_gain: 'track', after_write: () => record_history(db) }
   )

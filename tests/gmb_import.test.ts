@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 
 import { parse_gmbrc, default_gmbrc_path } from '@shared/import/gmbrc'
-import { import_gmbrc } from '@shared/import/gmb_import'
+import { import_gmbrc, join_path } from '@shared/import/gmb_import'
 import { fresh_db } from './sqlite.ts'
 
 const HEADER = [
@@ -159,6 +159,44 @@ describe('gmbrc import', () => {
        ORDER BY pt.position`).all() as { title: string }[]
     expect(rows).toHaveLength(2)
     db.close()
+  })
+
+  it('imports a saved list again in place, holding its tracks once', () => {
+    const extra = 'SavedLists:\n  Favourites: !SongArray::Named 2 1\n'
+    const db = fresh_db()
+    import_gmbrc(db, parse_gmbrc(gmbrc([row(1), row(2, { file: 'Freddie.flac' })], extra)))
+
+    import_gmbrc(db, parse_gmbrc(gmbrc([row(1), row(2, { file: 'Freddie.flac' })], extra)))
+
+    expect((db.prepare('SELECT COUNT(*) AS n FROM playlists').get() as { n: number }).n).toBe(1)
+    expect((db.prepare('SELECT COUNT(*) AS n FROM playlist_tracks').get() as { n: number }).n).toBe(2)
+    db.close()
+  })
+
+  it('skips a song with no file and says why', () => {
+    const db = fresh_db()
+    const report = import_gmbrc(db, parse_gmbrc(gmbrc([row(7, { file: '', path: '' })])))
+
+    expect(report.tracks_created).toBe(0)
+    expect(report.notes).toContain('Skipped song 7: no file path recorded.')
+    db.close()
+  })
+
+  it('notes the saved filters it does not translate and the columns it does not know', () => {
+    const extra = 'SavedFilters:\n  "50 Most Played": !Filter "playcount:h:50"\n'
+    const text = gmbrc([row(1)], extra).replace(HEADER, `${HEADER}\tsome_future_column`)
+    const db = fresh_db()
+
+    const report = import_gmbrc(db, parse_gmbrc(text))
+
+    expect(report.notes.some((note) => note.startsWith('1 saved filters found but not translated.'))).toBe(true)
+    expect(report.notes).toContain('Unmapped gmbrc columns ignored: some_future_column')
+    db.close()
+  })
+
+  it('joins an empty folder and file name to the current folder', () => {
+    expect(join_path('', '')).toBe('.')
+    expect(join_path('/music/./a/../b', 'c.flac')).toBe('/music/b/c.flac')
   })
 
   it('can import without statistics when asked', () => {

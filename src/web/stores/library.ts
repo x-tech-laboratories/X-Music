@@ -1,17 +1,15 @@
 // The library's browse state as X-Libs stores: the tracks the filters let through, how they are sorted and narrowed, and the picked rows.
 
 import { browser_storage, read_pref, write_pref } from '@x-tech-laboratories/x-libs/web/prefs'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { intent_for, Selection } from '@x-tech-laboratories/x-libs/web/selection'
 import { create_store } from '@x-tech-laboratories/x-libs/web/store'
 import type { Sorting } from '@x-tech-laboratories/x-libs/web/tables'
 import { create_watch } from '@x-tech-laboratories/x-libs/web/watch'
-import type { FilterNode, SortKey } from '@shared/filter'
-import { leaf, or } from '@shared/filter'
-import { FilterStack } from '@shared/view'
+import { FilterStack, leaf, or, type FilterNode, type SortKey } from '@x-tech-laboratories/x-libs/filter'
 import type { GroupRow, LibraryStats, TrackRow } from '@shared/ipc'
 import { field } from '@shared/fields'
-import { sanitize_pane_values, sanitize_sort_keys } from '@shared/viewstate'
+import { sanitize_pane_values, sanitize_sort_keys, seed_random_sort } from '@shared/viewstate'
 import { ipc } from '../lib/ipc.ts'
 
 // A track's id as the main process hands it over, never read as a number.
@@ -45,7 +43,7 @@ const DEFAULT_SORT: SortKey[] = [{ field: 'album' }, { field: 'disc_number' }, {
 
 function remembered(): Browse {
   const storage = browser_storage()
-  const sort = sanitize_sort_keys(read_pref<unknown>(storage, SORT_KEY, null))
+  const sort = seed_random_sort(sanitize_sort_keys(read_pref<unknown>(storage, SORT_KEY, null)), [])
   const search = read_pref<unknown>(storage, SEARCH_KEY, '')
   return {
     sort: sort.length > 0 ? sort : DEFAULT_SORT,
@@ -125,7 +123,7 @@ async function refresh(): Promise<void> {
     selection_changes.bump()
     results.set({ stats, tracks, order, error: null })
   } catch (error) {
-    if (request === latest_request) results.update((before) => ({ ...before, error: describe_error(error) }))
+    if (request === latest_request) results.update((before) => ({ ...before, error: describe_call_error(error) }))
   } finally {
     if (request === latest_request) loading.set(false)
   }
@@ -145,21 +143,22 @@ function groups_for(field_id: string): Promise<GroupRow[]> {
 // Track names
 // ============================================================================
 
-export interface TrackName { title: string; artist: string }
+export interface TrackName { title: string | null; artist: string | null }
 
 const names_fetched = new Map<TrackId, TrackName>()
 
-// The title and artist of each id, from the loaded list or else asked of the library once, for tracks the filters hide.
+// The title and artist of each id, from the loaded list or asked of the library once; an id the library no longer has is left out.
 async function names_of(ids: readonly TrackId[]): Promise<Map<TrackId, TrackName>> {
   const loaded = new Map(results.get().tracks.map((track) => [track.id, track]))
   const names = new Map<TrackId, TrackName>()
   await Promise.all(ids.map(async (id) => {
     const track = loaded.get(id)
-    if (track) return void names.set(id, { title: track.title ?? '', artist: track.artist ?? '' })
+    if (track) return void names.set(id, { title: track.title, artist: track.artist })
     if (!names_fetched.has(id)) {
       const details = await ipc('get_track', id)
-      const artist = details?.fields.find((each) => each.field === 'artist')?.value ?? ''
-      names_fetched.set(id, { title: details?.title ?? '', artist })
+      if (!details) return
+      const artist = details.fields.find((each) => each.field === 'artist')?.value ?? null
+      names_fetched.set(id, { title: details.title, artist })
     }
     names.set(id, names_fetched.get(id)!)
   }))
@@ -201,10 +200,10 @@ export const library = {
 
   // ── Sorting ──
 
-  sorting: (): Sorting[] => browse.get().sort.map((key) => ({ key: key.field, descending: key.dir === 'desc' })),
+  sorting: (): Sorting[] => browse.get().sort.map((key) => ({ key: key.field, descending: key.descending === true })),
 
   set_sorting: (sorting: readonly Sorting[]): Promise<void> =>
-    change_browse((state) => ({ ...state, sort: sorting.map((key) => ({ field: key.key, dir: key.descending ? 'desc' : 'asc' })) })),
+    change_browse((state) => ({ ...state, sort: seed_random_sort(sorting.map((key) => ({ field: key.key, descending: key.descending })), state.sort) })),
 
   // ── Picked rows ──
 

@@ -186,19 +186,19 @@ The single most valuable structural decision in the codebase: **anything expensi
 outside the renderer.**
 
 `src/shared/` is plain TypeScript with no framework primitives, no reactivity library, and no DOM
-access. It holds:
+access. The filter AST, its SQL compiler, its in-memory predicate and the filter stack are X-Libs `filter` and
+`filter_sql`. It holds:
 
 | Module | What it owns |
 |---|---|
 | `fields.ts` | Field descriptors: storage, filter operators, tag mappings, stable numeric ids |
-| `filter.ts` | The filter AST, its operators, composition and cycle detection |
-| `format.ts` | The format-string language (§5.5) — labels, tray text, the file renamer |
-| `view.ts` | The filter stack |
+| `filter_shapes.ts` | Filters and sorts saved in earlier shapes, read into the shapes of X-Libs `filter` |
+| `format.ts` | The format strings (§5.5) — labels, tray text, the file renamer — on X-Libs `format_strings`, with a stars format |
 | `viewstate.ts` | Checking remembered browse state against the field catalogue (§5.3.1) |
 | `ipc.ts` | The IPC contract |
 | `api.ts` | Every call described once in an X-Libs `api_spec`, for the local MCP server (§10) |
 | `library/` | The store: Drizzle schema, migrations, identity, albums, merge, duplicates, history |
-| `query/` | The filter compilers: `compile.ts` (AST → SQL) and `evaluate.ts` (AST → predicate) |
+| `query/` | `catalogue.ts`: the tracks as an X-Libs filter catalogue, with X-Music's `matches` and `in_playlist` operators |
 | `import/` | Reading and importing gmusicbrowser's `gmbrc` |
 
 Anchored range selection, multi-key sort with shift-click semantics and the arithmetic deciding
@@ -540,9 +540,9 @@ a synchronization surface, a memory footprint, a class of bugs where the two rep
 disagree, and a worker protocol to maintain.
 
 **Build one when, and only when**, a real library misses a §12 budget. The trigger is a measurement,
-not a hunch. The work is scoped and the seam already exists: `src/shared/query/evaluate.ts` is a
-complete native predicate over an `IndexedTrack` shape, so an index would supply data to an
-evaluator that is already written and already tested against SQL.
+not a hunch. The work is scoped and the seam already exists: X-Libs `filter` evaluates a filter
+against records held in memory, and is tested against its SQL, so an index would supply data to an
+evaluator that is already written.
 
 ### 3.6 Ratings
 
@@ -577,7 +577,7 @@ panes. It has exactly two node kinds.
 { "op": "and", "children": [
     { "field": "rating",     "op": ">=",       "value": 80 },
     { "field": "genre",      "op": "any",      "value": ["Jazz", "Blues"] },
-    { "field": "last_played","op": "not_in_last", "value": { "n": 30, "unit": "day" } },
+    { "field": "last_played","op": "not_in_last", "value": { "count": 30, "unit": "day" } },
     { "op": "or", "children": [
         { "field": "year",   "op": "between",  "value": [1955, 1969] },
         { "field": "tags",   "op": "any",      "value": ["essential"] }
@@ -607,7 +607,7 @@ The same AST compiles to:
 
 1. **Parameterized SQL** — the primary path. Every list, pane, count and saved playlist is answered
    by SQLite, which at the §12 target is fast enough that nothing else is needed.
-2. **A native predicate** (`evaluate.ts`) — answers *"does this one track match this filter?"*
+2. **A native predicate** (X-Libs `filter`'s `evaluate`) — answers *"does this one track match this filter?"*
    without a database round trip.
 
 The second target is not a performance shortcut any more; dropping the 250k target removed that
@@ -633,16 +633,16 @@ A smart playlist = filter AST + sort spec + optional limit + refresh policy.
   "name": "Neglected Gems",
   "filter":  { "op": "and", "children": [
       { "field": "rating", "op": ">=", "value": 80 },
-      { "field": "last_played", "op": "not_in_last", "value": { "n": 6, "unit": "month" } }
+      { "field": "last_played", "op": "not_in_last", "value": { "count": 6, "unit": "month" } }
   ]},
-  "sort":  [ { "field": "rating", "dir": "desc" }, { "field": "random", "seed": "session" } ],
-  "limit": { "count": 100, "by": "tracks" },   // or by: "duration" / "filesize"
+  "sort":  [ { "field": "rating", "descending": true }, { "field": "random" } ],
+  "limit": 100,                                 // at most this many tracks
   "refresh": "live",                            // live | on_open | manual
   "dedupe": { "by": "mb_recording_id", "keep": "highest_bitrate" }
 }
 ```
 
-`sort` supports a `random` pseudo-field with a seed policy (`session`, `daily`, `fixed:<n>`), and a
+`sort` supports a `random` pseudo-field, shuffled each time the list is read, and a
 `weighted_random` pseudo-field taking a weight expression — this is how gmusicbrowser's excellent
 "play what I like but haven't heard lately" shuffle gets reproduced:
 
@@ -670,9 +670,9 @@ what the remembered view settings already store (§5.3.1) and what a smart playl
 
 ```jsonc
 "sort": [
-  { "field": "rating",      "dir": "desc" },
-  { "field": "play_count",  "dir": "desc" },
-  { "field": "last_played", "dir": "asc" },
+  { "field": "rating",      "descending": true },
+  { "field": "play_count",  "descending": true },
+  { "field": "last_played" },
   { "field": "album" }, { "field": "disc_number" }, { "field": "track_number" }
 ]
 ```
@@ -1105,7 +1105,8 @@ touching every file you rate); when on, writes are deferred and coalesced.
 
 ### 8.0 What is implemented
 
-`src/main/play/` — an engine interface, an mpv backend, and a player that owns every decision.
+`src/main/play/` — a player that owns every decision, on the `PlaybackEngine`, `MpvEngine` and
+`NullEngine` of X-Libs `mpv`.
 
 The split is the point: **`player.ts` knows nothing about audio.** Which of a track's media to use,
 when a play counts, how the queue drains against the standing list, what repeat and shuffle mean —
@@ -1541,8 +1542,9 @@ Vitest, with `fast-check` for property tests. Tests reach SQLite through Node's 
 
 ### 13.1 The load-bearing test
 
-`tests/ast_agreement.test.ts`: for any generated filter over any generated library, the SQL
-compiler and the native predicate must return **identical id sets**. Two implementations of one
+X-Libs' filter property test: for any generated filter over any generated table, the SQL
+compiler and the native predicate must return **identical id sets**. X-Music's corpus tests in
+`tests/filter_compile.test.ts` check the same over its own catalogue. Two implementations of one
 semantics are only safe because this test holds them together — a live smart playlist that
 disagreed with the list it was derived from would be a maddening bug to chase (§4.2).
 
@@ -1593,7 +1595,7 @@ x-music/
 │   ├── main/                 # Electron main process
 │   │   ├── db/               # opens the database file through node:sqlite
 │   │   ├── library/          # audio_hash, scanner, artwork files, (planned) watcher
-│   │   ├── play/             # PlaybackEngine interface, mpv backend, the player
+│   │   ├── play/             # the player, on X-Libs' mpv engine
 │   │   ├── tags/             # (planned) TagIO interface + implementation + write journal
 │   │   ├── ipc.ts            # the calls' handlers, typed by the shared contract
 │   │   ├── backups.ts        # daily backups of the library through X-Libs
@@ -1608,14 +1610,13 @@ x-music/
 │   │   └── app.css           # layout only; the look is Halon's
 │   └── shared/               # imported by BOTH sides — the UI-agnostic core
 │       ├── fields.ts         # field descriptors
-│       ├── filter.ts         # the filter AST
-│       ├── format.ts         # the format-string language
-│       ├── view.ts           # the filter stack
+│       ├── filter_shapes.ts  # filters and sorts saved in earlier shapes
+│       ├── format.ts         # the format strings, on X-Libs
 │       ├── viewstate.ts      # checking remembered browse state
 │       ├── ipc.ts            # the IPC contract
 │       ├── api.ts            # the api_spec for the local MCP server
 │       ├── library/          # the store: Drizzle schema, migrations, identity, merge, history
-│       ├── query/            # compile.ts (AST→SQL), evaluate.ts (AST→predicate)
+│       ├── query/            # catalogue.ts, the tracks as an X-Libs filter catalogue
 │       └── import/           # gmusicbrowser's gmbrc
 ├── tests/                    # one *.test.ts or *.test.tsx per behaviour, and the helpers they share
 ├── bench/                    # performance budget benchmarks
@@ -1640,7 +1641,7 @@ hashing, the field descriptor system, the format-string engine, framework-free v
 a WAL database.
 
 **M1 — Library core (2 wk).** Scanner, watcher, tag reading, move detection via `audio_hash`, and
-the `songlist` widget wired to `shared/view.ts` for real virtualization and column config. Schema,
+the `songlist` widget wired to the filter stack for real virtualization and column config. Schema,
 field descriptors and both query compilers are already done, and §3.5.3 removed the in-memory index
 from scope. Milestone test: scan and scroll 50k tracks.
 

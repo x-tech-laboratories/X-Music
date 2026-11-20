@@ -3,13 +3,15 @@
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
-import { asc, count, eq, sum } from '@x-tech-laboratories/x-libs/drizzle'
+import { asc, count, drizzle_of, eq, isNotNull, sum } from '@x-tech-laboratories/x-libs/drizzle'
 import { migrate_drizzle } from '@x-tech-laboratories/x-libs/drizzle'
+import { compile_filter, compile_group_by } from '@x-tech-laboratories/x-libs/filter_sql'
 import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
+import { upgrade_definition } from '../filter_shapes.ts'
 import type { GroupRow, LibraryStats, QueryRequest, Root, TrackRow } from '../ipc.ts'
-import { compile_filter, compile_group_by } from '../query/compile.ts'
-import { all_rows, drizzle_of, first_row, new_id, run } from './database.ts'
+import { group_sums, track_catalogue } from '../query/catalogue.ts'
+import { all_rows, first_row, new_id, run } from './database.ts'
 import { install_history, track_history } from './history.ts'
 import { is_legacy, upgrade_legacy, type UpgradeReport } from './legacy.ts'
 import { migrations } from './migrations/index.ts'
@@ -38,12 +40,32 @@ export function needs_upgrade(database: SqlDatabase): boolean {
 
 export type { UpgradeReport }
 
+// Rewrites each smart playlist's saved filter that an earlier version wrote into today's shape; a definition that is not JSON is left alone.
+export function upgrade_playlist_definitions(database: SqlDatabase): number {
+  const db = drizzle_of(database)
+  let upgraded = 0
+  for (const playlist of db.select({ id: playlists.id, definition: playlists.definition }).from(playlists).where(isNotNull(playlists.definition)).all()) {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(playlist.definition!)
+    } catch {
+      continue
+    }
+    const definition = JSON.stringify(upgrade_definition(parsed))
+    if (definition === JSON.stringify(parsed)) continue
+    db.update(playlists).set({ definition }).where(eq(playlists.id, playlist.id)).run()
+    upgraded++
+  }
+  return upgraded
+}
+
 // Brings an open connection up to date and starts the track history; run once each time the library opens. Gives back what converting an older library did, when it was one.
 export function open_library(database: SqlDatabase): UpgradeReport | null {
   // SQLite changes a schema with foreign keys off and checks them after; PRAGMAs stay raw, since Drizzle builds none.
   database.exec('PRAGMA foreign_keys = OFF')
   const report = is_legacy(database) ? upgrade_legacy(database) : null
   migrate_drizzle(database, library_owner, migrations)
+  upgrade_playlist_definitions(database)
   const broken = all_rows(database, 'PRAGMA foreign_key_check')
   if (broken.length > 0) throw new Error(`the library has ${broken.length} broken references`)
   database.exec('PRAGMA foreign_keys = ON')
@@ -67,22 +89,23 @@ export function library_stats(database: SqlDatabase, path: string): LibraryStats
 }
 
 // Album lives on the albums table and artist in track_values, so a row resolves both; raw, since the compiled filter around it is SQL.
-const track_columns = `
-  t.id, t.title, t.year, t.track_number, t.length_ms, t.rating, t.play_count,
-  (SELECT a.name FROM albums a WHERE a.id = t.album_id) AS album,
+const track_columns = (row: string): string => `
+  ${row}.id, ${row}.title, ${row}.year, ${row}.track_number, ${row}.length_ms, ${row}.rating, ${row}.play_count,
+  (SELECT a.name FROM albums a WHERE a.id = ${row}.album_id) AS album,
   (SELECT vv.value FROM track_values tv JOIN values_ vv ON vv.id = tv.value_id
-    WHERE tv.track_id = t.id AND tv.field_id = 1 ORDER BY tv.ordinal LIMIT 1) AS artist`
+    WHERE tv.track_id = ${row}.id AND tv.field_id = 1 ORDER BY tv.ordinal LIMIT 1) AS artist`
 
 // The tracks a filter picks, as the song list shows them; the filter compiles to SQL, which Drizzle cannot build.
 export function query_tracks(database: SqlDatabase, request: QueryRequest): TrackRow[] {
-  const { sql, params } = compile_filter(request.filter, { sort: request.sort, limit: request.limit, select: track_columns })
-  const paged = request.offset ? `${sql} OFFSET ${Number(request.offset)}` : sql
-  return all_rows<TrackRow>(database, paged, ...params).map((row) => ({ ...row }))
+  const { sql, params } = compile_filter(track_catalogue, request.filter, {
+    sort: request.sort, limit: request.limit, offset: request.offset, select: track_columns
+  })
+  return all_rows<TrackRow>(database, sql, ...params).map((row) => ({ ...row }))
 }
 
 // Raw because the filter and the grouping compile to SQL.
 export function group_tracks(database: SqlDatabase, request: { filter: QueryRequest['filter']; field: string }): GroupRow[] {
-  const { sql, params } = compile_group_by(request.filter, request.field)
+  const { sql, params } = compile_group_by(track_catalogue, request.filter, request.field, { sums: group_sums })
   return all_rows<GroupRow>(database, sql, ...params).map((row) => ({ ...row }))
 }
 

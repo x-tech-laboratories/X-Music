@@ -3,7 +3,7 @@
 
 import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { PlayerStatus, TrackDetails } from '@shared/ipc'
 import { results } from '../src/web/stores/library.ts'
 import { player_status } from '../src/web/stores/player.ts'
@@ -21,10 +21,12 @@ const status = (queue: string[]): PlayerStatus => ({
 
 const details = { id: '99', title: 'Hidden by the filters', fields: [{ field: 'artist', name: 'Artist', value: 'Sample Trio', multi: true }] } as unknown as TrackDetails
 const dequeue = vi.fn(async () => status([]))
+const move = vi.fn(async (_index: number, _to_index: number) => status(['1', '2', '3']))
 
 beforeEach(() => {
   dequeue.mockClear()
-  install_bridge({ 'get_track': details, 'remove_from_queue': dequeue })
+  move.mockClear()
+  install_bridge({ 'get_track': details, 'remove_from_queue': dequeue, 'move_in_queue': move })
   results.set({ stats: null, tracks: [], order: [], error: null })
 })
 
@@ -47,6 +49,42 @@ describe('queue', () => {
     expect(screen.queryByText('Track 99')).toBeNull()
   })
 
+  it('calls a queued track that has no title an untitled track', async () => {
+    install_bridge({ 'get_track': { ...details, id: '77', title: null } })
+    player_status.set(status(['77']))
+    render(<TabbedLists />)
+
+    expect(await screen.findByText('Untitled track')).toBeTruthy()
+    expect(screen.getByText('Sample Trio')).toBeTruthy()
+  })
+
+  it('says a queued track is not in the library, rather than untitled, when the library cannot find it', async () => {
+    install_bridge({ 'get_track': null })
+    player_status.set(status(['404']))
+    render(<TabbedLists />)
+
+    expect(await screen.findByText('Not in the library')).toBeTruthy()
+    expect(screen.queryByText('Untitled track')).toBeNull()
+  })
+
+  it('says a queued track\'s name could not be loaded, rather than untitled, when the lookup fails', async () => {
+    install_bridge({ 'get_track': () => { throw new Error('the library is closed') } })
+    player_status.set(status(['500']))
+    render(<TabbedLists />)
+
+    expect(await screen.findByText('Name could not be loaded')).toBeTruthy()
+    expect(screen.queryByText('Untitled track')).toBeNull()
+  })
+
+  it('names nothing while the queued tracks\' names are still loading', async () => {
+    install_bridge({ 'get_track': new Promise(() => undefined) })
+    player_status.set(status(['600']))
+    render(<TabbedLists />)
+
+    expect(await screen.findByText('1 track queued')).toBeTruthy()
+    expect(screen.queryByText('Untitled track')).toBeNull()
+  })
+
   it('takes a track out with its remove button, named after it', async () => {
     player_status.set(status(['99']))
     render(<TabbedLists />)
@@ -64,6 +102,46 @@ describe('queue', () => {
     fireEvent.keyDown(row, { key: 'Delete' })
 
     expect(dequeue).toHaveBeenCalledWith(0)
+  })
+
+  it('moves a track up and down with its row\'s buttons', async () => {
+    player_status.set(status(['1', '2', '3']))
+    render(<TabbedLists />)
+    await screen.findAllByText('Hidden by the filters')
+    const [first, second] = screen.getAllByRole('row').slice(1)
+
+    expect((within(first!).getByRole('button', { name: 'Move up' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(within(first!).getByRole('button', { name: 'Move down' }))
+    fireEvent.click(within(second!).getByRole('button', { name: 'Move up' }))
+
+    expect(move.mock.calls).toEqual([[0, 1], [1, 0]])
+  })
+
+  it('moves the track under the keyboard with Alt and the arrow keys', async () => {
+    player_status.set(status(['1', '2', '3']))
+    render(<TabbedLists />)
+    await screen.findAllByText('Hidden by the filters')
+    const [, second, third] = screen.getAllByRole('row').slice(1)
+
+    fireEvent.keyDown(second!, { key: 'ArrowDown', altKey: true })
+    fireEvent.keyDown(third!, { key: 'ArrowDown', altKey: true })
+    fireEvent.keyDown(second!, { key: 'ArrowUp', altKey: true })
+
+    expect(move.mock.calls).toEqual([[1, 2], [1, 0]])
+  })
+
+  it('moves a dragged track to where it is dropped', async () => {
+    player_status.set(status(['1', '2', '3']))
+    render(<TabbedLists />)
+    await screen.findAllByText('Hidden by the filters')
+    const [first, , third] = screen.getAllByRole('row').slice(1)
+    const dataTransfer = { types: [], setData: () => undefined, setDragImage: () => undefined, effectAllowed: '', dropEffect: '' }
+
+    fireEvent.dragStart(first!, { dataTransfer })
+    fireEvent.dragOver(third!, { dataTransfer })
+    fireEvent.drop(third!, { dataTransfer })
+
+    expect(move).toHaveBeenCalledWith(0, 2)
   })
 
   it('says so when nothing is queued', () => {

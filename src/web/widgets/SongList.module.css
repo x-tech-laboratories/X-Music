@@ -1,2 +1,0 @@
-/* Every row stays one line high, which the virtual table's fixed row height needs; Halon's fit table cuts the text off with an ellipsis. */
-.single_line td { white-space: nowrap; }

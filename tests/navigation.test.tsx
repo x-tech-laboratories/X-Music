@@ -5,7 +5,7 @@ import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App } from '../src/web/App.tsx'
-import { view_of } from '../src/web/views/Navigation.tsx'
+import { view_of } from '../src/web/views/routes.ts'
 import { results } from '../src/web/stores/library.ts'
 import { emit_event, install_bridge } from './bridge.ts'
 
@@ -19,7 +19,7 @@ function go_to(hash: string): void {
 }
 
 function views_nav(): HTMLElement {
-  return screen.getByRole('navigation', { name: 'Views' })
+  return screen.getByRole('navigation', { name: 'Main' })
 }
 
 beforeEach(() => {
@@ -62,6 +62,13 @@ describe('navigation', () => {
     expect(rows.every((row) => row.querySelector('svg[aria-hidden="true"]') !== null)).toBe(true)
     expect(within(views_nav()).getByRole('link', { name: 'Library' }).getAttribute('aria-current')).toBe('page')
     expect(await screen.findByRole('heading', { level: 1, name: 'Library' })).toBeTruthy()
+  })
+
+  it('holds no navigation inside another', () => {
+    render(<App />)
+
+    for (const navigation of screen.getAllByRole('navigation')) expect(navigation.parentElement?.closest('nav')).toBeNull()
+    expect(views_nav().closest('aside')).not.toBeNull()
   })
 
   it('shows each view at its route and marks its row', async () => {

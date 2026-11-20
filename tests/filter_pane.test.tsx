@@ -13,7 +13,7 @@ import { install_bridge } from './bridge.ts'
 // Setup
 // ============================================================================
 
-const group = (label: string | null, n: number): GroupRow => ({ gid: label, label, n, total_ms: 0 })
+const group = (label: string | null, count: number): GroupRow => ({ group_id: label, label, count, total_ms: 0 })
 
 const group_by = vi.fn(async (_filter: unknown, field: string): Promise<GroupRow[]> => field === 'rating'
   ? [group('80', 2), group('20', 1)]

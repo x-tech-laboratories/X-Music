@@ -6,13 +6,13 @@
 
 import { existsSync } from 'node:fs'
 
+import type { EngineEvents, LoadOptions, PlaybackEngine } from '@x-tech-laboratories/x-libs/mpv'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import type { PlayerMedia, PlayerStatus, PlayerTrack, RepeatMode } from '@shared/ipc'
 import {
   count_play, count_skip, get_player_track, has_any_file, list_playable_files, set_file_present
 } from '@shared/library/plays'
-import type { LoadOptions, PlaybackEngine } from './engine.ts'
 
 export type { PlayerMedia, PlayerStatus, PlayerTrack, RepeatMode }
 
@@ -49,6 +49,11 @@ export function shuffle_order(length: number, seed: number): number[] {
   }
   return order
 }
+
+// What the engine needs to play a file: its part of the file and its loudness change.
+const load_options = (media: PlayerMedia): LoadOptions => ({
+  start_in_milliseconds: media.start_ms, end_in_milliseconds: media.end_ms, gain_in_decibels: media.gain_db
+})
 
 export interface PlayerOptions {
   // How ReplayGain is applied; 'off' leaves the file alone.
@@ -94,10 +99,10 @@ export class Player {
     this.opts = opts
     this.unsubscribe = engine.subscribe((event, payload) => {
       if (event === 'position') {
-        const p = payload as PlayerEvents['position']
-        this.position_ms = p.position_ms
-        this.duration_ms = p.duration_ms ?? this.duration_ms
-        this.furthest_ms = Math.max(this.furthest_ms, p.position_ms)
+        const p = payload as EngineEvents['position']
+        this.position_ms = p.position_in_milliseconds
+        this.duration_ms = p.duration_in_milliseconds ?? this.duration_ms
+        this.furthest_ms = Math.max(this.furthest_ms, p.position_in_milliseconds)
         this.maybe_count_play()
         this.emit('position', { position_ms: this.position_ms, duration_ms: this.duration_ms })
       } else if (event === 'state') {
@@ -269,9 +274,7 @@ export class Player {
     this.error = undefined
     if (context_index >= 0) this.context_index = context_index
 
-    const opts: LoadOptions = {
-      start_ms: media.start_ms, end_ms: media.end_ms, gain_db: media.gain_db
-    }
+    const opts = load_options(media)
 
     const started = await this.drive(async () => {
       await this.engine.load(media.uri, opts)
@@ -304,9 +307,7 @@ export class Player {
 
     const media = this.load_media(upcoming)
     if (!media) return
-    await this.engine.preload(media.uri, {
-      start_ms: media.start_ms, end_ms: media.end_ms, gain_db: media.gain_db
-    })
+    await this.engine.preload(media.uri, load_options(media))
   }
 
   peek_next(): string | null {
@@ -370,15 +371,19 @@ export class Player {
       await this.next(false)
       return
     }
-    // After a failure, play starts the track again rather than resuming nothing.
-    if (this.state === 'error') {
+    // After a failure, or after mpv quit by itself, play starts the track again rather than resuming nothing.
+    if (this.state === 'error' || this.state === 'idle') {
       await this.play_track(this.current_track.id)
       return
     }
     await this.drive(() => this.engine.play())
   }
 
-  async pause(): Promise<void> { await this.drive(() => this.engine.pause()) }
+  // Nothing is loaded once mpv has quit or failed, so there is nothing to pause.
+  async pause(): Promise<void> {
+    if (this.state === 'idle' || this.state === 'error') return
+    await this.drive(() => this.engine.pause())
+  }
 
   async toggle(): Promise<void> {
     if (this.state === 'playing') await this.pause()

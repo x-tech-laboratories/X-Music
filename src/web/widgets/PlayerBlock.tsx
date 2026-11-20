@@ -9,6 +9,7 @@ import {
   Icon, NextIcon, PauseIcon, PlayIcon, PreviousIcon, RepeatIcon, RepeatOneIcon, ShuffleIcon, StopIcon
 } from '@x-tech-laboratories/x-libs/web/react/icons'
 import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
+import { describe_keys } from '@x-tech-laboratories/x-libs/web/react/shortcuts'
 import { VolumeButton } from '@x-tech-laboratories/x-libs/web/react/volume'
 import type { RepeatMode } from '@shared/ipc'
 import { rating_to_stars } from '@shared/fields'
@@ -83,30 +84,30 @@ export function PlayerBlock() {
       <div className={s.main}>
         <div className={s.text}>
           <div className={s.transport}>
-            <button className="icon" aria-label="Previous" title="Previous (Alt+←)" onClick={() => void player.previous()}>
+            <button className="icon" aria-label="Previous" title={`Previous (${describe_keys('alt+arrowleft')})`} onClick={() => void player.previous()}>
               <Icon icon={PreviousIcon} />
             </button>
             <button className="icon" aria-label="Stop" title="Stop" onClick={() => void player.stop()}>
               <Icon icon={StopIcon} />
             </button>
-            <button className="icon accent solid" aria-label={playing ? 'Pause' : 'Play'} title={`${playing ? 'Pause' : 'Play'} (Ctrl+Space)`} onClick={() => void player.toggle()}>
+            <button className="icon accent solid" aria-label={playing ? 'Pause' : 'Play'} title={`${playing ? 'Pause' : 'Play'} (${describe_keys('ctrl+space')})`} onClick={() => void player.toggle()}>
               <Icon icon={playing ? PauseIcon : PlayIcon} />
             </button>
-            <button className="icon" aria-label="Next" title="Next (Alt+→)" onClick={() => void player.next()}>
+            <button className="icon" aria-label="Next" title={`Next (${describe_keys('alt+arrowright')})`} onClick={() => void player.next()}>
               <Icon icon={NextIcon} />
             </button>
             <span className={s.spacer} />
             <VolumeButton volume={status?.volume ?? 80} on_change={(volume) => void player.set_volume(volume)} />
           </div>
 
-          <div className={cx(s.line, s.title)} title={track?.title ?? ''}>{track?.title ?? 'Nothing playing'}</div>
+          <div className={cx(s.line, s.title)} title={track?.title ?? ''}>{track ? track.title ?? 'Untitled track' : 'Nothing playing'}</div>
           <div className={cx(s.line, s.artist)} title={track?.artist ?? ''}>{track?.artist ?? '—'}</div>
           <div className={cx(s.line, s.album)} title={track?.album ?? ''}>{track?.album ?? '—'}</div>
 
           {!failed && <TimeBar duration_in_milliseconds={duration} />}
         </div>
 
-        <TrackCover track_id={track?.id ?? null} size={88} />
+        <TrackCover track_id={track?.id ?? null} size="medium" />
       </div>
 
       {failed && (

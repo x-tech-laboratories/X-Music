@@ -5,12 +5,12 @@
 // file (same path, or same audio content). Guessing that two *different* files are the same
 // recording is a separate, reviewable operation — see DESIGN-SPEC §9.2.
 
-import { and, eq, isNotNull } from '@x-tech-laboratories/x-libs/drizzle'
+import { and, drizzle_of, eq, isNotNull } from '@x-tech-laboratories/x-libs/drizzle'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { field } from '../fields.ts'
 import { album_key_name, album_match_key, compilation_key } from './albums.ts'
-import { drizzle_of, new_id } from './database.ts'
+import { new_id } from './database.ts'
 import { albums, media, tracks } from './schema.ts'
 import { intern_value, set_extra, write_set } from './values.ts'
 

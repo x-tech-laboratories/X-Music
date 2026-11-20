@@ -136,6 +136,10 @@ describe('merge preview', () => {
   it('refuses fewer than two tracks', () => {
     expect(() => merge_preview(db, [make_track()])).toThrow(/at least two/)
   })
+
+  it('names the tracks that do not exist', () => {
+    expect(() => merge_preview(db, [make_track(), 'gone-1', 'gone-2'])).toThrow(/no such track gone-1, gone-2/)
+  })
 })
 
 describe('merging', () => {

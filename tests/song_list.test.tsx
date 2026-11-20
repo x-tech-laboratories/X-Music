@@ -3,7 +3,7 @@
 
 import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { api_method_names, type TrackRow } from '@shared/ipc'
 import { browse, library, results } from '../src/web/stores/library.ts'
 import { player, player_status } from '../src/web/stores/player.ts'
@@ -33,6 +33,8 @@ function bridge(listed: TrackRow[]): void {
     'list_tracks': listed,
     'get_library_stats': stats(listed.length),
     'list_track_groups': [],
+    'get_track': new Promise(() => undefined),
+    'get_merge_preview': new Promise(() => undefined),
     'get_player_status': { state: 'idle', track: null, media: null, position_ms: 0, duration_ms: null, volume: 80, repeat: 'off', shuffle: false, queue: [], context_length: 0, context_index: -1 }
   }
   // A plain object of every channel, as the preload exposes it.
@@ -50,6 +52,7 @@ beforeEach(() => {
   browse.set({ sort: [], panes: {}, search: '' })
   library.clear_selection()
   player_status.set(null)
+  history.replaceState(null, '', '#/library')
 })
 
 afterEach(cleanup)
@@ -153,7 +156,7 @@ describe('song list', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Title/ }))
 
-    await vi.waitFor(() => expect(calls.get('list_tracks')).toHaveBeenCalledWith(expect.anything(), [{ field: 'title', dir: 'asc' }]))
+    await vi.waitFor(() => expect(calls.get('list_tracks')).toHaveBeenCalledWith(expect.anything(), [{ field: 'title', descending: false }]))
   })
 
   it('marks the playing track with Halon\'s now-playing row', () => {
@@ -212,5 +215,67 @@ describe('filter chips', () => {
 
     expect(screen.getByText(/plays, right-click for more/)).toBeTruthy()
     expect(screen.getByText('Enter').tagName).toBe('KBD')
+  })
+})
+
+// ============================================================================
+// Pages over the list
+// ============================================================================
+
+describe('pages over the song list', () => {
+  it('opens a track\'s properties at an address of their own, which Back closes', async () => {
+    render(<SongList />)
+
+    act(() => void fireEvent.keyDown(row('Track 2'), { key: 'Enter', altKey: true }))
+
+    await waitFor(() => expect(location.hash).toBe('#/library/properties/track-20'))
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    act(() => history.back())
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(location.hash).toBe('#/library')
+  })
+
+  it('shows the properties a reload lands on, and Close goes back to the library', async () => {
+    history.replaceState(null, '', '#/library/properties/track-30')
+    render(<SongList />)
+
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(location.hash).toBe('#/library')
+  })
+
+  it('opens a merge of the picked tracks at an address naming them', async () => {
+    render(<SongList />)
+    fireEvent.click(row('Track 1'))
+    fireEvent.click(row('Track 3'), { ctrlKey: true })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Merge…' }))
+
+    await waitFor(() => expect(location.hash).toBe('#/library/merge/track-10/track-30'))
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+  })
+})
+
+// ============================================================================
+// Random sort
+// ============================================================================
+
+describe('a random sort', () => {
+  it('asks for the same shuffle each time the list is fetched again', async () => {
+    await library.set_sorting([{ key: 'random', descending: false }])
+    const [key] = browse.get().sort
+    expect(Number.isInteger(key!.seed)).toBe(true)
+
+    await library.refresh()
+    await library.set_sorting([{ key: 'random', descending: true }])
+
+    const sorts = calls.get('list_tracks')!.mock.calls.map((call) => call[1])
+    expect(sorts).toEqual([
+      [{ field: 'random', descending: false, seed: key!.seed }],
+      [{ field: 'random', descending: false, seed: key!.seed }],
+      [{ field: 'random', descending: true, seed: key!.seed }]
+    ])
   })
 })

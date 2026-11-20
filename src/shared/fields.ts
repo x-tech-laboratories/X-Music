@@ -33,8 +33,6 @@ export interface FieldDescriptor {
   range?: readonly [number, number]
   width?: number
   align?: 'left' | 'right'
-  // Populated for computed fields: a SQL expression over the tracks table.
-  expr?: string
 }
 
 const f = (d: FieldDescriptor): FieldDescriptor => d
@@ -75,7 +73,6 @@ export const BUILTIN_FIELDS: readonly FieldDescriptor[] = [
       tags: { id3v2: 'TPE2', vorbis: 'ALBUMARTIST', ilst: 'aART', ape: 'Album Artist' },
       flags: ['filterable', 'groupable', 'sortable', 'editable', 'columnar', 'searchable', 'writable'] }),
   f({ id: 'album', name: 'Album', type: 'string', storage: 'computed', width: 200,
-      expr: '(SELECT a.name FROM albums a WHERE a.id = t.album_id)',
       tags: { id3v2: 'TALB', vorbis: 'ALBUM', ilst: '©alb', ape: 'Album' },
       flags: ['filterable', 'groupable', 'sortable', 'editable', 'columnar', 'searchable', 'writable'] }),
   f({ id: 'composer', name: 'Composer', type: 'artist', storage: 'multi', field_id: 3, width: 160,

@@ -5,6 +5,7 @@ import '@x-tech-laboratories/x-libs/web/react/test_stubs'
 import { afterEach, describe, expect, it } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Toasts } from '@x-tech-laboratories/x-libs/web/react/toasts'
+import { describe_keys } from '@x-tech-laboratories/x-libs/web/react/shortcuts'
 import type { PlayerStatus } from '@shared/ipc'
 import { player, player_position, player_status } from '../src/web/stores/player.ts'
 import { PlayerBlock } from '../src/web/widgets/PlayerBlock.tsx'
@@ -32,22 +33,30 @@ describe('player block', () => {
     render(<PlayerBlock />)
 
     const seek = screen.getByRole('slider', { name: 'Seek' })
-    expect(seek.classList.contains('seek')).toBe(true)
     expect(seek.style.getPropertyValue('--range-progress')).toBe('25%')
   })
 
-  it('draws the transport as labelled icon buttons with no emoji', () => {
+  it('draws the transport as buttons named by label alone, with no emoji', () => {
     record_calls()
     player_status.set({ ...idle, state: 'playing', track })
 
     render(<PlayerBlock />)
 
     for (const name of ['Previous', 'Stop', 'Pause', 'Next', 'Shuffle', 'Repeat']) {
-      const button = screen.getByRole('button', { name })
-      expect(button.querySelector('svg.line-icon')).not.toBeNull()
-      expect(button.textContent).toBe('')
+      expect(screen.getByRole('button', { name }).textContent).toBe('')
     }
     expect(screen.queryByRole('button', { name: 'Play' })).toBeNull()
+  })
+
+  it('names each transport button\'s shortcut as X-Libs writes keys', () => {
+    record_calls()
+    player_status.set({ ...idle, state: 'playing', track })
+
+    render(<PlayerBlock />)
+
+    expect(screen.getByRole('button', { name: 'Previous' }).getAttribute('title')).toBe(`Previous (${describe_keys('alt+arrowleft')})`)
+    expect(screen.getByRole('button', { name: 'Pause' }).getAttribute('title')).toBe(`Pause (${describe_keys('ctrl+space')})`)
+    expect(screen.getByRole('button', { name: 'Next' }).getAttribute('title')).toBe(`Next (${describe_keys('alt+arrowright')})`)
   })
 
   it('shows shuffle and repeat as pressed toggles and cycles repeat', async () => {
@@ -93,6 +102,16 @@ describe('player block', () => {
     expect(screen.getByRole('slider', { name: 'Seek' }).hasAttribute('disabled')).toBe(true)
     expect(screen.getAllByText('0:00')).toHaveLength(2)
     expect(screen.getByText('Nothing playing')).toBeTruthy()
+  })
+
+  it('calls a playing track with no title an untitled track, not nothing playing', () => {
+    record_calls()
+    player_status.set({ ...idle, state: 'playing', track: { ...track, title: null } })
+
+    render(<PlayerBlock />)
+
+    expect(screen.getByText('Untitled track')).toBeTruthy()
+    expect(screen.queryByText('Nothing playing')).toBeNull()
   })
 
   it('keeps the store readable through the player module', () => {

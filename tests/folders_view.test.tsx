@@ -102,7 +102,7 @@ describe('folders view', () => {
     expect(within(log).getByText('not an audio file')).toBeTruthy()
     const filter = screen.getByRole('radiogroup', { name: 'Show' })
     expect(within(filter).getAllByRole('radio').map((choice) => choice.textContent)).toEqual(['All 3', 'New 1', 'Unchanged 1', 'Failed 1'])
-    expect(screen.getByText('Files read').previousElementSibling?.textContent).toBe('3')
+    expect(screen.getByText('Files read').previousElementSibling?.textContent).toBe('2')
     expect(screen.getByText('Took').previousElementSibling?.textContent).toBe('2 seconds')
     expect(screen.getByText(/1 file could not be read/)).toBeTruthy()
 
@@ -110,13 +110,24 @@ describe('folders view', () => {
     expect(within(filter).getByRole('radio', { name: 'Failed 1' }).getAttribute('aria-checked')).toBe('true')
   })
 
-  it('says why a scan could not start', async () => {
-    install_bridge({ 'list_folders': roots, 'scan_folders': () => { throw new Error('a scan is already running') } })
+  it('says a scan that took under a second took less than a second', async () => {
+    const emit = fake_events()
+    render(<FoldersView />)
+
+    await screen.findByRole('table', { name: 'Music folders' })
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Scan now' })))
+    emit('scan_done', { ...report, duration_ms: 400 })
+
+    expect(screen.getByText('Took').previousElementSibling?.textContent).toBe('less than a second')
+  })
+
+  it('says why a scan could not start, without the bridge\'s own wording', async () => {
+    install_bridge({ 'list_folders': roots, 'scan_folders': () => { throw new Error("Error invoking remote method 'scan_folders': Error: a scan is already running") } })
     render(<FoldersView />)
 
     await screen.findByRole('table', { name: 'Music folders' })
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Scan now' })))
 
-    expect(screen.getByRole('alert').textContent).toContain('a scan is already running')
+    expect(screen.getByRole('alert').textContent).toBe('a scan is already running')
   })
 })
