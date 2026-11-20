@@ -14,7 +14,14 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/shared/**', 'src/main/library/**'],
-      thresholds: { lines: 70, functions: 70, branches: 60 }
+      // Raise the floor to the integer reached; never lower it.
+      thresholds: {
+        lines: 89,
+        functions: 84,
+        branches: 76,
+        statements: 86,
+        autoUpdate: (newThreshold: number) => Math.floor(newThreshold)
+      }
     }
   }
 })

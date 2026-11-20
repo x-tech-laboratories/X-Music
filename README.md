@@ -99,7 +99,7 @@ otherwise makes Electron run as bare node and die on the ESM entry point.
 | `npm run build:desktop` | Typecheck and build to `out/` |
 | `npm run start:desktop` | Run the built app |
 | `npm test` | Full suite |
-| `npm run test:coverage` | Full suite with a coverage report |
+| `npm run coverage` | Full suite with a coverage report; the floor in `vitest.config.ts` only rises, so commit the numbers it rewrites |
 | `npm run check` | Typecheck, then the full suite |
 | `npm run test:watch` | Watch mode |
 | `npm run bench` | Performance budget benchmarks |
