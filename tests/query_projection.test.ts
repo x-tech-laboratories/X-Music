@@ -67,4 +67,25 @@ describe('song list row projection', () => {
     expect(order(1234)).not.toEqual(order(4321))
     db.close()
   })
+
+  it('sorts by a field with several values, by each track\'s first value, both ways, with tracks that have none last', () => {
+    const corpus = make_corpus(200, 19)
+    const db = fresh_db()
+    load_corpus(db, corpus)
+    const first_value = new Map(corpus.tracks.map((track) => [track.id, track]))
+
+    for (const [field, field_id] of [['artist', 1], ['album_artist', 2], ['genre', 4], ['mood', 6]] as const) {
+      for (const descending of [false, true]) {
+        const listed = query_tracks(db, { filter: and(), sort: [{ field, descending }] })
+          .map((row) => first_value.get(row.id)!.sets[field_id]![0] ?? null)
+        const present = listed.filter((value) => value !== null)
+        const expected = [...present].sort()
+        if (descending) expected.reverse()
+
+        expect(listed, `${field} ${descending ? 'descending' : 'ascending'}`).toEqual([...expected, ...listed.filter((value) => value === null)])
+        expect(new Set(present).size, `${field} has several values to sort`).toBeGreaterThan(1)
+      }
+    }
+    db.close()
+  })
 })
