@@ -16,7 +16,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "coverage": "vitest run --coverage",
     "bench": "vitest bench --run --reporter=verbose",
     "check": "npm run typecheck && npm run test",
     "app": "bash scripts/run.sh",

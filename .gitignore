@@ -6,3 +6,4 @@ result
 *.db-wal
 *.db-shm
 *.tsbuildinfo
+coverage/
