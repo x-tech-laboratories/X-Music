@@ -1,6 +1,6 @@
 // Filters and sorts as earlier versions of X-Music saved them, read into the shapes X-Libs' filter takes now: `cs` became
-// `case_sensitive`, a span `{n, unit}` became `{count, unit}`, a sort key's `dir` became `descending` and its `seed` went,
-// and a limit `{count}` became a plain number. Anything already in today's shape passes through unchanged.
+// `case_sensitive`, a span `{n, unit}` became `{count, unit}`, a sort key's `dir` became `descending` and its text `seed` a
+// whole number, and a limit `{count}` became a plain number. Anything already in today's shape passes through unchanged.
 
 // ── Imports ──────────────────────────────────────────────────────────────────
 
@@ -29,10 +29,24 @@ export function upgrade_filter(node: unknown): FilterNode {
 
 // ── Sorts and limits ─────────────────────────────────────────────────────────
 
+// The same whole number for the same text, so a shuffle saved with a text seed stays the same shuffle.
+function seed_of_text(text: string): number {
+  let hash = 0
+  for (const character of text) hash = (Math.imul(hash, 31) + character.codePointAt(0)!) | 0
+  return hash
+}
+
+function upgrade_seed(seed: unknown): number | undefined {
+  if (Number.isInteger(seed)) return seed as number
+  return typeof seed === 'string' ? seed_of_text(seed) : undefined
+}
+
 // One sort key in today's shape, from either shape; null for anything that is not one.
 export function upgrade_sort_key(key: unknown): SortKey | null {
   if (!is_object(key) || typeof key.field !== 'string') return null
-  return { field: key.field, descending: key.descending === true || key.dir === 'desc' }
+  const upgraded: SortKey = { field: key.field, descending: key.descending === true || key.dir === 'desc' }
+  const seed = upgrade_seed(key.seed)
+  return seed === undefined ? upgraded : { ...upgraded, seed }
 }
 
 export function upgrade_sort(keys: unknown): SortKey[] {

@@ -9,7 +9,7 @@ import { create_watch } from '@x-tech-laboratories/x-libs/web/watch'
 import { FilterStack, leaf, or, type FilterNode, type SortKey } from '@x-tech-laboratories/x-libs/filter'
 import type { GroupRow, LibraryStats, TrackRow } from '@shared/ipc'
 import { field } from '@shared/fields'
-import { sanitize_pane_values, sanitize_sort_keys } from '@shared/viewstate'
+import { sanitize_pane_values, sanitize_sort_keys, seed_random_sort } from '@shared/viewstate'
 import { ipc } from '../lib/ipc.ts'
 
 // A track's id as the main process hands it over, never read as a number.
@@ -43,7 +43,7 @@ const DEFAULT_SORT: SortKey[] = [{ field: 'album' }, { field: 'disc_number' }, {
 
 function remembered(): Browse {
   const storage = browser_storage()
-  const sort = sanitize_sort_keys(read_pref<unknown>(storage, SORT_KEY, null))
+  const sort = seed_random_sort(sanitize_sort_keys(read_pref<unknown>(storage, SORT_KEY, null)), [])
   const search = read_pref<unknown>(storage, SEARCH_KEY, '')
   return {
     sort: sort.length > 0 ? sort : DEFAULT_SORT,
@@ -202,7 +202,7 @@ export const library = {
   sorting: (): Sorting[] => browse.get().sort.map((key) => ({ key: key.field, descending: key.descending === true })),
 
   set_sorting: (sorting: readonly Sorting[]): Promise<void> =>
-    change_browse((state) => ({ ...state, sort: sorting.map((key) => ({ field: key.key, descending: key.descending })) })),
+    change_browse((state) => ({ ...state, sort: seed_random_sort(sorting.map((key) => ({ field: key.key, descending: key.descending })), state.sort) })),
 
   // ── Picked rows ──
 

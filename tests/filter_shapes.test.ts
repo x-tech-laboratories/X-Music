@@ -36,13 +36,29 @@ describe('saved filter shapes', () => {
     expect(upgrade_filter(new_filter)).toEqual(new_filter)
   })
 
-  it('reads sort keys with dir and seed, and limits as a count', () => {
-    expect(upgrade_sort([{ field: 'year', dir: 'desc' }, { field: 'random', seed: 'x' }]))
+  it('reads sort keys with dir, and limits as a count', () => {
+    expect(upgrade_sort([{ field: 'year', dir: 'desc' }, { field: 'random' }]))
       .toEqual([{ field: 'year', descending: true }, { field: 'random', descending: false }])
     expect(upgrade_limit({ count: 25 })).toBe(25)
     expect(upgrade_limit({ count: 25, by: 'tracks' })).toBe(25)
     expect(upgrade_limit({ count: 3_600_000, by: 'duration' })).toEqual({ count: 3_600_000, by: 'duration' })
     expect(upgrade_limit(25)).toBe(25)
+  })
+
+  it('keeps a random sort\'s seed, turning an earlier text seed into the same whole number each time', () => {
+    expect(upgrade_sort([{ field: 'random', seed: 42 }])).toEqual([{ field: 'random', descending: false, seed: 42 }])
+
+    const [first] = upgrade_sort([{ field: 'random', seed: 'x' }])
+    const [again] = upgrade_sort([{ field: 'random', seed: 'x' }])
+    const [other] = upgrade_sort([{ field: 'random', seed: 'y' }])
+    expect(Number.isInteger(first!.seed)).toBe(true)
+    expect(again).toEqual(first)
+    expect(other!.seed).not.toBe(first!.seed)
+  })
+
+  it('drops a seed that is not a whole number or text', () => {
+    expect(upgrade_sort([{ field: 'random', seed: 1.5 }, { field: 'year', seed: null }]))
+      .toEqual([{ field: 'random', descending: false }, { field: 'year', descending: false }])
   })
 
   it('reads a definition holding a filter with its sort and limit', () => {

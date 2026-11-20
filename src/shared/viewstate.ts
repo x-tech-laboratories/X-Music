@@ -21,6 +21,15 @@ export function sanitize_sort_keys(value: unknown): SortKey[] {
   return fields.map((field) => keys.find((key) => key.field === field)!)
 }
 
+// A seed for a new shuffle.
+const new_seed = (): number => Math.floor(Math.random() * 2 ** 31)
+
+// The sort with a seed on its random key, the one it had before if any, so fetching the list again keeps the same shuffle.
+export function seed_random_sort(keys: readonly SortKey[], before: readonly SortKey[], make_seed: () => number = new_seed): SortKey[] {
+  const kept = before.find((key) => key.field === random_field)?.seed
+  return keys.map((key) => (key.field !== random_field || key.seed !== undefined ? key : { ...key, seed: kept ?? make_seed() }))
+}
+
 export function sanitize_pane_values(value: unknown): Record<string, string[]> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return {}
 

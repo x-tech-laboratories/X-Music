@@ -3,7 +3,7 @@
 // recognise rather than trusting what was stored.
 
 import { describe, expect, it } from 'vitest'
-import { sanitize_pane_field, sanitize_pane_values, sanitize_sort_keys } from '@shared/viewstate'
+import { sanitize_pane_field, sanitize_pane_values, sanitize_sort_keys, seed_random_sort } from '@shared/viewstate'
 
 describe('sanitizeSortKeys', () => {
   it('keeps valid keys and normalises direction', () => {
@@ -11,9 +11,13 @@ describe('sanitizeSortKeys', () => {
       .toEqual([{ field: 'album', descending: true }, { field: 'year', descending: false }])
   })
 
-  it('reads keys an earlier version saved with dir and seed', () => {
-    expect(sanitize_sort_keys([{ field: 'album', dir: 'desc' }, { field: 'year', dir: 'asc' }, { field: 'random', seed: 'x' }]))
-      .toEqual([{ field: 'album', descending: true }, { field: 'year', descending: false }, { field: 'random', descending: false }])
+  it('reads keys an earlier version saved with dir', () => {
+    expect(sanitize_sort_keys([{ field: 'album', dir: 'desc' }, { field: 'year', dir: 'asc' }]))
+      .toEqual([{ field: 'album', descending: true }, { field: 'year', descending: false }])
+  })
+
+  it('keeps a random sort\'s seed', () => {
+    expect(sanitize_sort_keys([{ field: 'random', seed: 7 }])).toEqual([{ field: 'random', descending: false, seed: 7 }])
   })
 
   it('drops keys naming a field that no longer exists', () => {
@@ -65,5 +69,22 @@ describe('sanitizePaneField', () => {
     expect(sanitize_pane_field('album_artist', 'genre')).toBe('album_artist')
     expect(sanitize_pane_field('nope', 'genre')).toBe('genre')
     expect(sanitize_pane_field(undefined, 'genre')).toBe('genre')
+  })
+})
+
+describe('seed_random_sort', () => {
+  it('gives a random key without a seed a new one', () => {
+    expect(seed_random_sort([{ field: 'album' }, { field: 'random' }], [], () => 99))
+      .toEqual([{ field: 'album' }, { field: 'random', seed: 99 }])
+  })
+
+  it('keeps the seed the sort already had, so the shuffle stays the same', () => {
+    expect(seed_random_sort([{ field: 'random', descending: true }], [{ field: 'random', seed: 5 }], () => 99))
+      .toEqual([{ field: 'random', descending: true, seed: 5 }])
+  })
+
+  it('leaves a key that has a seed, and every other key, as it is', () => {
+    const keys = [{ field: 'random', seed: 3 }, { field: 'year', descending: true }]
+    expect(seed_random_sort(keys, [{ field: 'random', seed: 5 }], () => 99)).toEqual(keys)
   })
 })

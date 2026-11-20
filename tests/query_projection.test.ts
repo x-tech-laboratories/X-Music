@@ -54,4 +54,17 @@ describe('song list row projection', () => {
     expect(typeof groups[0]!.group_id).toBe('string')
     db.close()
   })
+
+  it('lists a seeded random sort in the same order every time, and a new seed in another', () => {
+    const corpus = make_corpus(50, 17)
+    const db = fresh_db()
+    load_corpus(db, corpus)
+
+    const order = (seed: number): string[] => query_tracks(db, { filter: and(), sort: [{ field: 'random', seed }] }).map((row) => row.id)
+
+    expect(order(1234)).toEqual(order(1234))
+    expect(order(1234)).toHaveLength(50)
+    expect(order(1234)).not.toEqual(order(4321))
+    db.close()
+  })
 })

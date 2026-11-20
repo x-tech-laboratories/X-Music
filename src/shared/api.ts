@@ -56,7 +56,11 @@ const sort: JsonSchema = {
   description: 'The order, first key first.',
   items: {
     type: 'object',
-    properties: { field: { type: 'string', enum: [...field_ids, 'random'] }, descending: { type: 'boolean', description: 'Whether the key runs from high to low; low to high unless set.' } },
+    properties: {
+      field: { type: 'string', enum: [...field_ids, 'random'] },
+      descending: { type: 'boolean', description: 'Whether the key runs from high to low; low to high unless set.' },
+      seed: { type: 'integer', description: 'For the random field, a whole number that gives the same shuffle each time; a new shuffle each time unless set.' }
+    },
     required: ['field'],
     additionalProperties: false
   }

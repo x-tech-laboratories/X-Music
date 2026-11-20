@@ -28,6 +28,10 @@ describe('api spec', () => {
     expect(destructive).toEqual(['clear_library', 'import_gmbrc', 'merge_tracks', 'restore_version', 'set_history_keep_days', 'undo_merge'])
   })
 
+  it('takes a seed on a sort key, so a client can ask for the same shuffle again', () => {
+    expect(input_schema(x_music_api.list_tracks)).toMatchObject({ properties: { sort: { items: { properties: { seed: { type: 'integer' } } } } } })
+  })
+
   it('moves a queued track by its place and the place to go to', () => {
     expect(input_schema(x_music_api.move_in_queue)).toMatchObject({ required: ['index', 'to_index'] })
     expect(positional_args(x_music_api.move_in_queue, { to_index: 0, index: 2 })).toEqual([2, 0])

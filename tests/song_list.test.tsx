@@ -257,3 +257,25 @@ describe('pages over the song list', () => {
     expect(await screen.findByRole('dialog')).toBeTruthy()
   })
 })
+
+// ============================================================================
+// Random sort
+// ============================================================================
+
+describe('a random sort', () => {
+  it('asks for the same shuffle each time the list is fetched again', async () => {
+    await library.set_sorting([{ key: 'random', descending: false }])
+    const [key] = browse.get().sort
+    expect(Number.isInteger(key!.seed)).toBe(true)
+
+    await library.refresh()
+    await library.set_sorting([{ key: 'random', descending: true }])
+
+    const sorts = calls.get('list_tracks')!.mock.calls.map((call) => call[1])
+    expect(sorts).toEqual([
+      [{ field: 'random', descending: false, seed: key!.seed }],
+      [{ field: 'random', descending: false, seed: key!.seed }],
+      [{ field: 'random', descending: true, seed: key!.seed }]
+    ])
+  })
+})
