@@ -16,10 +16,10 @@ export default defineConfig({
       include: ['src/shared/**', 'src/main/library/**'],
       // Raise the floor to the integer reached; never lower it.
       thresholds: {
-        lines: 70,
-        functions: 70,
-        branches: 60,
-        statements: 70,
+        lines: 89,
+        functions: 84,
+        branches: 76,
+        statements: 86,
         autoUpdate: (newThreshold: number) => Math.floor(newThreshold)
       }
     }
