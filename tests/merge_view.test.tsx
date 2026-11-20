@@ -47,7 +47,23 @@ describe('merge view', () => {
     expect(cell_button('Genre', 'Keep all').getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByText('2 fields disagree; pick which value to keep')).toBeTruthy()
     expect(screen.getAllByText('0:30').length).toBeGreaterThan(0)
-    expect(screen.getByRole('switch', { name: 'Only differences' }).closest('label')?.textContent).toContain('Only differences')
+    const files = screen.getByRole('table', { name: 'Files the surviving track will hold' })
+    expect(within(files).getAllByRole('row').slice(1).map((row) => row.textContent)).toEqual(['FLAC/music/a.flacSource 1', 'MP3/music/b.mp3 MissingSource 2'])
+    // The switch is named once, by the words beside it.
+    const only_differences = screen.getByRole('switch', { name: 'Only differences' })
+    expect(only_differences.getAttribute('aria-label')).toBeNull()
+    expect(only_differences.closest('label')?.textContent).toBe('Only differences')
+  })
+
+  it('warns that merging replaces an earlier decision made by hand', async () => {
+    record_calls({ 'get_merge_preview': { ...preview, pinned_sources: ['track-11', 'track-12'] } })
+    render(<MergeView ids={['track-11', 'track-12']} />)
+    expect(await screen.findByText(/^2 sources of these were merged or split by hand before\./)).toBeTruthy()
+    cleanup()
+
+    record_calls({ 'get_merge_preview': { ...preview, pinned_sources: ['track-12'] } })
+    render(<MergeView ids={['track-11', 'track-12']} />)
+    expect(await screen.findByText(/^1 source of these was merged or split by hand before\./)).toBeTruthy()
   })
 
   it('sends the winners the grid shows, then offers Undo in a toast', async () => {

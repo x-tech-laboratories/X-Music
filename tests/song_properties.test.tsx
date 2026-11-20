@@ -42,12 +42,15 @@ describe('song properties', () => {
 
     render(<SongProperties track_id="track-7" on_close={() => undefined} />)
 
-    await screen.findByRole('heading', { level: 2, name: 'All metadata' })
-    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Morning Tone', 'All metadata', 'Identity', 'Statistics', 'Merge history'])
+    await screen.findByRole('heading', { level: 3, name: 'All metadata' })
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual(['Morning Tone'])
+    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual(['All metadata', 'Identity', 'Statistics', 'Merge history'])
     expect(screen.getAllByText('0:30').length).toBeGreaterThan(0)
     expect(screen.queryByText('Comment')).toBeNull()
     expect(screen.getByText('1 source · 3 plays')).toBeTruthy()
-    expect(screen.getByText('2 tracks')).toBeTruthy()
+    const merges = screen.getByRole('table', { name: 'Merge history' })
+    expect(within(merges).getByRole('cell', { name: '2 tracks' })).toBeTruthy()
+    expect(within(merges).getByRole('cell', { name: 'batch-1' })).toBeTruthy()
   })
 
   it('shows each source with its facts and reveals it in its folder', async () => {
@@ -73,13 +76,25 @@ describe('song properties', () => {
     expect(screen.getByText('Never played')).toBeTruthy()
   })
 
+  it('lists the plays and skips in a table, newest first', async () => {
+    const history: TrackDetails['history'] = [{ kind: 'play', at: 1_700_000_200_000 }, { kind: 'skip', at: 1_700_000_100_000 }]
+    record_calls({ 'get_track': { ...details, history, history_total: 2 } })
+
+    render(<SongProperties track_id="track-7" on_close={() => undefined} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Plays and skips' }))
+
+    const plays = screen.getByRole('table', { name: 'Plays and skips' })
+    const rows = within(plays).getAllByRole('row').slice(1)
+    expect(rows.map((row) => within(row).getAllByRole('cell')[0]!.textContent)).toEqual(['Played', 'Skipped'])
+  })
+
   it('opens the track\'s history from its History button', async () => {
     record_calls({ 'get_track': details })
     const list_versions = vi.fn(async () => [])
     Object.assign(window, { xMusicHistory: { list_versions } })
 
     render(<><SongProperties track_id="track-7" on_close={() => undefined} /><Dialogs /></>)
-    await screen.findByRole('heading', { level: 2, name: 'All metadata' })
+    await screen.findByRole('heading', { level: 3, name: 'All metadata' })
     fireEvent.click(screen.getByRole('button', { name: 'History' }))
 
     expect(await screen.findByText('No history yet.')).toBeTruthy()

@@ -1,7 +1,7 @@
 // The library's browse state as X-Libs stores: the tracks the filters let through, how they are sorted and narrowed, and the picked rows.
 
 import { browser_storage, read_pref, write_pref } from '@x-tech-laboratories/x-libs/web/prefs'
-import { describe_error } from '@x-tech-laboratories/x-libs/web/errors'
+import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { intent_for, Selection } from '@x-tech-laboratories/x-libs/web/selection'
 import { create_store } from '@x-tech-laboratories/x-libs/web/store'
 import type { Sorting } from '@x-tech-laboratories/x-libs/web/tables'
@@ -123,7 +123,7 @@ async function refresh(): Promise<void> {
     selection_changes.bump()
     results.set({ stats, tracks, order, error: null })
   } catch (error) {
-    if (request === latest_request) results.update((before) => ({ ...before, error: describe_error(error) }))
+    if (request === latest_request) results.update((before) => ({ ...before, error: describe_call_error(error) }))
   } finally {
     if (request === latest_request) loading.set(false)
   }
