@@ -4,7 +4,7 @@
   buildNpmPackage,
   importNpmLock,
   nodejs_24,
-  electron_43,
+  electron_45,
   mpv,
   makeWrapper,
   copyDesktopItems,
@@ -43,7 +43,7 @@ buildNpmPackage {
     cp -r out resources package.json node_modules $out/lib/x-music/
     install -Dm644 resources/icon.svg $out/share/icons/hicolor/scalable/apps/x-music.svg
     install -Dm644 resources/icon.png $out/share/icons/hicolor/512x512/apps/x-music.png
-    makeWrapper ${lib.getExe electron_43} $out/bin/x-music \
+    makeWrapper ${lib.getExe electron_45} $out/bin/x-music \
       --add-flags $out/lib/x-music \
       --prefix PATH : ${lib.makeBinPath [ mpv ]} \
       --unset ELECTRON_RUN_AS_NODE
