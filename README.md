@@ -26,6 +26,7 @@ implemented yet. See the roadmap in DESIGN-SPEC §15.
 | Filesystem scanner (read-only, move detection) | working |
 | gmusicbrowser import | working |
 | Filter AST → SQL and → native predicate, on X-Libs `filter` | working, agreement property-tested in X-Libs |
+| Search bar language (`artist:miles rating:>3 played:<30d -live`), one chip per term, on X-Libs `filter_query` | working |
 | Audio content hashing (move/rename detection) | working |
 | Field descriptor system | working |
 | Format-string engine | working |
@@ -135,6 +136,21 @@ a UI failure is visible from the terminal rather than trapped in a devtools cons
 Uncaught errors and unhandled rejections are reported automatically.
 
 A malformed `X_MUSIC_LOG` falls back to the default rather than silencing logging.
+
+### Searching
+
+The search box takes plain words, found in titles, artists, albums, album artists, genres, comments
+and lyrics, and conditions on any field, each shown as a chip that takes it away again:
+
+```
+blue                      words; the last one may be the start of a word
+artist:miles  genre:jazz,blues  title:/^So/
+artist="miles davis"      exact, whatever its case
+rating:>3  rating:>=4.5   stars up to 5, else 0 to 100
+year:1965..1970  bpm:120..130  length:>4:00
+played:<30d  added:>6m  added:2024-03  added:<2024
+-live  -genre:blues       leave out what a term matches
+```
 
 ### Getting your library in
 

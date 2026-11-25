@@ -261,6 +261,26 @@ describe('filter chips', () => {
     expect(calls.get('list_tracks')).toHaveBeenCalledWith(expect.anything(), expect.anything())
   })
 
+  it('shows each term of the search as a chip, and its remove button takes that term out of the text', async () => {
+    calls.get('list_track_groups')!.mockImplementation(async () => [{ group_id: 1, label: 'Jazz', count: 3, total_ms: 0 }])
+    browse.set({ sort: [], panes: {}, search: 'blue genre:jazz rating:>3' })
+    await library.refresh()
+    render(<SongList />)
+
+    expect(screen.getAllByRole('button', { name: /^Remove the filter/ }).map((button) => button.getAttribute('aria-label'))).toEqual([
+      'Remove the filter "blue"', 'Remove the filter Genre has "jazz"', 'Remove the filter Rating over 3'
+    ])
+    expect(calls.get('list_track_groups')).toHaveBeenCalledWith({ op: 'and', children: [] }, 'genre')
+    expect(calls.get('list_tracks')!.mock.calls.at(-1)![0]).toEqual({ op: 'and', children: [
+      { field: 'title', op: 'matches', value: '"blue"*' },
+      { field: 'genre', op: 'any', value: ['Jazz'] },
+      { field: 'rating', op: '>', value: 60 }
+    ] })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove the filter Genre has "jazz"' }))
+    await vi.waitFor(() => expect(browse.get().search).toBe('blue rating:>3'))
+  })
+
   it('says how many of the library\'s tracks the filters let through', () => {
     results.set({ stats: stats(40), tracks: tracks(3), order: ['track-10', 'track-20', 'track-30'], error: null })
     render(<SongList />)

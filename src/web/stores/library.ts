@@ -7,9 +7,11 @@ import { create_store } from '@x-tech-laboratories/x-libs/web/store'
 import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import type { Sorting } from '@x-tech-laboratories/x-libs/web/tables'
 import { create_watch } from '@x-tech-laboratories/x-libs/web/watch'
-import { FilterStack, leaf, or, type FilterNode, type SortKey } from '@x-tech-laboratories/x-libs/filter'
+import { and, FilterStack, leaf, or, type FilterNode, type SortKey } from '@x-tech-laboratories/x-libs/filter'
+import { without_term } from '@x-tech-laboratories/x-libs/filter_query'
 import type { GroupRow, LibraryStats, TrackRow } from '@shared/ipc'
 import { field } from '@shared/fields'
+import { parse_search, set_fields_named } from '@shared/query/search'
 import { sanitize_pane_values, sanitize_sort_keys, seed_random_sort } from '@shared/viewstate'
 import { ipc } from '../lib/ipc.ts'
 
@@ -89,10 +91,25 @@ function stack_of(state: Browse, leave_out?: string): FilterStack {
     const label = values.length === 1 ? `${name}: ${values[0]}` : `${name}: ${values.length} picked`
     stack.push({ id: `pane:${field_id}`, label, node: pane_node(field_id, values), removable: true })
   }
-  if (state.search.trim() !== '') {
-    stack.push({ id: 'search', label: `Title: ${state.search.trim()}`, node: leaf('title', 'contains', state.search.trim()), removable: true })
-  }
+  // Each term of the search is a chip of its own, numbered by its place in the text.
+  parse_search(state.search, known_values).terms.forEach((term, index) => {
+    stack.push({ id: `search:${index}`, label: term.label, node: term.node, removable: true })
+  })
   return stack
+}
+
+// ============================================================================
+// Values of set fields
+// ============================================================================
+
+// The values of the set fields searches have named, so `genre:jazz` finds "Jazz"; forgotten whenever the library changes.
+let known_values: Record<string, readonly string[]> = {}
+
+async function learn_values(search: string): Promise<void> {
+  const missing = set_fields_named(search).filter((field_id) => known_values[field_id] === undefined)
+  if (missing.length === 0) return
+  const groups = await Promise.all(missing.map((field_id) => ipc('list_track_groups', and(), field_id)))
+  known_values = { ...known_values, ...Object.fromEntries(missing.map((field_id, index) => [field_id, groups[index]!.flatMap((group) => (group.label === null ? [] : [group.label]))])) }
 }
 
 export const filter_of = (state: Browse, leave_out?: string): FilterNode => stack_of(state, leave_out).to_filter()
@@ -112,6 +129,7 @@ async function refresh(): Promise<void> {
   const request = ++latest_request
   loading.set(true)
   try {
+    await learn_values(browse.get().search)
     const state = browse.get()
     const [stats, tracks] = await Promise.all([
       ipc('get_library_stats'),
@@ -179,7 +197,11 @@ export const library = {
   get error(): string | null { return results.get().error },
   get tracks(): TrackRow[] { return results.get().tracks },
 
-  refresh,
+  // Fetches again after the library changed, forgetting the set values searches had looked up.
+  refresh: (): Promise<void> => {
+    known_values = {}
+    return refresh()
+  },
   groups_for,
   names_of,
 
@@ -191,7 +213,10 @@ export const library = {
   set_search: (search: string): Promise<void> => change_browse((state) => ({ ...state, search })),
 
   remove_chip: (id: string): Promise<void> => change_browse((state) => {
-    if (id === 'search') return { ...state, search: '' }
+    if (id.startsWith('search:')) {
+      const term = parse_search(state.search, known_values).terms[Number(id.slice('search:'.length))]
+      return term ? { ...state, search: without_term(state.search, term) } : state
+    }
     const panes = { ...state.panes }
     delete panes[id.slice('pane:'.length)]
     return { ...state, panes }
