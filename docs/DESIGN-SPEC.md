@@ -1659,7 +1659,10 @@ they disagree, statistics, and merge provenance. Read-only, so it carries none o
 risk, and it is what makes the entity model legible.
 
 **M4 — Ratings and stats (1 wk).** Rating widget, play/skip history recording, stats fields
-filterable and sortable, optional tag write-back.
+filterable and sortable, optional tag write-back. Setting ratings is done: `set_rating` rates any
+number of tracks, from the stars in the list, the player and the selection bar, or keys 0–5 on the
+picked rows (0 makes them unrated), and each change is a version in the track's history. Half
+stars and tag write-back are still open.
 
 **M5 — Smart playlists (2 wk).** Saved filters, smart playlist editor UI over the AST, limits,
 weighted random, auto-fill, playlist import/export.

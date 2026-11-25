@@ -18,6 +18,7 @@ import {
   get_history_keep_days, record_history, set_history_keep_days, track_history_methods
 } from '@shared/library/history'
 import { list_recent_merges, merge_preview, merge_tracks, unmerge } from '@shared/library/merge'
+import { set_rating } from '@shared/library/ratings'
 import {
   add_root, enabled_root_paths, group_tracks, library_stats, list_roots, mark_roots_scanned,
   query_tracks, remove_root
@@ -174,6 +175,12 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
     },
 
     get_track: (track_id) => track_details(db, track_id),
+
+    set_rating: (track_ids, rating) => {
+      const result = set_rating(db, track_ids, rating)
+      player.reload_track(track_ids)
+      return result
+    },
 
     get_player_status: () => player.status(),
 

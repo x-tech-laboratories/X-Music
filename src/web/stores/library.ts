@@ -4,6 +4,7 @@ import { browser_storage, read_pref, write_pref } from '@x-tech-laboratories/x-l
 import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { intent_for, Selection } from '@x-tech-laboratories/x-libs/web/selection'
 import { create_store } from '@x-tech-laboratories/x-libs/web/store'
+import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import type { Sorting } from '@x-tech-laboratories/x-libs/web/tables'
 import { create_watch } from '@x-tech-laboratories/x-libs/web/watch'
 import { FilterStack, leaf, or, type FilterNode, type SortKey } from '@x-tech-laboratories/x-libs/filter'
@@ -197,6 +198,21 @@ export const library = {
   }),
 
   clear_filters: (): Promise<void> => change_browse((state) => ({ ...state, panes: {}, search: '' })),
+
+  // ── Ratings ──
+
+  // Shows the new rating at once, then fetches the list again so sorting and filters by rating catch up, or undo a failed change.
+  rate: async (ids: readonly TrackId[], rating: number | null): Promise<void> => {
+    if (ids.length === 0) return
+    const rated = new Set(ids)
+    results.update((before) => ({ ...before, tracks: before.tracks.map((track) => (rated.has(track.id) ? { ...track, rating } : track)) }))
+    try {
+      await ipc('set_rating', [...ids], rating)
+    } catch (error) {
+      toast(`Could not change the rating: ${describe_call_error(error)}`, { tone: 'bad' })
+    }
+    await refresh()
+  },
 
   // ── Sorting ──
 

@@ -171,7 +171,65 @@ describe('song list', () => {
     show([{ ...tracks(1)[0]!, rating: 60 }])
     render(<SongList />)
 
-    expect(screen.getByRole('slider', { name: 'Rating' }).getAttribute('aria-valuetext')).toBe('3 stars')
+    expect(screen.getByRole('slider', { name: 'Rating of Track 1' }).getAttribute('aria-valuetext')).toBe('3 stars')
+  })
+
+  it('rates a track by its stars, showing the new rating before the answer comes', async () => {
+    render(<SongList />)
+
+    const stars = screen.getByRole('slider', { name: 'Rating of Track 2' })
+    fireEvent.click(within(stars).getByRole('button', { name: '4 stars' }))
+
+    expect(calls.get('set_rating')).toHaveBeenCalledWith(['track-20'], 80)
+    expect(stars.getAttribute('aria-valuetext')).toBe('4 stars')
+    await vi.waitFor(() => expect(calls.get('list_tracks')).toHaveBeenCalled())
+  })
+
+  it('rates the picked tracks with a number key, and 0 makes them unrated', () => {
+    render(<SongList />)
+    fireEvent.click(row('Track 1'))
+    fireEvent.click(row('Track 3'), { ctrlKey: true })
+
+    fireEvent.keyDown(row('Track 3'), { key: '5' })
+    expect(calls.get('set_rating')).toHaveBeenLastCalledWith(['track-10', 'track-30'], 100)
+
+    fireEvent.keyDown(row('Track 3'), { key: '0' })
+    expect(calls.get('set_rating')).toHaveBeenLastCalledWith(['track-10', 'track-30'], null)
+  })
+
+  it('rates only the row under the cursor when it is not picked', () => {
+    render(<SongList />)
+    fireEvent.click(row('Track 1'))
+
+    fireEvent.keyDown(row('Track 2'), { key: '2' })
+
+    expect(calls.get('set_rating')).toHaveBeenCalledWith(['track-20'], 40)
+  })
+
+  it('leaves keys the stars handled to the stars', () => {
+    render(<SongList />)
+
+    fireEvent.keyDown(screen.getByRole('slider', { name: 'Rating of Track 1' }), { key: '0' })
+
+    expect(calls.get('set_rating')).toHaveBeenCalledTimes(1)
+    expect(calls.get('set_rating')).toHaveBeenCalledWith(['track-10'], null)
+  })
+
+  it('shows the rating the picked tracks share in the selection bar, and rates them all from it', () => {
+    show([{ ...tracks(3)[0]!, rating: 60 }, { ...tracks(3)[1]!, rating: 60 }, { ...tracks(3)[2]!, rating: 20 }])
+    render(<SongList />)
+    fireEvent.click(row('Track 1'))
+    fireEvent.click(row('Track 2'), { ctrlKey: true })
+
+    const bar = screen.getByRole('toolbar', { name: 'Selected rows' })
+    const stars = within(bar).getByRole('slider', { name: 'Rating of the picked tracks' })
+    expect(stars.getAttribute('aria-valuetext')).toBe('3 stars')
+
+    fireEvent.click(row('Track 3'), { ctrlKey: true })
+    expect(within(bar).getByRole('slider', { name: 'Rating of the picked tracks' }).getAttribute('aria-valuetext')).toBe('Unrated')
+
+    fireEvent.click(within(bar).getByRole('button', { name: '1 star' }))
+    expect(calls.get('set_rating')).toHaveBeenCalledWith(['track-10', 'track-20', 'track-30'], 20)
   })
 
   it('shows lengths as clock times', () => {
@@ -213,8 +271,9 @@ describe('filter chips', () => {
   it('names the keys as X-Libs writes them, each in a key cap', () => {
     render(<SongList />)
 
-    expect(screen.getByText(/plays, right-click for more/)).toBeTruthy()
+    expect(screen.getByText(/rate, right-click for more/)).toBeTruthy()
     expect(screen.getByText('Enter').tagName).toBe('KBD')
+    expect(screen.getByText('5').tagName).toBe('KBD')
   })
 })
 

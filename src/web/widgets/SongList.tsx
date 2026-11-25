@@ -17,7 +17,7 @@ import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import { row_after_key } from '@x-tech-laboratories/x-libs/web/selection'
 import { format_clock } from '@x-tech-laboratories/x-libs/durations'
 import type { TrackRow } from '@shared/ipc'
-import { field, rating_to_stars } from '@shared/fields'
+import { field, rating_to_stars, stars_to_rating } from '@shared/fields'
 import { browse, chips_of, library, loading, results, type TrackId } from '../stores/library.ts'
 import { player } from '../stores/player.ts'
 import { logger } from '../lib/log.ts'
@@ -50,11 +50,31 @@ const columns: TableColumn<TrackRow>[] = [
   column('album', 220, (track) => track.album ?? ''),
   column('year', 60, (track) => track.year ?? '', true),
   column('length', 70, (track) => format_clock(track.length_ms, ''), true),
-  column('rating', 96, (track) => <Rating value={rating_to_stars(track.rating)} />),
+  column('rating', 96, (track) => (
+    <Rating value={rating_to_stars(track.rating)} label={`Rating of ${track.title ?? 'this track'}`} on_change={(stars) => void rate([track.id], stars)} />
+  )),
   column('play_count', 60, (track) => track.play_count, true)
 ]
 
 type Modifiers = { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }
+
+// ============================================================================
+// Ratings
+// ============================================================================
+
+const rate = (ids: readonly TrackId[], stars: number | null): Promise<void> => library.rate(ids, stars === null ? null : stars_to_rating(stars))
+
+// The rating every one of the tracks has, or null when they differ or none is rated.
+function shared_rating(tracks: readonly TrackRow[], ids: readonly TrackId[]): number | null {
+  const picked = new Set(ids)
+  let shared: number | null | undefined
+  for (const track of tracks) {
+    if (!picked.has(track.id)) continue
+    if (shared === undefined) shared = track.rating
+    else if (shared !== track.rating) return null
+  }
+  return shared ?? null
+}
 
 // How tall a drawn row is, for how far Page Up and Page Down move.
 function drawn_row_height(body: HTMLElement | null): number {
@@ -132,8 +152,18 @@ export function SongList() {
 
   // Arrows move the cursor and Shift stretches the picks from the anchor; Ctrl alone moves without picking.
   function on_row_key(track: TrackRow, event: KeyboardEvent): void {
+    // The stars in a row handle their own keys.
+    if (event.defaultPrevented) return
     const index = index_of(track)
     const control = event.ctrlKey || event.metaKey
+
+    // 1 to 5 rate the picked tracks, or the one under the cursor, and 0 makes them unrated.
+    if (/^[0-5]$/.test(event.key) && !control && !event.altKey) {
+      event.preventDefault()
+      const ids = library.is_selected(track.id) ? library.selected_ids() : [track.id]
+      void rate(ids, event.key === '0' ? null : Number(event.key))
+      return
+    }
 
     if (event.key === 'Enter') {
       event.preventDefault()
@@ -224,7 +254,7 @@ export function SongList() {
         {chips.length > 1 && <button type="button" onClick={() => void library.clear_filters()}>Clear filters</button>}
         <span className="song-list-spacer" />
         <span className="muted small">
-          {keys('arrowup')} {keys('arrowdown')} move, {keys('shift+arrowdown')} picks, {keys('enter')} plays, right-click for more
+          {keys('arrowup')} {keys('arrowdown')} move, {keys('shift+arrowdown')} picks, {keys('enter')} plays, {keys('1')}–{keys('5')} rate, right-click for more
         </span>
         <span className="muted small">
           {narrowed ? `${format_count(tracks.length)} of ${plural(stats.tracks, 'track')}` : plural(tracks.length, 'track')}
@@ -235,6 +265,11 @@ export function SongList() {
 
       {selected_count > 0 && (
         <SelectionBar count={selected_count} total={order.length} on_clear={() => library.clear_selection()} on_select_all={() => library.select_all()}>
+          <Rating
+            value={rating_to_stars(shared_rating(tracks, library.selected_ids()))}
+            label="Rating of the picked tracks"
+            on_change={(stars) => void rate(library.selected_ids(), stars)}
+          />
           <button type="button" onClick={() => void player.enqueue(library.selected_ids(), 'next')}>Play next</button>
           <button type="button" onClick={() => void player.enqueue(library.selected_ids(), 'end')}>Add to queue</button>
           {selected_count > 1 && <button type="button" onClick={() => merge(library.selected_ids())}>Merge…</button>}

@@ -103,6 +103,13 @@ export const x_music_api: ApiSpec<XMusicApi & XMusicHistoryApi> = {
     description: 'Gives everything known about one track: every field, its files, how it is recognised, and its raw tags; null if there is no such track.',
     params: [{ name: 'track_id', schema: id_of('track') }]
   },
+  set_rating: {
+    description: 'Rates tracks 0 to 100, five stars being 100 and one star 20, or makes them unrated with null. Gives how many tracks changed; each change is kept in the track\'s history.',
+    params: [
+      { name: 'track_ids', schema: track_ids },
+      { name: 'rating', schema: { type: ['integer', 'null'], minimum: 0, maximum: 100, description: 'The rating 0 to 100, or null for unrated.' } }
+    ]
+  },
   list_duplicates: {
     description: 'Lists groups of tracks that look like the same piece of music, each with why and how sure X-Music is. Nothing is changed; merge_tracks merges a group.',
     params: [
