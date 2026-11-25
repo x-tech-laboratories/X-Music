@@ -1686,6 +1686,52 @@ History page (§9.4.6).
 Post-1.0: plugins on the X-Libs host (§11), replay-gain scanner UI, lyrics/artist-info providers,
 visualizer library, multi-library support.
 
+### 15.1 Quod Libet parity, ranked
+
+The order to close the gaps with Quod Libet, ranked on 2026-11-24 by everyday value in a large
+local library, by what X-Music already has, and by cost. §18 holds the full feature table; this is
+the order to work through it. Already built, so not ranked: filter panes, plain-text search, the
+duplicates browser, song properties, play and skip counting, the queue, repeat and shuffle,
+ReplayGain playback, artwork and move detection.
+
+**Tier 1 — core gaps, next.**
+
+1. Setting ratings: stars on the list and in a menu, keys, many tracks at once (M4). Ratings show
+   today but cannot be changed.
+2. Tag editing as Ex Falso does it: multi-track and multi-value edits, tags from path, renaming
+   files, track numbers (M6). The Picard hand-off (§7.1.1) lands first.
+3. The query language in the search bar (§4.4): `field=value`, `/regex/`, numeric and date
+   comparisons, `&`, `|` and `!` (M2). The search bar is plain full-text today.
+4. Playlists and saved searches you can browse and edit, with M3U, PLS and XSPF in and out (M5).
+5. MPRIS, global media keys, notifications and the tray (M3, M8).
+6. Watching folders for changes, and hiding the tracks of a drive that is not mounted instead of
+   calling them missing (M1).
+
+**Tier 2 — high value, moderate cost.**
+
+7. Last.fm and ListenBrainz scrobbling with an offline queue.
+8. The ReplayGain and R128 scanner for untagged files.
+9. Queue modes: keep songs after they play, stop after the current track, a queue that pauses shuffle.
+10. Album grid and album collection browsers.
+11. Totals for the selection (count, length, size) and an information window for many tracks.
+12. Ratings and play counts written back to files (§7.4).
+13. Import of a Quod Libet library: ratings, counts, playlists and saved searches.
+14. Cover art download, and lyrics from tags, `.lrc` files and synced display.
+15. Bookmarks within a track and playback speed.
+16. Sleep timer and equalizer.
+
+**Tier 3 — small and pleasant.** Random album, `@()` search shortcuts, website searches on the
+context menu, custom commands on the selection, a global filter that keeps things like audiobooks
+out of the library, ratings from play counts and skipping by rating, a filesystem browser, HTML
+and CSV export, pause on screen lock, a waveform seek bar, MusicBrainz album lookup, AcoustID.
+
+**Tier 4 — after 1.0.** Internet radio, podcasts, device sync, the plugin ecosystem (§11),
+translations, and an MPD-protocol server for phone remotes, which needs a decision against the
+desktop-only deviation first.
+
+**Not adopted.** Soundcloud, Squeezebox, MQTT, chat-status integrations, the Python console and
+Quod Libet's theme switcher; the reasons are in §18.
+
 ---
 
 ## 16. Decisions taken (and what would reverse them)
@@ -1837,6 +1883,7 @@ the most interesting decisions in the document.
 | "Random album" / "choose random" actions | ✓ | — | **Decide** | One line of work; good for radio-mode users |
 | Duplicate browser | — | ✓ | **In v1** | §9.2 |
 | Missing/invalid files view | ✓ | ✓ | **In v1** | §9.1 |
+| Hide tracks on an unmounted drive rather than mark them missing | — | ✓ (masked mounts) | **In v1** | §15.1 item 6; part of folder watching |
 | Internet radio browser | — | ✓ | **Post-1.0** | Needs a stream engine path and a station DB |
 | Podcast / audio feeds | — | ✓ | **Post-1.0** | Large surface: subscriptions, downloads, resume, unplayed state |
 | Soundcloud browser | — | ✓ | **Reject** | Third-party API that keeps breaking; not local-library work |
@@ -1893,6 +1940,7 @@ the most interesting decisions in the document.
 | CD ripping | ✓ (plugin) | — | **Reject** | Solved better by dedicated tools |
 | Library statistics / "song info" summary | ✓ | ✓ | **Decide** | Aggregate view: totals, top artists, listening over time |
 | Import ratings/playcounts from other players | ✓ | ✓ (plugins) | **In v1** | §9.3 |
+| Import a Quod Libet library (stats, playlists, saved searches) | — | — | **Post-1.0** | §15.1 item 13; only gmusicbrowser is imported today |
 | Export library to CSV/JSON/HTML | ✓ | ✓ | **In v1** | §9.3 |
 | Auto library update on file change | ✓ | ✓ | **In v1** | §9.1 |
 | Moved-file detection preserving stats | partial | partial | **In v1** | §9.1 |
@@ -1961,6 +2009,7 @@ the most interesting decisions in the document.
 | "Run a command on track change" hooks | ✓ | ✓ | **Decide** | Powerful and a security surface; needs an explicit opt-in model |
 | Custom user commands on selection (`%f`, `%s`) | ✓ | ✓ | **Decide** | Same decision as above |
 | Squeezebox / MQTT / external device sync | — | ✓ (plugins) | **Reject** | Plugin territory if anyone wants it |
+| MPD-protocol server, so phone MPD clients act as a remote | — | ✓ (plugin) | **Decide** | A network listener against the desktop-only deviation (§1.1); §15.1 tier 4 |
 | Portable-device sync (MTP/iPod) | — | ✓ (plugin) | **Post-1.0** | Plugin, §11 |
 | Plugin system | ✓ (Perl) | ✓ (Python, ~100 plugins) | **Post-1.0** | §11 |
 | Autosave / crash-safe library persistence | ✓ (plugin) | ✓ | **In v1** | SQLite WAL makes this structural, not a plugin |
