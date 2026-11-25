@@ -22,6 +22,7 @@ import { browse, chips_of, library, loading, results, type TrackId } from '../st
 import { player } from '../stores/player.ts'
 import { logger } from '../lib/log.ts'
 import { MergeView } from './MergeView.tsx'
+import { tag_with_picard } from './picard.tsx'
 import { SongProperties } from './SongProperties.tsx'
 import { close_overlay, open_overlay, overlay_of } from '../views/routes.ts'
 
@@ -146,7 +147,8 @@ export function SongList() {
       { label: many ? `Play ${ids.length} next` : 'Play next', run: () => void player.enqueue(ids, 'next') },
       { label: many ? `Add ${ids.length} to queue` : 'Add to queue', run: () => void player.enqueue(ids, 'end') },
       { label: 'Properties', hint: describe_keys('alt+enter'), separator_before: true, disabled: many, run: () => inspect(track.id) },
-      { label: `Merge ${ids.length} tracks…`, disabled: !many, run: () => merge(ids) }
+      { label: `Merge ${ids.length} tracks…`, disabled: !many, run: () => merge(ids) },
+      { label: 'Tag with Picard…', separator_before: true, run: () => tag_with_picard(ids) }
     ])
   }
 
@@ -273,6 +275,7 @@ export function SongList() {
           <button type="button" onClick={() => void player.enqueue(library.selected_ids(), 'next')}>Play next</button>
           <button type="button" onClick={() => void player.enqueue(library.selected_ids(), 'end')}>Add to queue</button>
           {selected_count > 1 && <button type="button" onClick={() => merge(library.selected_ids())}>Merge…</button>}
+          <button type="button" onClick={() => tag_with_picard(library.selected_ids())}>Tag with Picard…</button>
         </SelectionBar>
       )}
 

@@ -25,6 +25,7 @@ const defaults: Record<string, unknown> = {
   list_recent_versions: [],
   list_recent_merges: [],
   get_history_keep_days: 365,
+  get_picard_setup: { path: '', rescan: true, found: '/usr/bin/picard' },
   get_local_mcp_settings: { enabled: false, port: 3919 },
   get_local_mcp_status: { state: 'off', url: '', error: '' }
 }

@@ -211,3 +211,37 @@ describe('scanning', () => {
       .get() as { present: number }).present).toBe(1)
   })
 })
+
+describe('scanning single files', () => {
+  it('reads the files named, and nothing else in their folder', async () => {
+    await writeFile(join(dir, 'tagged.flac'), flac('0'.repeat(31) + '7', Buffer.alloc(512, 7)))
+    await writeFile(join(dir, 'other.flac'), flac('0'.repeat(31) + '8', Buffer.alloc(512, 8)))
+
+    const report = await scan_roots(db, [], { files: [join(dir, 'tagged.flac'), join(dir, 'notes.txt')] })
+
+    expect(report.files_found).toBe(1)
+    expect(db.prepare('SELECT uri FROM media').all()).toEqual([{ uri: join(dir, 'tagged.flac') }])
+  })
+
+  it('marks a named file that is gone missing, rather than reporting an error', async () => {
+    const file = join(dir, 'tagged.flac')
+    await writeFile(file, flac('0'.repeat(31) + '7', Buffer.alloc(512, 7)))
+    await scan_roots(db, [], { files: [file] })
+    await rm(file)
+
+    const report = await scan_roots(db, [], { files: [file] })
+
+    expect(report.errors).toEqual([])
+    expect(report.marked_missing).toBe(1)
+    expect(tracks()).toBe(1)
+  })
+
+  it('reads a named file once when a root holds it too', async () => {
+    const file = join(dir, 'tagged.flac')
+    await writeFile(file, flac('0'.repeat(31) + '7', Buffer.alloc(512, 7)))
+
+    const report = await scan_roots(db, [dir], { files: [file] })
+
+    expect(report.files_found).toBe(1)
+  })
+})

@@ -28,6 +28,8 @@ export interface ScanOptions {
   exclude_dirs?: readonly string[]
   // Skip hashing; much faster, but move detection stops working. For slow network mounts.
   slow?: boolean
+  // Single files read besides the roots; one no longer there is marked missing.
+  files?: readonly string[]
   on_progress?: (p: ScanProgress) => void
   on_file?: (r: FileResult) => void
   signal?: { aborted: boolean }
@@ -96,6 +98,13 @@ export async function scan_roots(
       }
       if (opts.signal?.aborted) break
     }
+  }
+  // A named file that is gone is left to the missing check below rather than reported as an error.
+  const walked = new Set(files)
+  for (const file of opts.files ?? []) {
+    if (walked.has(file) || !AUDIO_EXTENSIONS.has(extname(file).toLowerCase())) continue
+    const there = await stat(file).then((info) => info.isFile(), () => false)
+    if (there) files.push(file)
   }
   report.files_found = files.length
 
@@ -230,11 +239,12 @@ export async function scan_roots(
   // Anything under a scanned root that was not seen is gone from disk. The media is flagged, never deleted, so its track keeps its rating and history (DESIGN-SPEC §3.4).
   opts.on_progress?.({ phase: 'finishing', found: files.length, processed: files.length })
 
-  if (!opts.signal?.aborted && roots.length > 0) {
+  const named = new Set(opts.files ?? [])
+  if (!opts.signal?.aborted && (roots.length > 0 || named.size > 0)) {
     in_transaction(db, () => {
       const candidates = drizzle_of(db).select({ id: media_table.id, uri: media_table.uri }).from(media_table).where(and(eq(media_table.kind, 'file'), eq(media_table.present, 1))).all()
       for (const m of candidates) {
-        const under_root = roots.some((r) => m.uri.startsWith(r.endsWith('/') ? r : `${r}/`))
+        const under_root = named.has(m.uri) || roots.some((r) => m.uri.startsWith(r.endsWith('/') ? r : `${r}/`))
         if (under_root && !seen.has(m.id)) {
           drizzle_of(db).update(media_table).set({ present: 0 }).where(eq(media_table.id, m.id)).run()
           report.marked_missing++

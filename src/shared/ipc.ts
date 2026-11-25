@@ -212,17 +212,47 @@ export const api_method_names = [
   'seek', 'set_volume', 'queue_tracks', 'remove_from_queue', 'move_in_queue', 'clear_queue', 'set_repeat', 'set_shuffle'
 ] as const satisfies readonly (keyof XMusicApi)[]
 
-// Calls only X-Music's own window makes: dialogs, the file manager and cover images, none of them for other programs.
+// How X-Music hands tracks to MusicBrainz Picard; an empty path means Picard is looked for on PATH.
+export interface PicardSettings {
+  path: string
+  rescan: boolean
+}
+
+// The settings, and the Picard they lead to, or null when there is none.
+export interface PicardSetup extends PicardSettings {
+  found: string | null
+}
+
+export interface PicardHandoff {
+  files: number
+  skipped: number
+  picard: string
+}
+
+// What happened once the Picard window X-Music opened was closed.
+export interface PicardClosed {
+  files: number
+  report: ScanReport | null
+  error?: string
+}
+
+// Calls only X-Music's own window makes: dialogs, the file manager, cover images and Picard, none of them for other programs.
 export interface XMusicPageApi {
   pick_folder: () => string | null
   pick_gmbrc_file: () => string | null
+  pick_program: (title: string) => string | null
   show_in_folder: (uri: string) => { revealed: boolean }
   // Finds a track's cover and caches it, so it writes; gives an x-music-art:// url, or null when the track has none.
   cache_cover: (track_id: string, size?: number) => { url: string | null; source: string }
+  get_picard_setup: () => PicardSetup
+  set_picard_settings: (changes: Partial<PicardSettings>) => PicardSetup
+  // Opens the tracks' files in a Picard window of their own, and answers once it is open.
+  tag_with_picard: (track_ids: string[]) => PicardHandoff
 }
 
 export const page_method_names = [
-  'pick_folder', 'pick_gmbrc_file', 'show_in_folder', 'cache_cover'
+  'pick_folder', 'pick_gmbrc_file', 'pick_program', 'show_in_folder', 'cache_cover',
+  'get_picard_setup', 'set_picard_settings', 'tag_with_picard'
 ] as const satisfies readonly (keyof XMusicPageApi)[]
 
 // Pushed from the main process; the renderer subscribes rather than polling.
@@ -231,6 +261,7 @@ export type XMusicEvents = {
   // Batched, because one message per file would flood the bridge on a large library.
   scan_files: FileResult[]
   scan_done: ScanReport
+  picard_closed: PicardClosed
   player_status: PlayerStatus
   // Throttled; the UI interpolates between ticks rather than being fed every frame.
   player_position: { position_ms: number; duration_ms: number | null }
