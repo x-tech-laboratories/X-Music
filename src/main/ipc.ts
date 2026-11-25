@@ -20,6 +20,7 @@ import {
 } from '@shared/library/history'
 import { list_recent_merges, merge_preview, merge_tracks, unmerge } from '@shared/library/merge'
 import { set_picard_settings } from '@shared/library/picard'
+import { add_to_playlist, create_playlist, delete_playlist, list_playlists, remove_from_playlist, rename_playlist } from '@shared/library/playlists'
 import { set_rating } from '@shared/library/ratings'
 import {
   add_root, enabled_root_paths, group_tracks, library_stats, list_roots, mark_roots_scanned,
@@ -213,6 +214,13 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
     },
 
     get_track: (track_id) => track_details(db, track_id),
+
+    list_playlists: () => list_playlists(db),
+    create_playlist: (name, track_ids, filter) => create_playlist(db, name, { track_ids, filter }),
+    rename_playlist: (playlist_id, name) => { rename_playlist(db, playlist_id, name); return list_playlists(db) },
+    delete_playlist: (playlist_id) => { delete_playlist(db, playlist_id); return list_playlists(db) },
+    add_to_playlist: (playlist_id, track_ids) => add_to_playlist(db, playlist_id, track_ids),
+    remove_from_playlist: (playlist_id, track_ids) => remove_from_playlist(db, playlist_id, track_ids),
 
     set_rating: (track_ids, rating) => {
       const result = set_rating(db, track_ids, rating)

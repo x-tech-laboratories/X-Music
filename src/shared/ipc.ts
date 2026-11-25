@@ -43,6 +43,15 @@ export interface TrackRow {
 }
 
 // One value of a field among the tracks, with how many tracks hold it and their total length.
+// A playlist as lists show it: a static one's track count, or a smart one's filter.
+export interface PlaylistRow {
+  id: string
+  name: string
+  kind: 'static' | 'smart'
+  tracks: number | null
+  filter: FilterNode | null
+}
+
 export interface GroupRow {
   group_id: number | string | null
   label: string | null
@@ -174,6 +183,12 @@ export interface XMusicApi {
   list_track_groups: (filter: FilterNode, field: string) => GroupRow[]
   get_track: (track_id: string) => TrackDetails | null
   set_rating: (track_ids: string[], rating: number | null) => { changed: number }
+  list_playlists: () => PlaylistRow[]
+  create_playlist: (name: string, track_ids?: string[], filter?: FilterNode) => PlaylistRow
+  rename_playlist: (playlist_id: string, name: string) => PlaylistRow[]
+  delete_playlist: (playlist_id: string) => PlaylistRow[]
+  add_to_playlist: (playlist_id: string, track_ids: string[]) => { tracks: number }
+  remove_from_playlist: (playlist_id: string, track_ids: string[]) => { tracks: number }
   list_duplicates: (reasons?: DuplicateReason[], length_tolerance_ms?: number, limit?: number) => DuplicateGroup[]
   get_merge_preview: (track_ids: string[]) => MergePreview
   merge_tracks: (track_ids: string[], survivor_id: string, resolutions?: Record<string, Resolution>) => MergeResult
@@ -205,6 +220,7 @@ export interface XMusicApi {
 
 export const api_method_names = [
   'get_app_info', 'get_library_stats', 'list_tracks', 'list_track_groups', 'get_track', 'set_rating',
+  'list_playlists', 'create_playlist', 'rename_playlist', 'delete_playlist', 'add_to_playlist', 'remove_from_playlist',
   'list_duplicates', 'get_merge_preview', 'merge_tracks', 'undo_merge',
   'list_folders', 'add_folder', 'remove_folder', 'scan_folders', 'cancel_scan',
   'get_default_gmbrc_path', 'get_gmbrc_preview', 'import_gmbrc', 'clear_library',

@@ -33,6 +33,7 @@ function bridge(listed: TrackRow[]): void {
     'list_tracks': listed,
     'get_library_stats': stats(listed.length),
     'list_track_groups': [],
+    'list_playlists': [],
     'get_track': new Promise(() => undefined),
     'get_merge_preview': new Promise(() => undefined),
     'get_player_status': { state: 'idle', track: null, media: null, position_ms: 0, duration_ms: null, volume: 80, repeat: 'off', shuffle: false, queue: [], context_length: 0, context_index: -1 }
@@ -49,7 +50,7 @@ function show(listed: TrackRow[]): void {
 beforeEach(() => {
   bridge(tracks(3))
   show(tracks(3))
-  browse.set({ sort: [], panes: {}, search: '' })
+  browse.set({ sort: [], panes: {}, search: '', playlist: null })
   library.clear_selection()
   player_status.set(null)
   history.replaceState(null, '', '#/library')
@@ -252,18 +253,18 @@ describe('song list', () => {
 
 describe('filter chips', () => {
   it('names each chip\'s remove button and takes the filter off with it', async () => {
-    browse.set({ sort: [], panes: { genre: ['Jazz'] }, search: '' })
+    browse.set({ sort: [], panes: { genre: ['Jazz'] }, search: '', playlist: null })
     render(<SongList />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove the filter Genre: Jazz' }))
 
     await vi.waitFor(() => expect(browse.get().panes).toEqual({}))
-    expect(calls.get('list_tracks')).toHaveBeenCalledWith(expect.anything(), expect.anything())
+    await vi.waitFor(() => expect(calls.get('list_tracks')).toHaveBeenCalledWith(expect.anything(), expect.anything()))
   })
 
   it('shows each term of the search as a chip, and its remove button takes that term out of the text', async () => {
     calls.get('list_track_groups')!.mockImplementation(async () => [{ group_id: 1, label: 'Jazz', count: 3, total_ms: 0 }])
-    browse.set({ sort: [], panes: {}, search: 'blue genre:jazz rating:>3' })
+    browse.set({ sort: [], panes: {}, search: 'blue genre:jazz rating:>3', playlist: null })
     await library.refresh()
     render(<SongList />)
 

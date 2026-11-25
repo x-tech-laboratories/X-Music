@@ -9,8 +9,9 @@ import type { Sorting } from '@x-tech-laboratories/x-libs/web/tables'
 import { create_watch } from '@x-tech-laboratories/x-libs/web/watch'
 import { and, FilterStack, leaf, or, type FilterNode, type SortKey } from '@x-tech-laboratories/x-libs/filter'
 import { without_term } from '@x-tech-laboratories/x-libs/filter_query'
-import type { GroupRow, LibraryStats, TrackRow } from '@shared/ipc'
+import type { GroupRow, LibraryStats, PlaylistRow, TrackRow } from '@shared/ipc'
 import { field } from '@shared/fields'
+import { playlist_filter } from '@shared/library/playlists'
 import { parse_search, set_fields_named } from '@shared/query/search'
 import { sanitize_pane_values, sanitize_sort_keys, seed_random_sort } from '@shared/viewstate'
 import { ipc } from '../lib/ipc.ts'
@@ -36,11 +37,14 @@ export interface Browse {
   // Field id to the values picked in its pane; several values in one pane mean any of them.
   panes: Record<string, string[]>
   search: string
+  // The playlist the library is narrowed to, if any.
+  playlist: string | null
 }
 
 const SORT_KEY = 'x-music.pref.library.sort'
 const PANES_KEY = 'x-music.pref.library.panes'
 const SEARCH_KEY = 'x-music.pref.library.search'
+const PLAYLIST_KEY = 'x-music.pref.library.playlist'
 
 const DEFAULT_SORT: SortKey[] = [{ field: 'album' }, { field: 'disc_number' }, { field: 'track_number' }]
 
@@ -48,12 +52,17 @@ function remembered(): Browse {
   const storage = browser_storage()
   const sort = seed_random_sort(sanitize_sort_keys(read_pref<unknown>(storage, SORT_KEY, null)), [])
   const search = read_pref<unknown>(storage, SEARCH_KEY, '')
+  const playlist = read_pref<unknown>(storage, PLAYLIST_KEY, null)
   return {
+    playlist: typeof playlist === 'string' ? playlist : null,
     sort: sort.length > 0 ? sort : DEFAULT_SORT,
     panes: sanitize_pane_values(read_pref<unknown>(storage, PANES_KEY, null)),
     search: typeof search === 'string' ? search : ''
   }
 }
+
+// Every playlist, as the Playlists tab lists them.
+export const playlists = create_store<PlaylistRow[]>([])
 
 export const results = create_store<Results>({ stats: null, tracks: [], order: [], error: null })
 export const browse = create_store<Browse>(remembered())
@@ -69,6 +78,7 @@ browse.watch.subscribe(() => {
   write_pref(storage, SORT_KEY, state.sort)
   write_pref(storage, PANES_KEY, state.panes)
   write_pref(storage, SEARCH_KEY, state.search)
+  write_pref(storage, PLAYLIST_KEY, state.playlist)
 })
 
 // ============================================================================
@@ -85,6 +95,8 @@ function pane_node(field_id: string, values: readonly string[]): FilterNode {
 // The filter stack the browse state stands for, leaving out one pane so that pane can still offer every value.
 function stack_of(state: Browse, leave_out?: string): FilterStack {
   const stack = new FilterStack()
+  const playlist = playlists.get().find((row) => row.id === state.playlist)
+  if (playlist) stack.push({ id: 'playlist', label: `Playlist: ${playlist.name}`, node: playlist_filter(playlist), removable: true })
   for (const [field_id, values] of Object.entries(state.panes)) {
     if (field_id === leave_out || values.length === 0) continue
     const name = field(field_id).name
@@ -129,7 +141,8 @@ async function refresh(): Promise<void> {
   const request = ++latest_request
   loading.set(true)
   try {
-    await learn_values(browse.get().search)
+    const [, listed] = await Promise.all([learn_values(browse.get().search), ipc('list_playlists')])
+    playlists.set(listed)
     const state = browse.get()
     const [stats, tracks] = await Promise.all([
       ipc('get_library_stats'),
@@ -213,6 +226,7 @@ export const library = {
   set_search: (search: string): Promise<void> => change_browse((state) => ({ ...state, search })),
 
   remove_chip: (id: string): Promise<void> => change_browse((state) => {
+    if (id === 'playlist') return { ...state, playlist: null }
     if (id.startsWith('search:')) {
       const term = parse_search(state.search, known_values).terms[Number(id.slice('search:'.length))]
       return term ? { ...state, search: without_term(state.search, term) } : state
@@ -222,7 +236,18 @@ export const library = {
     return { ...state, panes }
   }),
 
-  clear_filters: (): Promise<void> => change_browse((state) => ({ ...state, panes: {}, search: '' })),
+  clear_filters: (): Promise<void> => change_browse((state) => ({ ...state, panes: {}, search: '', playlist: null })),
+
+  // ── Playlists ──
+
+  // Narrows the library to a playlist, with no other filter left over from before.
+  open_playlist: (playlist_id: string): Promise<void> => change_browse((state) => ({ ...state, panes: {}, search: '', playlist: playlist_id })),
+
+  // The view as it stands, for saving as a smart playlist; null when nothing narrows it.
+  current_filter: (): FilterNode | null => {
+    const filter = filter_of(browse.get())
+    return 'children' in filter && filter.op === 'and' && filter.children.length === 0 ? null : filter
+  },
 
   // ── Ratings ──
 

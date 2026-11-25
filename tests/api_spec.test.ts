@@ -25,7 +25,7 @@ describe('api spec', () => {
 
   it('marks the calls that delete or overwrite data as destructive, and only those', () => {
     const destructive = Object.entries(x_music_api).filter(([, spec]) => spec.destructive).map(([name]) => name).sort()
-    expect(destructive).toEqual(['clear_library', 'import_gmbrc', 'merge_tracks', 'restore_version', 'set_history_keep_days', 'undo_merge'])
+    expect(destructive).toEqual(['clear_library', 'delete_playlist', 'import_gmbrc', 'merge_tracks', 'remove_from_playlist', 'restore_version', 'set_history_keep_days', 'undo_merge'])
   })
 
   it('takes a seed on a sort key, so a client can ask for the same shuffle again', () => {

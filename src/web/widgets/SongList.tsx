@@ -23,6 +23,7 @@ import { player } from '../stores/player.ts'
 import { logger } from '../lib/log.ts'
 import { MergeView } from './MergeView.tsx'
 import { tag_with_picard } from './picard.tsx'
+import { add_to_playlist, open_static_playlist, remove_from_open_playlist } from './Playlists.tsx'
 import { SongProperties } from './SongProperties.tsx'
 import { close_overlay, open_overlay, overlay_of } from '../views/routes.ts'
 
@@ -141,6 +142,7 @@ export function SongList() {
     if (!library.is_selected(track.id)) library.click_row(index, {})
     const ids = library.selected_ids()
     const many = ids.length > 1
+    const in_playlist = open_static_playlist()
 
     open_context_menu(event, [
       { label: 'Play', hint: describe_keys('enter'), run: () => play_from(index) },
@@ -148,6 +150,8 @@ export function SongList() {
       { label: many ? `Add ${ids.length} to queue` : 'Add to queue', run: () => void player.enqueue(ids, 'end') },
       { label: 'Properties', hint: describe_keys('alt+enter'), separator_before: true, disabled: many, run: () => inspect(track.id) },
       { label: `Merge ${ids.length} tracks…`, disabled: !many, run: () => merge(ids) },
+      { label: many ? `Add ${ids.length} to playlist…` : 'Add to playlist…', separator_before: true, run: () => add_to_playlist(ids) },
+      ...(in_playlist ? [{ label: `Remove from ${in_playlist.name}`, run: () => remove_from_open_playlist(ids) }] : []),
       { label: 'Tag with Picard…', separator_before: true, run: () => tag_with_picard(ids) }
     ])
   }
@@ -275,6 +279,7 @@ export function SongList() {
           <button type="button" onClick={() => void player.enqueue(library.selected_ids(), 'next')}>Play next</button>
           <button type="button" onClick={() => void player.enqueue(library.selected_ids(), 'end')}>Add to queue</button>
           {selected_count > 1 && <button type="button" onClick={() => merge(library.selected_ids())}>Merge…</button>}
+          <button type="button" onClick={() => add_to_playlist(library.selected_ids())}>Add to playlist…</button>
           <button type="button" onClick={() => tag_with_picard(library.selected_ids())}>Tag with Picard…</button>
         </SelectionBar>
       )}
