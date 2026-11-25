@@ -724,7 +724,7 @@ A single input parses a "smart string" into an AST — gmusicbrowser's `smartfil
 beatles                      → FTS across searchable fields
 artist:beatles               → artist contains "beatles"
 artist="the beatles"         → exact
-rating:>3                    → rating >= 60  (star-aware: numbers ≤5 on a rating field mean stars)
+rating:>3                    → rating > 60  (star-aware: numbers ≤5 on a rating field mean stars)
 year:1965..1970              → between
 genre:jazz,blues             → genre has any of
 -live                        → NOT (FTS "live")
@@ -735,6 +735,13 @@ bpm:120..130 rating:>=4      → implicit AND
 
 Parse errors never block: the bar shows what it understood as removable chips, and unparseable text
 degrades to a plain FTS term.
+
+**Status: implemented** on X-Libs `filter_query`, with X-Music's fields in `src/shared/query/search.ts`.
+Every filterable field answers to its id, its name and short names (`played`, `plays`, `label`,
+`len`); lengths take `4:05`, `4m` or seconds. Plain words go to the full-text index as a quoted
+phrase whose last word matches as a prefix, so `beat` finds Beatles. Set fields match exactly, so the
+store fetches the values of each set field a search names and the parser picks them whatever their
+case; they are forgotten when the library changes. `/pattern/` is case-sensitive, as `regex` is.
 
 **The full-text index is filled.** `track_search` holds each track's title, artists, album, album
 artist, genres, comment and lyrics under a lasting integer key, and the FTS5 table `tracks_fts` reads
@@ -1719,7 +1726,8 @@ ReplayGain playback, artwork and move detection.
 2. Tag editing as Ex Falso does it: multi-track and multi-value edits, tags from path, renaming
    files, track numbers (M6). The Picard hand-off (§7.1.1) is **done**; X-Music's own editor is next.
 3. The query language in the search bar (§4.4): `field=value`, `/regex/`, numeric and date
-   comparisons, `&`, `|` and `!` (M2). The search bar is plain full-text today.
+   comparisons, `&`, `|` and `!` (M2). **Done** as §4.4's own language on X-Libs `filter_query`;
+   Quod Libet's `&()` and `|()` syntax remains an import to add.
 4. Playlists and saved searches you can browse and edit, with M3U, PLS and XSPF in and out (M5).
 5. MPRIS, global media keys, notifications and the tray (M3, M8).
 6. Watching folders for changes, and hiding the tracks of a drive that is not mounted instead of
