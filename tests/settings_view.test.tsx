@@ -24,9 +24,9 @@ describe('settings view', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeTruthy()
     const categories = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
-    expect(categories).toEqual(['General', 'Data', 'About'])
+    expect(categories).toEqual(['General', 'Tagging', 'Data', 'About'])
     const outline = screen.getByRole('navigation', { name: 'Settings sections' })
-    expect(within(outline).getAllByRole('link').map((link) => link.textContent)).toEqual(['Appearance', 'Library database', 'History', 'Backups', 'MCP server', 'X-Music'])
+    expect(within(outline).getAllByRole('link').map((link) => link.textContent)).toEqual(['Appearance', 'MusicBrainz Picard', 'Library database', 'History', 'Backups', 'MCP server', 'X-Music'])
     for (const name of ['Folders', 'Import', 'Duplicates']) expect(screen.queryByRole('heading', { name })).toBeNull()
   })
 
@@ -114,5 +114,30 @@ describe('settings view', () => {
 
     expect(await screen.findByText('claude mcp add --transport http x-music http://127.0.0.1:3919/mcp')).toBeTruthy()
     expect(calls.find((call) => call.channel === 'set_local_mcp_settings')?.args).toEqual([{ enabled: true, port: 3919 }])
+  })
+})
+
+describe('picard settings', () => {
+  it('says which Picard it uses and saves a path and the rescan switch', async () => {
+    const calls: Call[] = install_bridge({
+      'set_picard_settings': (changes: { path?: string; rescan?: boolean }) => ({ path: changes.path ?? '', rescan: changes.rescan ?? true, found: changes.path ? null : '/usr/bin/picard' })
+    })
+    render(<SettingsView info={info} density="normal" on_density={() => undefined} />)
+
+    expect(await screen.findByText(/Using \/usr\/bin\/picard\./)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Read files again when Picard closes' }))
+    await waitFor(() => expect(calls.find((call) => call.channel === 'set_picard_settings')?.args).toEqual([{ rescan: false }]))
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Picard program' }), { target: { value: '/opt/picard ' } })
+    await waitFor(() => expect(screen.getByText(/There is no program at this path\./)).toBeTruthy())
+    expect((screen.getByRole('textbox', { name: 'Picard program' }) as HTMLInputElement).value).toBe('/opt/picard ')
+  })
+
+  it('says so when Picard is not on PATH', async () => {
+    install_bridge({ 'get_picard_setup': { path: '', rescan: true, found: null } })
+    render(<SettingsView info={info} density="normal" on_density={() => undefined} />)
+
+    expect(await screen.findByText(/Picard was not found on PATH/)).toBeTruthy()
   })
 })

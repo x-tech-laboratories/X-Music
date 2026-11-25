@@ -4,13 +4,14 @@ import { homedir } from 'node:os'
 
 import type { Implementation, IpcMainEventLike } from '@x-tech-laboratories/x-libs/electron/bridge'
 import { find_mpv, MpvEngine, NullEngine } from '@x-tech-laboratories/x-libs/mpv'
+import { on_path, run_program } from '@x-tech-laboratories/x-libs/agent/programs'
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { default_gmbrc_path, parse_gmbrc } from '@shared/import/gmbrc'
 import { import_gmbrc } from '@shared/import/gmb_import'
 import {
   x_music_bridge, x_music_events, x_music_history_bridge, x_music_page_bridge,
-  type XMusicApi, type XMusicEvents, type XMusicHistoryApi, type XMusicPageApi, type EventName, type FileResult
+  type XMusicApi, type XMusicEvents, type XMusicHistoryApi, type XMusicPageApi, type EventName, type FileResult, type ScanReport
 } from '@shared/ipc'
 import { track_details } from '@shared/library/details'
 import { find_duplicates } from '@shared/library/duplicates'
@@ -18,6 +19,7 @@ import {
   get_history_keep_days, record_history, set_history_keep_days, track_history_methods
 } from '@shared/library/history'
 import { list_recent_merges, merge_preview, merge_tracks, unmerge } from '@shared/library/merge'
+import { set_picard_settings } from '@shared/library/picard'
 import { set_rating } from '@shared/library/ratings'
 import {
   add_root, enabled_root_paths, group_tracks, library_stats, list_roots, mark_roots_scanned,
@@ -28,6 +30,7 @@ import { clear_library_backed_up, type LibraryBackups } from './backups.ts'
 import { resolve_artwork, thumbnail } from './library/artwork.ts'
 import { scan_roots } from './library/scan.ts'
 import { logger } from './log.ts'
+import { picard_setup, tag_with_picard, type PicardLauncher, type PicardScans } from './picard.ts'
 import { Player } from './play/player.ts'
 
 // Every call other programs may make too, answered on the library and the player.
@@ -59,6 +62,7 @@ function recording<Methods extends Record<string, (...args: never[]) => unknown>
 export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promise<{ api: ApiImplementation; stop_player: () => Promise<void> }> {
   // A scan runs at most once at a time; the flag is what cancel flips.
   let scanning: { aborted: boolean } | null = null
+  let current_scan: Promise<ScanReport> | null = null
 
   // Without mpv the app still runs and the library still works; only audio is unavailable, and the player reports that plainly rather than failing at the first click.
   const play_log = logger('play')
@@ -78,6 +82,63 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
     if (event === 'status') emit('player_status', payload as XMusicEvents['player_status'])
     else if (event === 'position') emit('player_position', payload as XMusicEvents['player_position'])
   })
+
+  // Scans the roots and the single files, telling the page how it goes; one runs at a time.
+  async function run_scan(roots: readonly string[], files: readonly string[] = []): Promise<ScanReport> {
+    const signal = { aborted: false }
+    scanning = signal
+
+    // One IPC message per file would flood the bridge; flush in batches instead.
+    let pending: FileResult[] = []
+    const flush = (): void => {
+      if (pending.length === 0) return
+      emit('scan_files', pending)
+      pending = []
+    }
+
+    const running = scan_roots(db, roots, {
+      files,
+      signal,
+      on_progress: (p) => emit('scan_progress', p),
+      on_file: (r) => {
+        pending.push(r)
+        if (pending.length >= 40) flush()
+      }
+    })
+    current_scan = running
+    try {
+      const report = await running
+      flush()
+      emit('scan_done', report)
+      return report
+    } finally {
+      scanning = null
+      current_scan = null
+    }
+  }
+
+  // Waits for a scan already running, then runs this one; for scans nobody asked for by hand.
+  async function scan_when_free(roots: readonly string[], files: readonly string[] = []): Promise<ScanReport> {
+    while (current_scan) await current_scan.catch(() => undefined)
+    return run_scan(roots, files)
+  }
+
+  const picard_launcher: PicardLauncher = {
+    on_path,
+    exists: existsSync,
+    run: (argv) => run_program(argv, { stdout: 'drop', stderr: 'drop' })
+  }
+
+  // Picard's rescans change tracks outside any call, so they record history and tell the page themselves.
+  const picard_scans: PicardScans = {
+    music_folders: () => enabled_root_paths(db),
+    scan: (targets) => scan_when_free(targets.folders, targets.files),
+    scan_all: async () => {
+      const report = await scan_when_free(enabled_root_paths(db))
+      mark_roots_scanned(db, Date.now())
+      return report
+    }
+  }
 
   const handlers: Implementation<XMusicApi> = {
     get_app_info: () => ({
@@ -146,32 +207,9 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
       const roots = enabled_root_paths(db)
       if (roots.length === 0) throw new Error('no music folders configured')
 
-      scanning = { aborted: false }
-
-      // One IPC message per file would flood the bridge; flush in batches instead.
-      let pending: FileResult[] = []
-      const flush = (): void => {
-        if (pending.length === 0) return
-        emit('scan_files', pending)
-        pending = []
-      }
-
-      try {
-        const report = await scan_roots(db, roots, {
-          signal: scanning,
-          on_progress: (p) => emit('scan_progress', p),
-          on_file: (r) => {
-            pending.push(r)
-            if (pending.length >= 40) flush()
-          }
-        })
-        flush()
-        mark_roots_scanned(db, Date.now())
-        emit('scan_done', report)
-        return report
-      } finally {
-        scanning = null
-      }
+      const report = await run_scan(roots)
+      mark_roots_scanned(db, Date.now())
+      return report
     },
 
     get_track: (track_id) => track_details(db, track_id),
@@ -234,6 +272,28 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
     pick_folder: () => {
       const picked = dialog.showOpenDialogSync({ title: 'Choose a music folder', properties: ['openDirectory', 'createDirectory'] })
       return picked?.[0] ?? null
+    },
+
+    pick_program: (title) => {
+      const picked = dialog.showOpenDialogSync({ title, properties: ['openFile'] })
+      return picked?.[0] ?? null
+    },
+
+    get_picard_setup: () => picard_setup(db, picard_launcher),
+
+    set_picard_settings: (changes) => {
+      set_picard_settings(db, changes)
+      return picard_setup(db, picard_launcher)
+    },
+
+    tag_with_picard: async (track_ids) => {
+      const { closed, ...handoff } = await tag_with_picard(db, track_ids, picard_launcher, picard_scans)
+      void closed.then((outcome) => {
+        record_history(db)
+        emit('picard_closed', outcome)
+        if (outcome.report) emit('changed', null)
+      })
+      return handoff
     },
 
     pick_gmbrc_file: () => {

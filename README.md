@@ -44,7 +44,7 @@ implemented yet. See the roadmap in DESIGN-SPEC §15.
 | Setting ratings (stars in the list, the player and the selection bar; keys 0–5 on picked rows) | working |
 | Album art (embedded, folder image, cached) | working |
 | Daily backups of the library database, on X-Libs | working |
-| Picard hand-off for tagging | specified (DESIGN-SPEC §7.1.1) |
+| Picard hand-off for tagging: the picked tracks open in Picard, and their files are read again when it closes | working |
 | Local MCP server for AI clients, every call described in an `api_spec` | working |
 
 ## Deviations

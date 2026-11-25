@@ -1,9 +1,9 @@
-// Settings: how the app looks, the library database, its backups and the MCP server, and the version.
+// Settings: how the app looks, Picard, the library database, its backups and the MCP server, and the version.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BackupSettings } from '@x-tech-laboratories/x-libs/web/react/backup_settings'
 import { confirm_dialog } from '@x-tech-laboratories/x-libs/web/react/dialog'
-import { NumberField, Segmented } from '@x-tech-laboratories/x-libs/web/react/controls'
+import { NumberField, PathInput, Segmented, Switch } from '@x-tech-laboratories/x-libs/web/react/controls'
 import { LocalMcpSettings } from '@x-tech-laboratories/x-libs/web/react/local_mcp_settings'
 import { Facts, PageHeading, SettingRow, SettingsPage, type SettingsCategory } from '@x-tech-laboratories/x-libs/web/react/layout'
 import { Loaded, use_resource } from '@x-tech-laboratories/x-libs/web/react/states'
@@ -13,10 +13,11 @@ import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { format_duration } from '@x-tech-laboratories/x-libs/durations'
 import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { Theme } from '@x-tech-laboratories/x-libs/web/theme'
-import type { AppInfo } from '@shared/ipc'
-import { ipc } from '../lib/ipc.ts'
+import type { AppInfo, PicardSettings, PicardSetup } from '@shared/ipc'
+import { ipc, page_ipc } from '../lib/ipc.ts'
 import { theme } from '../lib/theme.ts'
 import { library } from '../stores/library.ts'
+import { PICARD_WARNING } from '../widgets/picard.tsx'
 
 export type Density = 'compact' | 'normal' | 'comfortable'
 
@@ -107,6 +108,57 @@ function HistoryKeeping() {
 }
 
 // ============================================================================
+// Picard
+// ============================================================================
+
+// Where Picard is and whether its files are read again when it closes, each saved as it changes.
+function PicardSettingsSection() {
+  const loaded = use_resource(() => page_ipc('get_picard_setup'), [])
+  const [changed, set_changed] = useState<PicardSetup | null>(null)
+  const latest = useRef(0)
+  const setup = changed ?? loaded.data ?? null
+
+  // The path is saved on every key, so only the newest answer counts, and the field keeps what was typed.
+  async function change(changes: Partial<PicardSettings>): Promise<void> {
+    const request = ++latest.current
+    if (setup) set_changed({ ...setup, ...changes })
+    try {
+      const saved = await page_ipc('set_picard_settings', changes)
+      if (request === latest.current) set_changed((shown) => ({ ...saved, path: shown?.path ?? saved.path }))
+    } catch (error) {
+      if (request === latest.current) set_changed(null)
+      toast(`Could not change the Picard settings: ${describe_call_error(error)}`, { tone: 'bad' })
+    }
+  }
+
+  const found_hint = (current: PicardSetup): string => {
+    if (current.found) return `Using ${current.found}.`
+    return current.path ? 'There is no program at this path.' : 'Picard was not found on PATH; install it, or choose where it is.'
+  }
+
+  return (
+    <Loaded resource={loaded} lines={2}>
+      {() => setup && (
+        <>
+          <SettingRow label="Picard program" hint={`${found_hint(setup)} Leave empty to look for picard on PATH.`}>
+            <PathInput
+              label="Picard program"
+              value={setup.path}
+              placeholder={setup.path ? undefined : setup.found ?? 'picard on PATH'}
+              on_change={(path) => void change({ path })}
+              pick={() => page_ipc('pick_program', 'Choose the Picard program')}
+            />
+          </SettingRow>
+          <SettingRow label="Read files again when Picard closes" hint="Picks up Picard's tags, and follows files it renamed or moved.">
+            <Switch label="Read files again when Picard closes" checked={setup.rescan} on_change={(rescan) => void change({ rescan })} />
+          </SettingRow>
+        </>
+      )}
+    </Loaded>
+  )
+}
+
+// ============================================================================
 // Page
 // ============================================================================
 
@@ -146,6 +198,17 @@ export function SettingsView({ info, density, on_density }: SettingsViewProps) {
               </SettingRow>
             </>
           )
+        }
+      ]
+    },
+    {
+      heading: 'Tagging',
+      sections: [
+        {
+          id: 'picard',
+          heading: 'MusicBrainz Picard',
+          hint: PICARD_WARNING,
+          content: <PicardSettingsSection />
         }
       ]
     },

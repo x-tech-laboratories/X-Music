@@ -26,6 +26,7 @@ import { ImportView } from './views/ImportView.tsx'
 import { LibraryView } from './views/LibraryView.tsx'
 import { view_href, view_labels, view_of, views, type ViewId } from './views/routes.ts'
 import { SettingsView, type Density } from './views/SettingsView.tsx'
+import { listen_for_picard } from './widgets/picard.tsx'
 
 // ============================================================================
 // Shortcuts
@@ -73,12 +74,14 @@ export function App() {
     const stop_player = player.init()
     // A change an AI client made through the MCP server shows as if made here.
     const stop_changes = window.xMusicEvents.on('changed', () => void library.refresh())
+    const stop_picard = listen_for_picard()
     void boot()
 
     return () => {
       page_log.stop()
       stop_player()
       stop_changes()
+      stop_picard()
     }
   }, [])
 

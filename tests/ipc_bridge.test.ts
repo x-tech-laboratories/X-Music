@@ -29,7 +29,7 @@ describe('IPC bridge', () => {
       'get_app_info', 'get_library_stats', 'list_tracks', 'list_track_groups', 'get_track', 'list_duplicates', 'get_merge_preview',
       'list_folders', 'get_default_gmbrc_path', 'get_gmbrc_preview', 'get_player_status'
     ])
-    expect(page_method_names.filter((name) => is_read_only(name))).toEqual([])
+    expect(page_method_names.filter((name) => is_read_only(name))).toEqual(['get_picard_setup'])
   })
 
   it('exposes the client and the events where the page reads them', () => {

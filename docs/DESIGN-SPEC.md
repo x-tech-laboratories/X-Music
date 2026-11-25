@@ -1034,6 +1034,15 @@ gains its strongest signal (§3.5.0). The scanner already reads the tag; nothing
 
 #### 7.1.1.3 What is needed
 
+**Status: levels 1 and 2 implemented.** "Tag with Picard…" on the context menu and the selection
+bar warns that Picard writes to the files, then opens the tracks' whole files in
+`picard --stand-alone-instance`, so the process ends when that window closes; ranges inside a CUE
+container are left out, since Picard would retag the container. On close, X-Music reads again the
+folders of files inside the music folders, and only the files themselves when they lie outside, so
+their neighbours do not join the library; if a file went missing, the music folders are scanned to
+follow a move. Settings → Tagging holds the Picard path (found on `PATH` when empty) and the rescan
+switch. An action on an album row waits for album rows; picking an album's tracks covers it.
+
 1. A `picard` setting: binary path, plus whether to rescan the affected paths on return.
 2. A "Tag with Picard" action on a track selection and on an album.
 3. A targeted rescan — `scan_roots` already takes a root list, so scanning specific paths is a small
@@ -1699,10 +1708,10 @@ ReplayGain playback, artwork and move detection.
 
 **Tier 1 — core gaps, next.**
 
-1. Setting ratings: stars on the list and in a menu, keys, many tracks at once (M4). Ratings show
-   today but cannot be changed.
+1. Setting ratings: stars on the list and in a menu, keys, many tracks at once (M4). **Done**:
+   stars in the list, the player and the selection bar, and keys 0–5.
 2. Tag editing as Ex Falso does it: multi-track and multi-value edits, tags from path, renaming
-   files, track numbers (M6). The Picard hand-off (§7.1.1) lands first.
+   files, track numbers (M6). The Picard hand-off (§7.1.1) is **done**; X-Music's own editor is next.
 3. The query language in the search bar (§4.4): `field=value`, `/regex/`, numeric and date
    comparisons, `&`, `|` and `!` (M2). The search bar is plain full-text today.
 4. Playlists and saved searches you can browse and edit, with M3U, PLS and XSPF in and out (M5).
