@@ -59,7 +59,7 @@ export const track_catalogue = define_catalogue({
   operators: {
     // Full-text search over the search index, in SQLite's FTS5 query language.
     matches: {
-      sql: (node, context) => `${context.row_id} IN (SELECT track_id FROM tracks_fts WHERE tracks_fts MATCH ${context.param(node.value)})`
+      sql: (node, context) => `${context.row_id} IN (SELECT track_id FROM track_search WHERE row IN (SELECT rowid FROM tracks_fts WHERE tracks_fts MATCH ${context.param(node.value)}))`
     },
     // The tracks of a playlist, by its id.
     in_playlist: {

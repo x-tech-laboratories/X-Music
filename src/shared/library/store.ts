@@ -95,8 +95,25 @@ const track_columns = (row: string): string => `
   (SELECT vv.value FROM track_values tv JOIN values_ vv ON vv.id = tv.value_id
     WHERE tv.track_id = ${row}.id AND tv.field_id = 1 ORDER BY tv.ordinal LIMIT 1) AS artist`
 
+// ── Searching ────────────────────────────────────────────────────────────────
+
+const search_columns = 'title, artist, album, album_artist, genre, comment, lyrics'
+
+// Rebuilds the search rows of tracks changed since the last search, in one pass; raw because the search tables are kept by triggers, not in the schema.
+export function refresh_search(database: SqlDatabase): void {
+  if (first_row(database, 'SELECT 1 FROM track_search_stale LIMIT 1') === undefined) return
+  in_transaction(database, () => {
+    run(database, `INSERT INTO track_search (track_id, ${search_columns})
+      SELECT track_id, ${search_columns} FROM track_search_source WHERE track_id IN (SELECT track_id FROM track_search_stale)
+      ON CONFLICT(track_id) DO UPDATE SET title = excluded.title, artist = excluded.artist, album = excluded.album,
+        album_artist = excluded.album_artist, genre = excluded.genre, comment = excluded.comment, lyrics = excluded.lyrics`)
+    run(database, 'DELETE FROM track_search_stale')
+  })
+}
+
 // The tracks a filter picks, as the song list shows them; the filter compiles to SQL, which Drizzle cannot build.
 export function query_tracks(database: SqlDatabase, request: QueryRequest): TrackRow[] {
+  refresh_search(database)
   const { sql, params } = compile_filter(track_catalogue, request.filter, {
     sort: request.sort, limit: request.limit, offset: request.offset, select: track_columns
   })
@@ -105,6 +122,7 @@ export function query_tracks(database: SqlDatabase, request: QueryRequest): Trac
 
 // Raw because the filter and the grouping compile to SQL.
 export function group_tracks(database: SqlDatabase, request: { filter: QueryRequest['filter']; field: string }): GroupRow[] {
+  refresh_search(database)
   const { sql, params } = compile_group_by(track_catalogue, request.filter, request.field, { sums: group_sums })
   return all_rows<GroupRow>(database, sql, ...params).map((row) => ({ ...row }))
 }
@@ -151,8 +169,9 @@ export function clear_library(database: SqlDatabase): void {
     for (const table of [playlist_tracks, playlists, play_history, track_values, track_extras, tag_writes, media_tags, media, artwork, tracks, albums, values_, merge_journal]) {
       db.delete(table).run()
     }
-    // Raw because the search index and the versions table are FTS and X-Libs history tables, not in the schema.
-    run(database, 'DELETE FROM tracks_fts')
+    // Raw because the search table and the versions table are kept by triggers and X-Libs history, not in the schema.
+    run(database, 'DELETE FROM track_search')
+    run(database, 'DELETE FROM track_search_stale')
     track_history.forget_touched(database)
     run(database, 'DELETE FROM track_versions')
   })

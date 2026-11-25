@@ -53,5 +53,30 @@ export const migrations: DrizzleMigration[] = [
     "statements": [
       "-- Full-text search over the tracks, keyed by the track's id; Drizzle has no builder for a virtual table.\nCREATE VIRTUAL TABLE `tracks_fts` USING fts5(\n\ttrack_id UNINDEXED, title, artist, album, album_artist, genre, comment, lyrics,\n\ttokenize = \"unicode61 remove_diacritics 2\"\n);"
     ]
+  },
+  {
+    "name": "20261125044919_search_index",
+    "statements": [
+      "-- The searchable text of each track kept in a plain table with a lasting integer key, which the full-text index reads\n-- from. Triggers only note which tracks changed; the store rebuilds those rows in one pass before it next searches.\nDROP TABLE `tracks_fts`;",
+      "CREATE TABLE `track_search` (\n\t`row` integer PRIMARY KEY,\n\t`track_id` text NOT NULL UNIQUE REFERENCES `tracks`(`id`) ON DELETE CASCADE,\n\t`title` text, `artist` text, `album` text, `album_artist` text, `genre` text, `comment` text, `lyrics` text\n);",
+      "CREATE TABLE `track_search_stale` (\n\t`track_id` text PRIMARY KEY\n) WITHOUT ROWID;",
+      "CREATE VIRTUAL TABLE `tracks_fts` USING fts5(\n\ttitle, artist, album, album_artist, genre, comment, lyrics,\n\tcontent = 'track_search', content_rowid = 'row',\n\ttokenize = \"unicode61 remove_diacritics 2\"\n);",
+      "CREATE VIEW `track_search_source` AS SELECT\n\tt.id AS track_id,\n\tt.title AS title,\n\t(SELECT group_concat(v.value, ' ') FROM `track_values` tv JOIN `values_` v ON v.id = tv.value_id WHERE tv.track_id = t.id AND +tv.field_id = 1) AS artist,\n\t(SELECT a.name FROM `albums` a WHERE a.id = t.album_id) AS album,\n\t(SELECT group_concat(v.value, ' ') FROM `track_values` tv JOIN `values_` v ON v.id = tv.value_id WHERE tv.track_id = t.id AND +tv.field_id = 2) AS album_artist,\n\t(SELECT group_concat(v.value, ' ') FROM `track_values` tv JOIN `values_` v ON v.id = tv.value_id WHERE tv.track_id = t.id AND +tv.field_id = 4) AS genre,\n\t(SELECT e.value FROM `track_extras` e WHERE e.track_id = t.id AND e.field_id = 20) AS comment,\n\t(SELECT e.value FROM `track_extras` e WHERE e.track_id = t.id AND e.field_id = 21) AS lyrics\nFROM `tracks` t;",
+      "CREATE TRIGGER `track_search_added` AFTER INSERT ON `track_search` BEGIN\n\tINSERT INTO `tracks_fts` (rowid, title, artist, album, album_artist, genre, comment, lyrics) VALUES (new.row, new.title, new.artist, new.album, new.album_artist, new.genre, new.comment, new.lyrics);\nEND;",
+      "CREATE TRIGGER `track_search_removed` AFTER DELETE ON `track_search` BEGIN\n\tINSERT INTO `tracks_fts` (tracks_fts, rowid, title, artist, album, album_artist, genre, comment, lyrics) VALUES ('delete', old.row, old.title, old.artist, old.album, old.album_artist, old.genre, old.comment, old.lyrics);\nEND;",
+      "CREATE TRIGGER `track_search_changed` AFTER UPDATE ON `track_search` BEGIN\n\tINSERT INTO `tracks_fts` (tracks_fts, rowid, title, artist, album, album_artist, genre, comment, lyrics) VALUES ('delete', old.row, old.title, old.artist, old.album, old.album_artist, old.genre, old.comment, old.lyrics);\n\tINSERT INTO `tracks_fts` (rowid, title, artist, album, album_artist, genre, comment, lyrics) VALUES (new.row, new.title, new.artist, new.album, new.album_artist, new.genre, new.comment, new.lyrics);\nEND;",
+      "CREATE TRIGGER `search_track_added` AFTER INSERT ON `tracks` BEGIN\n\tINSERT OR IGNORE INTO `track_search_stale` (track_id) VALUES (new.id);\nEND;",
+      "CREATE TRIGGER `search_track_changed` AFTER UPDATE OF title, album_id ON `tracks` BEGIN\n\tINSERT OR IGNORE INTO `track_search_stale` (track_id) VALUES (new.id);\nEND;",
+      "CREATE TRIGGER `search_track_removed` AFTER DELETE ON `tracks` BEGIN\n\tDELETE FROM `track_search` WHERE track_id = old.id;\n\tDELETE FROM `track_search_stale` WHERE track_id = old.id;\nEND;",
+      "CREATE TRIGGER `search_value_added` AFTER INSERT ON `track_values` WHEN new.field_id IN (1, 2, 4) BEGIN\n\tINSERT OR IGNORE INTO `track_search_stale` (track_id) VALUES (new.track_id);\nEND;",
+      "CREATE TRIGGER `search_value_removed` AFTER DELETE ON `track_values` WHEN old.field_id IN (1, 2, 4) BEGIN\n\tINSERT OR IGNORE INTO `track_search_stale` (track_id) VALUES (old.track_id);\nEND;",
+      "CREATE TRIGGER `search_value_changed` AFTER UPDATE ON `track_values` WHEN new.field_id IN (1, 2, 4) OR old.field_id IN (1, 2, 4) BEGIN\n\tINSERT OR IGNORE INTO `track_search_stale` (track_id) VALUES (old.track_id), (new.track_id);\nEND;",
+      "CREATE TRIGGER `search_extra_added` AFTER INSERT ON `track_extras` WHEN new.field_id IN (20, 21) BEGIN\n\tINSERT OR IGNORE INTO `track_search_stale` (track_id) VALUES (new.track_id);\nEND;",
+      "CREATE TRIGGER `search_extra_removed` AFTER DELETE ON `track_extras` WHEN old.field_id IN (20, 21) BEGIN\n\tINSERT OR IGNORE INTO `track_search_stale` (track_id) VALUES (old.track_id);\nEND;",
+      "CREATE TRIGGER `search_extra_changed` AFTER UPDATE ON `track_extras` WHEN new.field_id IN (20, 21) OR old.field_id IN (20, 21) BEGIN\n\tINSERT OR IGNORE INTO `track_search_stale` (track_id) VALUES (old.track_id), (new.track_id);\nEND;",
+      "CREATE TRIGGER `search_album_renamed` AFTER UPDATE OF name ON `albums` BEGIN\n\tINSERT OR IGNORE INTO `track_search_stale` (track_id) SELECT id FROM `tracks` WHERE album_id = new.id;\nEND;",
+      "CREATE TRIGGER `search_value_renamed` AFTER UPDATE OF value ON `values_` WHEN new.field_id IN (1, 2, 4) BEGIN\n\tINSERT OR IGNORE INTO `track_search_stale` (track_id) SELECT track_id FROM `track_values` WHERE value_id = new.id;\nEND;",
+      "INSERT INTO `track_search` (track_id, title, artist, album, album_artist, genre, comment, lyrics) SELECT track_id, title, artist, album, album_artist, genre, comment, lyrics FROM `track_search_source` WHERE true;"
+    ]
   }
 ];
