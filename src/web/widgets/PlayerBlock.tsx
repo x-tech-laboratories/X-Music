@@ -12,7 +12,8 @@ import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { describe_keys } from '@x-tech-laboratories/x-libs/web/react/shortcuts'
 import { VolumeButton } from '@x-tech-laboratories/x-libs/web/react/volume'
 import type { RepeatMode } from '@shared/ipc'
-import { rating_to_stars } from '@shared/fields'
+import { rating_to_stars, stars_to_rating } from '@shared/fields'
+import { library } from '../stores/library.ts'
 import { player, player_position, player_status } from '../stores/player.ts'
 import { TrackCover } from './Cover.tsx'
 import s from './PlayerBlock.module.css'
@@ -78,7 +79,7 @@ export function PlayerBlock() {
         </button>
         {queued > 0 && <Badge tone="info">{queued} queued</Badge>}
         <span className={s.spacer} />
-        {track && <Rating value={rating_to_stars(track.rating)} />}
+        {track && <Rating value={rating_to_stars(track.rating)} label="Rating of the playing track" on_change={(stars) => void library.rate([track.id], stars === null ? null : stars_to_rating(stars))} />}
       </div>
 
       <div className={s.main}>

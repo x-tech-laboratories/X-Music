@@ -93,6 +93,27 @@ describe('player block', () => {
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Playback failed: the player is gone'))
   })
 
+  it('rates the playing track from its stars', async () => {
+    const recorded = record_calls()
+    player_status.set({ ...idle, state: 'playing', track: { ...track, rating: 40 } })
+
+    render(<PlayerBlock />)
+    expect(screen.getByRole('slider', { name: 'Rating of the playing track' }).getAttribute('aria-valuetext')).toBe('2 stars')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '5 stars' })) })
+
+    expect(recorded.find((call) => call.channel === 'set_rating')?.args).toEqual([['track-7'], 100])
+  })
+
+  it('says so in a toast when a rating cannot be changed', async () => {
+    record_calls({ 'set_rating': () => { throw new Error("Error invoking remote method 'set_rating': Error: the library is locked") } })
+    player_status.set({ ...idle, state: 'playing', track })
+
+    render(<><PlayerBlock /><Toasts /></>)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '3 stars' })) })
+
+    expect(await screen.findByText('Could not change the rating: the library is locked')).toBeTruthy()
+  })
+
   it('shows no length or rating when nothing is playing', () => {
     record_calls()
     player_status.set(idle)

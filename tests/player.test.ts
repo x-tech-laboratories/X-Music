@@ -433,3 +433,21 @@ describe('engine hand-off', () => {
     expect(seen).toContain('playing')
   })
 })
+
+describe('reloading the playing track', () => {
+  it('shows a new rating on the playing track, and ignores edits to other tracks', async () => {
+    const id = make_track({ title: 'So What' })
+    const other = make_track({ title: 'Blue in Green' })
+    await player.play_track(id)
+    const seen: (number | null | undefined)[] = []
+    player.subscribe((event) => { if (event === 'status') seen.push(player.status().track?.rating) })
+
+    db.prepare('UPDATE tracks SET rating = 80 WHERE id IN (?, ?)').run(id, other)
+    player.reload_track([other])
+    expect(player.status().track?.rating).toBeNull()
+
+    player.reload_track([other, id])
+    expect(player.status().track?.rating).toBe(80)
+    expect(seen).toEqual([80])
+  })
+})

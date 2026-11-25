@@ -173,6 +173,7 @@ export interface XMusicApi {
   list_tracks: (filter: FilterNode, sort?: readonly SortKey[], limit?: number, offset?: number) => TrackRow[]
   list_track_groups: (filter: FilterNode, field: string) => GroupRow[]
   get_track: (track_id: string) => TrackDetails | null
+  set_rating: (track_ids: string[], rating: number | null) => { changed: number }
   list_duplicates: (reasons?: DuplicateReason[], length_tolerance_ms?: number, limit?: number) => DuplicateGroup[]
   get_merge_preview: (track_ids: string[]) => MergePreview
   merge_tracks: (track_ids: string[], survivor_id: string, resolutions?: Record<string, Resolution>) => MergeResult
@@ -203,7 +204,7 @@ export interface XMusicApi {
 }
 
 export const api_method_names = [
-  'get_app_info', 'get_library_stats', 'list_tracks', 'list_track_groups', 'get_track',
+  'get_app_info', 'get_library_stats', 'list_tracks', 'list_track_groups', 'get_track', 'set_rating',
   'list_duplicates', 'get_merge_preview', 'merge_tracks', 'undo_merge',
   'list_folders', 'add_folder', 'remove_folder', 'scan_folders', 'cancel_scan',
   'get_default_gmbrc_path', 'get_gmbrc_preview', 'import_gmbrc', 'clear_library',

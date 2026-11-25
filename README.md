@@ -41,6 +41,7 @@ implemented yet. See the roadmap in DESIGN-SPEC §15.
 | Track history (every change a version, any version restorable, on X-Libs) | working, on the History page |
 | Duplicate detection (hash, MBID, tags, fuzzy) | working |
 | Song properties (identity, sources, raw tags, history) | working |
+| Setting ratings (stars in the list, the player and the selection bar; keys 0–5 on picked rows) | working |
 | Album art (embedded, folder image, cached) | working |
 | Daily backups of the library database, on X-Libs | working |
 | Picard hand-off for tagging | specified (DESIGN-SPEC §7.1.1) |
@@ -203,7 +204,7 @@ Every call the window makes on the library and the player is a tool, described o
 `get_app_info`, `get_library_stats`, `list_tracks`, `list_track_groups`, `get_track`, `list_duplicates`,
 `get_merge_preview`, `list_folders`, `get_default_gmbrc_path`, `get_gmbrc_preview`, `get_player_status`,
 `list_versions`, `list_recent_versions`, `list_recent_merges` and `get_history_keep_days`. Every other tool changes something and
-is marked so, and a client asks before running it: `add_folder`, `remove_folder`, `scan_folders`,
+is marked so, and a client asks before running it: `set_rating`, `add_folder`, `remove_folder`, `scan_folders`,
 `cancel_scan`, `import_gmbrc`, `merge_tracks`, `undo_merge`, `restore_version`, `set_history_keep_days`,
 `clear_library` and the player's `play_track`, `toggle_playback`, `play_next`, `play_previous`,
 `stop_playback`, `seek`, `set_volume`, `queue_tracks`, `remove_from_queue`, `move_in_queue`, `clear_queue`, `set_repeat` and

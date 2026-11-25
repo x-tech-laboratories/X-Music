@@ -246,6 +246,13 @@ export class Player {
     this.publish()
   }
 
+  // Reads the playing track again when one of these was edited, so its rating and tags show as they are now.
+  reload_track(track_ids: readonly string[]): void {
+    if (!this.current_track || !track_ids.includes(this.current_track.id)) return
+    this.current_track = this.load_track(this.current_track.id) ?? this.current_track
+    this.publish()
+  }
+
   async play_track(track_id: string, context_index = -1): Promise<void> {
     this.record_skip()
 
