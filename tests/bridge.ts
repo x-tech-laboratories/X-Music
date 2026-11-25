@@ -18,6 +18,7 @@ const defaults: Record<string, unknown> = {
   get_library_stats: empty_stats,
   list_tracks: [],
   list_track_groups: [],
+  list_playlists: [],
   list_folders: [],
   get_default_gmbrc_path: '',
   get_player_status: idle_status,

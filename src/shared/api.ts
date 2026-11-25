@@ -110,6 +110,36 @@ export const x_music_api: ApiSpec<XMusicApi & XMusicHistoryApi> = {
       { name: 'rating', schema: { type: ['integer', 'null'], minimum: 0, maximum: 100, description: 'The rating 0 to 100, or null for unrated.' } }
     ]
   },
+  list_playlists: {
+    description: 'Lists the playlists by name: a static one with how many tracks it holds, a smart one with the filter it keeps. A playlist\'s tracks are found with list_tracks and {"field": "title", "op": "in_playlist", "value": <playlist id>}.',
+    params: []
+  },
+  create_playlist: {
+    description: 'Makes a playlist: a static one of the tracks given, in that order, or a smart one keeping the filter given. Gives the new playlist.',
+    params: [
+      { name: 'name', schema: { type: 'string', minLength: 1, description: 'The playlist\'s name.' } },
+      { name: 'track_ids', schema: { ...track_ids, minItems: 0 }, optional: true },
+      { name: 'filter', schema: filter, optional: true }
+    ]
+  },
+  rename_playlist: {
+    description: 'Renames a playlist. Gives every playlist.',
+    params: [{ name: 'playlist_id', schema: id_of('playlist') }, { name: 'name', schema: { type: 'string', minLength: 1, description: 'The new name.' } }]
+  },
+  delete_playlist: {
+    description: 'Deletes a playlist; its tracks stay in the library. Gives every playlist left.',
+    params: [{ name: 'playlist_id', schema: id_of('playlist') }],
+    destructive: true
+  },
+  add_to_playlist: {
+    description: 'Puts tracks at the end of a static playlist. Gives how many tracks it holds now.',
+    params: [{ name: 'playlist_id', schema: id_of('playlist') }, { name: 'track_ids', schema: track_ids }]
+  },
+  remove_from_playlist: {
+    description: 'Takes every entry of these tracks out of a static playlist; they stay in the library. Gives how many tracks it holds now.',
+    params: [{ name: 'playlist_id', schema: id_of('playlist') }, { name: 'track_ids', schema: track_ids }],
+    destructive: true
+  },
   list_duplicates: {
     description: 'Lists groups of tracks that look like the same piece of music, each with why and how sure X-Music is. Nothing is changed; merge_tracks merges a group.',
     params: [

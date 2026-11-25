@@ -25,7 +25,7 @@ beforeEach(() => {
   group_by.mockClear()
   query.mockClear()
   install_bridge({ list_track_groups: group_by, list_tracks: query })
-  browse.set({ sort: [], panes: {}, search: '' })
+  browse.set({ sort: [], panes: {}, search: '', playlist: null })
 })
 
 afterEach(cleanup)
@@ -78,7 +78,7 @@ describe('filter pane', () => {
   })
 
   it('offers every value of its own field while it narrows the others', async () => {
-    browse.set({ sort: [], panes: { genre: ['Jazz'] }, search: '' })
+    browse.set({ sort: [], panes: { genre: ['Jazz'] }, search: '', playlist: null })
     render(<><FilterPane id="first" field="genre" /><FilterPane id="second" field="album_artist" /></>)
     await screen.findByRole('listbox', { name: 'Album artist' })
 
@@ -88,7 +88,7 @@ describe('filter pane', () => {
   })
 
   it('lets go of a remembered pick the library no longer holds', async () => {
-    browse.set({ sort: [], panes: { genre: ['Jazz', 'Polka'] }, search: '' })
+    browse.set({ sort: [], panes: { genre: ['Jazz', 'Polka'] }, search: '', playlist: null })
     render(<FilterPane field="genre" />)
 
     await vi.waitFor(() => expect(browse.get().panes.genre).toEqual(['Jazz']))

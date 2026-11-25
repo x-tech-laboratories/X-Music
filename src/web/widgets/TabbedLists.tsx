@@ -1,4 +1,4 @@
-// The lists beside the player, after gmusicbrowser's TabbedLists: the queue and what is playing.
+// The lists beside the player, after gmusicbrowser's TabbedLists: the queue, the playlists and what is playing.
 
 import { useRef, useState, type KeyboardEvent } from 'react'
 import { Facts, RowActions, Tabs } from '@x-tech-laboratories/x-libs/web/react/layout'
@@ -10,9 +10,11 @@ import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import { row_after_key } from '@x-tech-laboratories/x-libs/web/selection'
 import { player } from '../stores/player.ts'
 import { library, type TrackId, type TrackName } from '../stores/library.ts'
+import { PlaylistsTab } from './Playlists.tsx'
 
 const tabs = [
   { id: 'queue', label: 'Queue' },
+  { id: 'playlists', label: 'Playlists' },
   { id: 'info', label: 'Now playing' }
 ] as const
 
@@ -142,6 +144,8 @@ export function TabbedLists() {
   let body
   if (tab === 'queue') {
     body = <Queue queue={status?.queue ?? []} />
+  } else if (tab === 'playlists') {
+    body = <PlaylistsTab />
   } else if (status?.track) {
     body = (
       <Facts layout="rows" rows={[

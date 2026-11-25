@@ -1,0 +1,108 @@
+// Playlists: static ones keep tracks in order, smart ones a filter, and browsing either is a filter on the library.
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+
+import { leaf } from '@x-tech-laboratories/x-libs/filter'
+import {
+  add_to_playlist, create_playlist, delete_playlist, list_playlists, playlist_filter, playlist_track_ids, remove_from_playlist, rename_playlist
+} from '@shared/library/playlists'
+import { query_tracks } from '@shared/library/store'
+import { add_track, fresh_db, type TestDb } from './sqlite.ts'
+
+let db: TestDb
+
+beforeEach(() => { db = fresh_db() })
+afterEach(() => db.close())
+
+// ============================================================================
+// Static playlists
+// ============================================================================
+
+describe('static playlists', () => {
+  it('keeps tracks in the order given, adds at the end, and counts them', () => {
+    const [first, second, third] = [add_track(db), add_track(db), add_track(db)]
+    const made = create_playlist(db, '  Late night  ', { track_ids: [second, first] })
+
+    expect(made).toMatchObject({ name: 'Late night', kind: 'static', tracks: 2, filter: null })
+    expect(add_to_playlist(db, made.id, [third, second])).toEqual({ tracks: 4 })
+    expect(playlist_track_ids(db, made.id)).toEqual([second, first, third, second])
+  })
+
+  it('takes every entry of a track out and keeps the rest in order', () => {
+    const [first, second, third] = [add_track(db), add_track(db), add_track(db)]
+    const made = create_playlist(db, 'Mix', { track_ids: [first, second, third, second] })
+
+    expect(remove_from_playlist(db, made.id, [second])).toEqual({ tracks: 2 })
+    expect(playlist_track_ids(db, made.id)).toEqual([first, third])
+    expect(add_to_playlist(db, made.id, [second])).toEqual({ tracks: 3 })
+  })
+
+  it('is browsed as the tracks it holds', () => {
+    const [first, , third] = [add_track(db), add_track(db), add_track(db)]
+    const made = create_playlist(db, 'Mix', { track_ids: [third, first] })
+
+    expect(query_tracks(db, { filter: playlist_filter(made) }).map((row) => row.id).sort()).toEqual([first, third].sort())
+  })
+
+  it('loses a deleted track from its entries', () => {
+    const [first, second] = [add_track(db), add_track(db)]
+    create_playlist(db, 'Mix', { track_ids: [first, second] })
+    db.prepare('DELETE FROM tracks WHERE id = ?').run(first)
+
+    expect(list_playlists(db)[0]!.tracks).toBe(1)
+  })
+})
+
+// ============================================================================
+// Smart playlists
+// ============================================================================
+
+describe('smart playlists', () => {
+  it('keeps a filter and is browsed as it', () => {
+    const loved = add_track(db, { rating: 100 })
+    add_track(db, { rating: 20 })
+    const made = create_playlist(db, 'Loved', { filter: leaf('rating', '>=', 80) })
+
+    expect(made).toMatchObject({ kind: 'smart', tracks: null, filter: leaf('rating', '>=', 80) })
+    expect(query_tracks(db, { filter: playlist_filter(made) }).map((row) => row.id)).toEqual([loved])
+  })
+
+  it('reads a definition kept with its sort and limit, as gmusicbrowser\'s import and older versions wrote it', () => {
+    db.prepare("INSERT INTO playlists (id, name, kind, definition, created, modified) VALUES ('old', 'Old', 'smart', ?, 0, 0)")
+      .run(JSON.stringify({ filter: leaf('year', '<', 1970), sort: [{ field: 'year' }], limit: 10 }))
+
+    expect(list_playlists(db)[0]!.filter).toEqual(leaf('year', '<', 1970))
+  })
+
+  it('refuses tracks', () => {
+    const made = create_playlist(db, 'Loved', { filter: leaf('rating', '>=', 80) })
+
+    expect(() => add_to_playlist(db, made.id, [add_track(db)])).toThrow(/smart playlist keeps a filter/)
+  })
+})
+
+// ============================================================================
+// Naming and deleting
+// ============================================================================
+
+describe('naming and deleting playlists', () => {
+  it('lists playlists by name, renames them and deletes them without touching their tracks', () => {
+    const track = add_track(db)
+    const zed = create_playlist(db, 'Zed', { track_ids: [track] })
+    create_playlist(db, 'Alpha', { track_ids: [] })
+
+    expect(list_playlists(db).map((row) => row.name)).toEqual(['Alpha', 'Zed'])
+    rename_playlist(db, zed.id, 'Beta')
+    expect(list_playlists(db).map((row) => row.name)).toEqual(['Alpha', 'Beta'])
+
+    delete_playlist(db, zed.id)
+    expect(list_playlists(db).map((row) => row.name)).toEqual(['Alpha'])
+    expect(db.prepare('SELECT COUNT(*) AS n FROM tracks').get()).toEqual({ n: 1 })
+  })
+
+  it('refuses an empty name and a playlist that is not there', () => {
+    expect(() => create_playlist(db, '   ', { track_ids: [] })).toThrow(/needs a name/)
+    expect(() => rename_playlist(db, 'nope', 'Name')).toThrow(/no playlist nope/)
+    expect(() => delete_playlist(db, 'nope')).toThrow(/no playlist nope/)
+  })
+})
