@@ -51,7 +51,7 @@ describe('library counts', () => {
     fill()
 
     expect(library_stats(db, '/tmp/library.db')).toEqual({
-      tracks: 2, media: 2, albums: 1, missing: 1, total_ms: 3000, schema_version: 2, path: '/tmp/library.db'
+      tracks: 2, media: 2, albums: 1, missing: 1, total_ms: 3000, schema_version: 3, path: '/tmp/library.db'
     })
   })
 })

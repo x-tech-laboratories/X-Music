@@ -4,6 +4,7 @@ import { and, leaf, not, or, select_ids, type FilterNode } from '@x-tech-laborat
 import { compile_filter, compile_group_by } from '@x-tech-laboratories/x-libs/filter_sql'
 
 import { group_sums, track_catalogue } from '@shared/query/catalogue'
+import { refresh_search } from '@shared/library/store'
 import { make_corpus, FIXED_NOW, record_of, type Corpus } from './corpus.ts'
 import { fresh_db, load_corpus, run_query, type TestDb } from './sqlite.ts'
 
@@ -156,7 +157,8 @@ describe('filter compiler', () => {
     const second = corpus.tracks[1]!.id
     db.prepare("INSERT INTO playlists (id, name, kind, created, modified) VALUES ('mix', 'Mix', 'static', 0, 0)").run()
     db.prepare("INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES ('mix', ?, 0), ('mix', ?, 1)").run(first, second)
-    db.prepare("INSERT INTO tracks_fts (track_id, title) VALUES (?, 'Unmistakable')").run(first)
+    db.prepare("UPDATE tracks SET title = 'Unmistakable' WHERE id = ?").run(first)
+    refresh_search(db)
 
     expect(ids(leaf('title', 'in_playlist', 'mix')).sort()).toEqual([first, second].sort())
     expect(ids(leaf('title', 'matches', 'unmistakable'))).toEqual([first])
