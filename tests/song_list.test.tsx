@@ -50,7 +50,7 @@ function show(listed: TrackRow[]): void {
 beforeEach(() => {
   bridge(tracks(3))
   show(tracks(3))
-  browse.set({ sort: [], panes: {}, search: '', playlist: null })
+  browse.set({ sort: [], panes: {}, search: '', playlist: null, in_order: false })
   library.clear_selection()
   player_status.set(null)
   history.replaceState(null, '', '#/library')
@@ -253,7 +253,7 @@ describe('song list', () => {
 
 describe('filter chips', () => {
   it('names each chip\'s remove button and takes the filter off with it', async () => {
-    browse.set({ sort: [], panes: { genre: ['Jazz'] }, search: '', playlist: null })
+    browse.set({ sort: [], panes: { genre: ['Jazz'] }, search: '', playlist: null, in_order: false })
     render(<SongList />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove the filter Genre: Jazz' }))
@@ -264,7 +264,7 @@ describe('filter chips', () => {
 
   it('shows each term of the search as a chip, and its remove button takes that term out of the text', async () => {
     calls.get('list_track_groups')!.mockImplementation(async () => [{ group_id: 1, label: 'Jazz', count: 3, total_ms: 0 }])
-    browse.set({ sort: [], panes: {}, search: 'blue genre:jazz rating:>3', playlist: null })
+    browse.set({ sort: [], panes: {}, search: 'blue genre:jazz rating:>3', playlist: null, in_order: false })
     await library.refresh()
     render(<SongList />)
 

@@ -189,6 +189,8 @@ export interface XMusicApi {
   delete_playlist: (playlist_id: string) => PlaylistRow[]
   add_to_playlist: (playlist_id: string, track_ids: string[]) => { tracks: number }
   remove_from_playlist: (playlist_id: string, track_ids: string[]) => { tracks: number }
+  get_playlist_order: (playlist_id: string) => string[]
+  move_in_playlist: (playlist_id: string, track_ids: string[], before_track_id: string | null) => string[]
   list_duplicates: (reasons?: DuplicateReason[], length_tolerance_ms?: number, limit?: number) => DuplicateGroup[]
   get_merge_preview: (track_ids: string[]) => MergePreview
   merge_tracks: (track_ids: string[], survivor_id: string, resolutions?: Record<string, Resolution>) => MergeResult
@@ -220,7 +222,7 @@ export interface XMusicApi {
 
 export const api_method_names = [
   'get_app_info', 'get_library_stats', 'list_tracks', 'list_track_groups', 'get_track', 'set_rating',
-  'list_playlists', 'create_playlist', 'rename_playlist', 'delete_playlist', 'add_to_playlist', 'remove_from_playlist',
+  'list_playlists', 'create_playlist', 'rename_playlist', 'delete_playlist', 'add_to_playlist', 'remove_from_playlist', 'get_playlist_order', 'move_in_playlist',
   'list_duplicates', 'get_merge_preview', 'merge_tracks', 'undo_merge',
   'list_folders', 'add_folder', 'remove_folder', 'scan_folders', 'cancel_scan',
   'get_default_gmbrc_path', 'get_gmbrc_preview', 'import_gmbrc', 'clear_library',

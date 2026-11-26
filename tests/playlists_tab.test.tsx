@@ -39,7 +39,7 @@ beforeEach(() => {
     delete_playlist: () => [loved],
     rename_playlist: () => [mix, loved]
   })
-  browse.set({ sort: [], panes: {}, search: '', playlist: null })
+  browse.set({ sort: [], panes: {}, search: '', playlist: null, in_order: false })
   playlists.set([mix, loved])
   results.set({ stats: { ...empty_stats, tracks: 2 }, tracks: rows, order: rows.map((row) => row.id), error: null })
   library.clear_selection()
@@ -56,7 +56,7 @@ const made = (channel: string) => calls.filter((call) => call.channel === channe
 
 describe('the playlists tab', () => {
   it('lists the playlists and opens one as a chip on the library, leaving no other filter', async () => {
-    browse.set({ sort: [], panes: { genre: ['Jazz'] }, search: 'blue', playlist: null })
+    browse.set({ sort: [], panes: { genre: ['Jazz'] }, search: 'blue', playlist: null, in_order: false })
     render(<PlaylistsTab />)
 
     expect(screen.getByText('Smart')).toBeTruthy()
@@ -89,7 +89,7 @@ describe('the playlists tab', () => {
   })
 
   it('saves the narrowed view as a smart playlist and opens it', async () => {
-    browse.set({ sort: [], panes: {}, search: 'rating:>=4', playlist: null })
+    browse.set({ sort: [], panes: {}, search: 'rating:>=4', playlist: null, in_order: false })
     calls = install_bridge({ list_playlists: [mix, loved], create_playlist: (name: string, _ids: unknown, filter: unknown) => ({ id: 'saved', name, kind: 'smart', tracks: null, filter }) })
     render(<><PlaylistsTab /><Dialogs /></>)
 
@@ -109,7 +109,7 @@ describe('the playlists tab', () => {
   })
 
   it('renames and deletes a playlist from its menu, deleting only once confirmed', async () => {
-    browse.set({ sort: [], panes: {}, search: '', playlist: 'mix' })
+    browse.set({ sort: [], panes: {}, search: '', playlist: 'mix', in_order: false })
     render(<><PlaylistsTab /><ContextMenus /><Dialogs /></>)
 
     fireEvent.contextMenu(screen.getByText('Late night'))
@@ -162,7 +162,7 @@ describe('playlists from the song list', () => {
   })
 
   it('takes tracks out of the static playlist the library shows', async () => {
-    browse.set({ sort: [], panes: {}, search: '', playlist: 'mix' })
+    browse.set({ sort: [], panes: {}, search: '', playlist: 'mix', in_order: false })
     render(<><SongList /><ContextMenus /></>)
 
     fireEvent.contextMenu(screen.getByText('Track 2').closest('tr')!)
@@ -177,5 +177,68 @@ describe('playlists from the song list', () => {
     fireEvent.contextMenu(screen.getByText('Track 2').closest('tr')!)
 
     expect(screen.queryByRole('menuitem', { name: /^Remove from/ })).toBeNull()
+  })
+})
+
+// ============================================================================
+// Playlist order
+// ============================================================================
+
+describe('a static playlist in its own order', () => {
+  const three: TrackRow[] = [1, 2, 3].map((number) => ({ ...rows[0]!, id: `track-${number}`, title: `Track ${number}`, track_number: number }))
+
+  function open_mix(order: string[]) {
+    calls = install_bridge({ list_playlists: [mix, loved], list_tracks: three, get_library_stats: { ...empty_stats, tracks: 3 }, get_playlist_order: order, move_in_playlist: () => order })
+    return act(async () => { await library.open_playlist('mix') })
+  }
+
+  it('shows the tracks in the playlist\'s order, each once, until a column is sorted', async () => {
+    await open_mix(['track-3', 'track-1', 'track-3', 'track-2'])
+
+    expect(results.get().order).toEqual(['track-3', 'track-1', 'track-2'])
+    expect(library.sorting()).toEqual([])
+    expect(library.in_playlist_order()).toBe(true)
+
+    await act(async () => { await library.set_sorting([{ key: 'title', descending: false }]) })
+    expect(library.in_playlist_order()).toBe(false)
+    expect(made('get_playlist_order')).toHaveLength(1)
+  })
+
+  it('moves the picked tracks with Alt and an arrow', async () => {
+    await open_mix(['track-1', 'track-2', 'track-3'])
+    render(<SongList />)
+
+    fireEvent.keyDown(screen.getByText('Track 1').closest('tr')!, { key: 'ArrowDown', altKey: true })
+    expect(made('move_in_playlist').at(-1)).toEqual(['mix', ['track-1'], 'track-3'])
+
+    fireEvent.keyDown(screen.getByText('Track 2').closest('tr')!, { key: 'ArrowDown', altKey: true })
+    expect(made('move_in_playlist').at(-1)).toEqual(['mix', ['track-2'], null])
+
+    fireEvent.keyDown(screen.getByText('Track 3').closest('tr')!, { key: 'ArrowUp', altKey: true })
+    expect(made('move_in_playlist').at(-1)).toEqual(['mix', ['track-3'], 'track-2'])
+  })
+
+  it('moves the picked tracks to where they are dropped, after the row they land on', async () => {
+    await open_mix(['track-1', 'track-2', 'track-3'])
+    render(<SongList />)
+    fireEvent.click(screen.getByText('Track 1').closest('tr')!)
+    fireEvent.click(screen.getByText('Track 2').closest('tr')!, { ctrlKey: true })
+    const dataTransfer = { types: [], setData: () => undefined, setDragImage: () => undefined, effectAllowed: '', dropEffect: '' }
+
+    fireEvent.dragStart(screen.getByText('Track 1').closest('tr')!, { dataTransfer })
+    fireEvent.dragOver(screen.getByText('Track 3').closest('tr')!, { dataTransfer })
+    fireEvent.drop(screen.getByText('Track 3').closest('tr')!, { dataTransfer })
+
+    expect(made('move_in_playlist')).toEqual([['mix', ['track-1', 'track-2'], null]])
+  })
+
+  it('does not move tracks of a playlist sorted by a column, or past either end', async () => {
+    await open_mix(['track-1', 'track-2', 'track-3'])
+    render(<SongList />)
+
+    fireEvent.keyDown(screen.getByText('Track 1').closest('tr')!, { key: 'ArrowUp', altKey: true })
+    fireEvent.keyDown(screen.getByText('Track 3').closest('tr')!, { key: 'ArrowDown', altKey: true })
+    expect(made('move_in_playlist')).toEqual([])
+    expect(screen.getByText(/to reorder/)).toBeTruthy()
   })
 })

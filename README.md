@@ -43,7 +43,7 @@ implemented yet. See the roadmap in DESIGN-SPEC §15.
 | Duplicate detection (hash, MBID, tags, fuzzy) | working |
 | Song properties (identity, sources, raw tags, history) | working |
 | Setting ratings (stars in the list, the player and the selection bar; keys 0–5 on picked rows) | working |
-| Playlists: a Playlists tab that opens one as a filter, new and renamed playlists, adding and removing tracks, the view saved as a smart playlist | working; M3U, PLS and XSPF import and export not yet |
+| Playlists: a Playlists tab that opens one as a filter, new and renamed playlists, adding and removing tracks, the view saved as a smart playlist | working, a static playlist in its own order and rearranged by dragging; M3U, PLS and XSPF import and export not yet |
 | Album art (embedded, folder image, cached) | working |
 | Daily backups of the library database, on X-Libs | working |
 | Picard hand-off for tagging: the picked tracks open in Picard, and their files are read again when it closes | working |
@@ -218,11 +218,11 @@ claude mcp add --transport http x-music http://127.0.0.1:3919/mcp
 
 Every call the window makes on the library and the player is a tool, described once in
 `src/shared/api.ts`. The calls that only read are marked read-only, so a client may run them without asking:
-`get_app_info`, `get_library_stats`, `list_tracks`, `list_track_groups`, `get_track`, `list_playlists`, `list_duplicates`,
+`get_app_info`, `get_library_stats`, `list_tracks`, `list_track_groups`, `get_track`, `list_playlists`, `get_playlist_order`, `list_duplicates`,
 `get_merge_preview`, `list_folders`, `get_default_gmbrc_path`, `get_gmbrc_preview`, `get_player_status`,
 `list_versions`, `list_recent_versions`, `list_recent_merges` and `get_history_keep_days`. Every other tool changes something and
 is marked so, and a client asks before running it: `set_rating`, `create_playlist`, `rename_playlist`,
-`delete_playlist`, `add_to_playlist`, `remove_from_playlist`, `add_folder`, `remove_folder`, `scan_folders`,
+`delete_playlist`, `add_to_playlist`, `remove_from_playlist`, `move_in_playlist`, `add_folder`, `remove_folder`, `scan_folders`,
 `cancel_scan`, `import_gmbrc`, `merge_tracks`, `undo_merge`, `restore_version`, `set_history_keep_days`,
 `clear_library` and the player's `play_track`, `toggle_playback`, `play_next`, `play_previous`,
 `stop_playback`, `seek`, `set_volume`, `queue_tracks`, `remove_from_queue`, `move_in_queue`, `clear_queue`, `set_repeat` and

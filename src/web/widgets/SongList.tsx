@@ -1,6 +1,6 @@
 // The library's tracks in the X-Libs table, every one of them drawn only where it shows: the library sorts them, the table shows the sort, and the list adds keyboard selection and playing.
 
-import { useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { Chip, Chips } from '@x-tech-laboratories/x-libs/web/react/badges'
 import { SearchBox } from '@x-tech-laboratories/x-libs/web/react/controls'
 import { SelectionBar } from '@x-tech-laboratories/x-libs/web/react/layout'
@@ -11,7 +11,8 @@ import { Rating } from '@x-tech-laboratories/x-libs/web/react/rating'
 import { describe_keys } from '@x-tech-laboratories/x-libs/web/react/shortcuts'
 import { Empty, Skeleton } from '@x-tech-laboratories/x-libs/web/react/states'
 import { use_store } from '@x-tech-laboratories/x-libs/web/react/store'
-import { DataTable, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
+import { DataTable, type DropPlacement, type TableColumn } from '@x-tech-laboratories/x-libs/web/react/table'
+import { set_drag_badge } from '@x-tech-laboratories/x-libs/web/drag'
 import { use_watch } from '@x-tech-laboratories/x-libs/web/react/watch'
 import { format_count, plural } from '@x-tech-laboratories/x-libs/web/format'
 import { row_after_key } from '@x-tech-laboratories/x-libs/web/selection'
@@ -136,6 +137,33 @@ export function SongList() {
     if (id !== undefined) void player.play_track(id, order, index)
   }
 
+  // A static playlist in its own order can be rearranged by dragging rows or with Alt and the arrows.
+  const ordered = library.in_playlist_order()
+  const dragged = useRef<TrackId[] | null>(null)
+  const moving_ids = (id: TrackId): TrackId[] => (library.is_selected(id) ? order.filter((row) => library.is_selected(row)) : [id])
+
+  // Where rows dropped before or after a row land: in front of that row, or of the next one not being moved.
+  function drop_before(target: TrackRow, placement: DropPlacement, ids: readonly TrackId[]): TrackId | null {
+    if (placement === 'before') return target.id
+    const moving = new Set(ids)
+    return order.slice(index_of(target) + 1).find((id) => !moving.has(id)) ?? null
+  }
+
+  const drag_props = ordered ? {
+    on_row_drag_start: (track: TrackRow, event: DragEvent) => {
+      dragged.current = moving_ids(track.id)
+      set_drag_badge(event, dragged.current.length > 1 ? `${dragged.current.length} tracks` : track.title ?? 'Untitled track')
+    },
+    on_row_drag_end: () => { dragged.current = null },
+    allow_inside_drop: false,
+    can_drop_on_row: (track: TrackRow) => dragged.current !== null && !dragged.current.includes(track.id),
+    on_row_drop: (track: TrackRow, placement: DropPlacement) => {
+      const ids = dragged.current
+      dragged.current = null
+      if (ids) void library.move_in_playlist(ids, drop_before(track, placement, ids))
+    }
+  } : {}
+
   // Right-clicking a row that is not picked picks it, as every list does.
   function open_menu(track: TrackRow, event: MouseEvent): void {
     const index = index_of(track)
@@ -180,6 +208,17 @@ export function SongList() {
     if (event.key === ' ') {
       event.preventDefault()
       select_row(index, event)
+      return
+    }
+    // Alt with an arrow moves the picked tracks, or this one, within a playlist shown in its own order.
+    if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown') && ordered) {
+      event.preventDefault()
+      const ids = moving_ids(track.id)
+      const places = ids.map((id) => positions.get(id) ?? 0)
+      const before = event.key === 'ArrowUp'
+        ? order[Math.min(...places) - 1]
+        : order[Math.max(...places) + 1] === undefined ? undefined : order[Math.max(...places) + 2] ?? null
+      if (before !== undefined) void library.move_in_playlist(ids, before)
       return
     }
     if (event.key === 'a' && control) {
@@ -240,6 +279,7 @@ export function SongList() {
         on_row_double_click={(track) => play_from(index_of(track))}
         on_row_context_menu={open_menu}
         on_row_key_down={on_row_key}
+        {...drag_props}
       />
     )
   }
@@ -260,7 +300,7 @@ export function SongList() {
         {chips.length > 1 && <button type="button" onClick={() => void library.clear_filters()}>Clear filters</button>}
         <span className="song-list-spacer" />
         <span className="muted small">
-          {keys('arrowup')} {keys('arrowdown')} move, {keys('shift+arrowdown')} picks, {keys('enter')} plays, {keys('1')}–{keys('5')} rate, right-click for more
+          {keys('arrowup')} {keys('arrowdown')} move, {keys('shift+arrowdown')} picks, {keys('enter')} plays, {keys('1')}–{keys('5')} rate, right-click for more{ordered && <>, drag or {keys('alt+arrowup')} {keys('alt+arrowdown')} to reorder</>}
         </span>
         <span className="muted small">
           {narrowed ? `${format_count(tracks.length)} of ${plural(stats.tracks, 'track')}` : plural(tracks.length, 'track')}

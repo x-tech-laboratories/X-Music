@@ -114,6 +114,23 @@ export function remove_from_playlist(database: SqlDatabase, playlist_id: string,
   })
 }
 
+// Moves the tracks, in the order given, to just before an entry of another track, or to the end with null; a moved track keeps one entry.
+export function move_in_playlist(database: SqlDatabase, playlist_id: string, track_ids: readonly string[], before_track_id: string | null, now = Date.now()): string[] {
+  static_playlist(database, playlist_id)
+  const moving = [...new Set(track_ids)]
+  const moved = new Set(moving)
+  return in_transaction(database, () => {
+    const entries = playlist_track_ids(database, playlist_id)
+    if (moving.length === 0 || (before_track_id !== null && moved.has(before_track_id))) return entries
+    const kept = entries.filter((id) => !moved.has(id))
+    const at = before_track_id === null ? -1 : kept.indexOf(before_track_id)
+    const order = at < 0 ? [...kept, ...moving] : [...kept.slice(0, at), ...moving, ...kept.slice(at)]
+    write_tracks(database, playlist_id, order)
+    drizzle_of(database).update(playlists).set({ modified: now }).where(eq(playlists.id, playlist_id)).run()
+    return order
+  })
+}
+
 function write_tracks(database: SqlDatabase, playlist_id: string, track_ids: readonly string[]): void {
   const db = drizzle_of(database)
   db.delete(playlist_tracks).where(eq(playlist_tracks.playlist_id, playlist_id)).run()
