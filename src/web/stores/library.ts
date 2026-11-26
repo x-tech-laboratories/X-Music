@@ -39,12 +39,15 @@ export interface Browse {
   search: string
   // The playlist the library is narrowed to, if any.
   playlist: string | null
+  // Whether a static playlist shows in its own order rather than the sort, until a column is sorted.
+  in_order: boolean
 }
 
 const SORT_KEY = 'x-music.pref.library.sort'
 const PANES_KEY = 'x-music.pref.library.panes'
 const SEARCH_KEY = 'x-music.pref.library.search'
 const PLAYLIST_KEY = 'x-music.pref.library.playlist'
+const IN_ORDER_KEY = 'x-music.pref.library.in_order'
 
 const DEFAULT_SORT: SortKey[] = [{ field: 'album' }, { field: 'disc_number' }, { field: 'track_number' }]
 
@@ -55,6 +58,7 @@ function remembered(): Browse {
   const playlist = read_pref<unknown>(storage, PLAYLIST_KEY, null)
   return {
     playlist: typeof playlist === 'string' ? playlist : null,
+    in_order: read_pref<unknown>(storage, IN_ORDER_KEY, false) === true,
     sort: sort.length > 0 ? sort : DEFAULT_SORT,
     panes: sanitize_pane_values(read_pref<unknown>(storage, PANES_KEY, null)),
     search: typeof search === 'string' ? search : ''
@@ -79,6 +83,7 @@ browse.watch.subscribe(() => {
   write_pref(storage, PANES_KEY, state.panes)
   write_pref(storage, SEARCH_KEY, state.search)
   write_pref(storage, PLAYLIST_KEY, state.playlist)
+  write_pref(storage, IN_ORDER_KEY, state.in_order)
 })
 
 // ============================================================================
@@ -144,11 +149,14 @@ async function refresh(): Promise<void> {
     const [, listed] = await Promise.all([learn_values(browse.get().search), ipc('list_playlists')])
     playlists.set(listed)
     const state = browse.get()
-    const [stats, tracks] = await Promise.all([
+    const ordered_by = ordering_playlist(state)
+    const [stats, listed_tracks, playlist_order] = await Promise.all([
       ipc('get_library_stats'),
-      ipc('list_tracks', filter_of(state), [...state.sort])
+      ipc('list_tracks', filter_of(state), [...state.sort]),
+      ordered_by ? ipc('get_playlist_order', ordered_by) : Promise.resolve(null)
     ])
     if (request !== latest_request) return
+    const tracks = playlist_order ? in_playlist_order(listed_tracks, playlist_order) : listed_tracks
     const order = tracks.map((track) => track.id)
     // A narrowed list must not leave picks on rows nobody can see.
     selection.retain(order)
@@ -159,6 +167,19 @@ async function refresh(): Promise<void> {
   } finally {
     if (request === latest_request) loading.set(false)
   }
+}
+
+// The static playlist whose own order the list shows, if any.
+function ordering_playlist(state: Browse): string | null {
+  if (!state.in_order || state.playlist === null) return null
+  return playlists.get().find((row) => row.id === state.playlist)?.kind === 'static' ? state.playlist : null
+}
+
+// The tracks in the playlist's order, each where it first appears, since a row shows a track once.
+export function in_playlist_order(tracks: readonly TrackRow[], order: readonly string[]): TrackRow[] {
+  const place = new Map<string, number>()
+  order.forEach((id, index) => { if (!place.has(id)) place.set(id, index) })
+  return [...tracks].sort((first, second) => (place.get(first.id) ?? Infinity) - (place.get(second.id) ?? Infinity))
 }
 
 function change_browse(make: (state: Browse) => Browse): Promise<void> {
@@ -241,7 +262,23 @@ export const library = {
   // ── Playlists ──
 
   // Narrows the library to a playlist, with no other filter left over from before.
-  open_playlist: (playlist_id: string): Promise<void> => change_browse((state) => ({ ...state, panes: {}, search: '', playlist: playlist_id })),
+  open_playlist: (playlist_id: string): Promise<void> =>
+    change_browse((state) => ({ ...state, panes: {}, search: '', playlist: playlist_id, in_order: true })),
+
+  // Whether the list shows a static playlist in its own order, so rows can be dragged within it.
+  in_playlist_order: (): boolean => ordering_playlist(browse.get()) !== null,
+
+  // Moves tracks within the open playlist to before another, or to the end with null.
+  move_in_playlist: async (ids: readonly TrackId[], before: TrackId | null): Promise<void> => {
+    const playlist_id = ordering_playlist(browse.get())
+    if (!playlist_id) return
+    try {
+      await ipc('move_in_playlist', playlist_id, [...ids], before)
+    } catch (error) {
+      toast(`Could not move the tracks: ${describe_call_error(error)}`, { tone: 'bad' })
+    }
+    await refresh()
+  },
 
   // The view as it stands, for saving as a smart playlist; null when nothing narrows it.
   current_filter: (): FilterNode | null => {
@@ -266,10 +303,10 @@ export const library = {
 
   // ── Sorting ──
 
-  sorting: (): Sorting[] => browse.get().sort.map((key) => ({ key: key.field, descending: key.descending === true })),
+  sorting: (): Sorting[] => (ordering_playlist(browse.get()) ? [] : browse.get().sort.map((key) => ({ key: key.field, descending: key.descending === true }))),
 
   set_sorting: (sorting: readonly Sorting[]): Promise<void> =>
-    change_browse((state) => ({ ...state, sort: seed_random_sort(sorting.map((key) => ({ field: key.key, descending: key.descending })), state.sort) })),
+    change_browse((state) => ({ ...state, in_order: false, sort: seed_random_sort(sorting.map((key) => ({ field: key.key, descending: key.descending })), state.sort) })),
 
   // ── Picked rows ──
 

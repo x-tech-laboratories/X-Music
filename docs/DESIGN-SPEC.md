@@ -1730,8 +1730,8 @@ ReplayGain playback, artwork and move detection.
    Quod Libet's `&()` and `|()` syntax remains an import to add.
 4. Playlists and saved searches you can browse and edit, with M3U, PLS and XSPF in and out (M5).
    Browsing and editing are **done**: a Playlists tab beside the queue opens one as a chip on the
-   library, and the view saves as a smart playlist. Still open: the files in and out, showing a
-   static playlist in its own order rather than the library's sort, and reordering it.
+   library, and the view saves as a smart playlist. A static playlist shows in its own order until a
+   column is sorted, and rows drag or move with Alt and the arrows. Still open: the files in and out.
 5. MPRIS, global media keys, notifications and the tray (M3, M8).
 6. Watching folders for changes, and hiding the tracks of a drive that is not mounted instead of
    calling them missing (M1).

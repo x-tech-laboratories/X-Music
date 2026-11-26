@@ -26,7 +26,7 @@ describe('IPC bridge', () => {
   it('names every call in snake case, a read with list_ or get_', () => {
     for (const name of [...api_method_names, ...page_method_names]) expect(name).toMatch(/^[a-z]+(_[a-z]+)*$/)
     expect(api_method_names.filter((name) => /^(list|get)_/.test(name))).toEqual([
-      'get_app_info', 'get_library_stats', 'list_tracks', 'list_track_groups', 'get_track', 'list_playlists', 'list_duplicates', 'get_merge_preview',
+      'get_app_info', 'get_library_stats', 'list_tracks', 'list_track_groups', 'get_track', 'list_playlists', 'get_playlist_order', 'list_duplicates', 'get_merge_preview',
       'list_folders', 'get_default_gmbrc_path', 'get_gmbrc_preview', 'get_player_status'
     ])
     expect(page_method_names.filter((name) => is_read_only(name))).toEqual(['get_picard_setup'])

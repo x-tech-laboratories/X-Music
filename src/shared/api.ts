@@ -140,6 +140,18 @@ export const x_music_api: ApiSpec<XMusicApi & XMusicHistoryApi> = {
     params: [{ name: 'playlist_id', schema: id_of('playlist') }, { name: 'track_ids', schema: track_ids }],
     destructive: true
   },
+  get_playlist_order: {
+    description: 'Gives a static playlist\'s track ids in its own order, a track once for each entry it has.',
+    params: [{ name: 'playlist_id', schema: id_of('playlist') }]
+  },
+  move_in_playlist: {
+    description: 'Moves tracks within a static playlist, in the order given, to just before another track\'s first entry, or to the end. A moved track keeps one entry. Gives the playlist\'s new order.',
+    params: [
+      { name: 'playlist_id', schema: id_of('playlist') },
+      { name: 'track_ids', schema: track_ids },
+      { name: 'before_track_id', schema: { type: ['string', 'null'], description: 'The track to move them in front of, or null for the end.' } }
+    ]
+  },
   list_duplicates: {
     description: 'Lists groups of tracks that look like the same piece of music, each with why and how sure X-Music is. Nothing is changed; merge_tracks merges a group.',
     params: [

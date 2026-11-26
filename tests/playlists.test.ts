@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { leaf } from '@x-tech-laboratories/x-libs/filter'
 import {
-  add_to_playlist, create_playlist, delete_playlist, list_playlists, playlist_filter, playlist_track_ids, remove_from_playlist, rename_playlist
+  add_to_playlist, create_playlist, delete_playlist, list_playlists, move_in_playlist, playlist_filter, playlist_track_ids, remove_from_playlist, rename_playlist
 } from '@shared/library/playlists'
 import { query_tracks } from '@shared/library/store'
 import { add_track, fresh_db, type TestDb } from './sqlite.ts'
@@ -50,6 +50,31 @@ describe('static playlists', () => {
     db.prepare('DELETE FROM tracks WHERE id = ?').run(first)
 
     expect(list_playlists(db)[0]!.tracks).toBe(1)
+  })
+})
+
+describe('moving within a static playlist', () => {
+  it('moves tracks before another, in the order given, or to the end', () => {
+    const [a, b, c, d] = [add_track(db), add_track(db), add_track(db), add_track(db)]
+    const made = create_playlist(db, 'Mix', { track_ids: [a, b, c, d] })
+
+    expect(move_in_playlist(db, made.id, [d, c], b)).toEqual([a, d, c, b])
+    expect(move_in_playlist(db, made.id, [a], null)).toEqual([d, c, b, a])
+    expect(playlist_track_ids(db, made.id)).toEqual([d, c, b, a])
+  })
+
+  it('keeps one entry of a moved track, and leaves the order alone when moved onto itself', () => {
+    const [a, b, c] = [add_track(db), add_track(db), add_track(db)]
+    const made = create_playlist(db, 'Mix', { track_ids: [a, b, a, c] })
+
+    expect(move_in_playlist(db, made.id, [b], b)).toEqual([a, b, a, c])
+    expect(move_in_playlist(db, made.id, [a], c)).toEqual([b, a, c])
+  })
+
+  it('refuses a smart playlist', () => {
+    const made = create_playlist(db, 'Loved', { filter: leaf('rating', '>=', 80) })
+
+    expect(() => move_in_playlist(db, made.id, [add_track(db)], null)).toThrow(/keeps a filter/)
   })
 })
 

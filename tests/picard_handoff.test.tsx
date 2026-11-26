@@ -26,7 +26,7 @@ let calls: Call[]
 beforeEach(() => {
   calls = install_bridge({ 'tag_with_picard': (ids: string[]) => ({ files: ids.length, skipped: 0, picard: '/usr/bin/picard' }) })
   results.set({ stats: { ...empty_stats, tracks: 2 }, tracks: rows, order: rows.map((row) => row.id), error: null })
-  browse.set({ sort: [], panes: {}, search: '', playlist: null })
+  browse.set({ sort: [], panes: {}, search: '', playlist: null, in_order: false })
   library.clear_selection()
 })
 
