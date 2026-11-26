@@ -129,6 +129,52 @@ describe('the playlists tab', () => {
     expect(browse.get().playlist).toBeNull()
   })
 
+  it('imports a playlist file, opens it, and warns about entries the library does not hold', async () => {
+    calls = install_bridge({
+      list_playlists: [mix, loved],
+      pick_playlist_file: '/music/lists/road.m3u',
+      import_playlist_file: () => ({ playlist: { id: 'road', name: 'Road trip', kind: 'static', tracks: 2, filter: null }, matched: 2, missing: ['/gone.mp3'] })
+    })
+    render(<><PlaylistsTab /><Toasts /></>)
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Import…' })) })
+
+    expect(made('import_playlist_file')).toEqual([['/music/lists/road.m3u']])
+    expect(browse.get().playlist).toBe('road')
+    expect(await screen.findByText('Road trip: 2 tracks imported; 1 listed file not in the library.')).toBeTruthy()
+  })
+
+  it('imports nothing when no file is picked', async () => {
+    calls = install_bridge({ list_playlists: [mix], pick_playlist_file: null })
+    render(<PlaylistsTab />)
+
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Import…' })) })
+
+    expect(made('import_playlist_file')).toEqual([])
+  })
+
+  it('exports a playlist from its menu to the file picked', async () => {
+    calls = install_bridge({ list_playlists: [mix], pick_playlist_save_path: '/music/Late night.m3u8', save_playlist_file: () => ({ written: 2, skipped: 0 }) })
+    render(<><PlaylistsTab /><ContextMenus /><Toasts /></>)
+
+    fireEvent.contextMenu(screen.getByText('Late night'))
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: 'Export…' })) })
+
+    expect(made('pick_playlist_save_path')).toEqual([['Late night']])
+    expect(made('save_playlist_file')).toEqual([['mix', '/music/Late night.m3u8']])
+    expect(await screen.findByText('2 tracks written to /music/Late night.m3u8.')).toBeTruthy()
+  })
+
+  it('says so when a playlist cannot be exported', async () => {
+    calls = install_bridge({ list_playlists: [mix], pick_playlist_save_path: '/x.m3u', save_playlist_file: () => { throw new Error("Error invoking remote method 'save_playlist_file': Error: EACCES") } })
+    render(<><PlaylistsTab /><ContextMenus /><Toasts /></>)
+
+    fireEvent.contextMenu(screen.getByText('Late night'))
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: 'Export…' })) })
+
+    expect(await screen.findByText('Could not export the playlist: EACCES')).toBeTruthy()
+  })
+
   it('says so when there are no playlists', () => {
     playlists.set([])
     render(<PlaylistsTab />)

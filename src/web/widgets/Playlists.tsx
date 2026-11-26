@@ -1,4 +1,4 @@
-// Playlists beside the player: each one opens as a filter on the library, and dialogs make, name, fill and delete them.
+// Playlists beside the player: each one opens as a filter on the library, and dialogs make, name, fill, import, export and delete them.
 
 import { useState, type FormEvent, type MouseEvent } from 'react'
 import { Select } from '@x-tech-laboratories/x-libs/web/react/controls'
@@ -11,7 +11,7 @@ import { toast } from '@x-tech-laboratories/x-libs/web/react/toasts'
 import { describe_call_error } from '@x-tech-laboratories/x-libs/web/errors'
 import { plural } from '@x-tech-laboratories/x-libs/web/format'
 import type { PlaylistRow } from '@shared/ipc'
-import { ipc } from '../lib/ipc.ts'
+import { ipc, page_ipc } from '../lib/ipc.ts'
 import { browse, library, playlists, type TrackId } from '../stores/library.ts'
 import { view_href } from '../views/routes.ts'
 
@@ -99,6 +99,34 @@ export function delete_playlist(playlist: PlaylistRow): void {
   })
 }
 
+// A playlist file made into a static playlist and opened, saying what the file lists that the library does not hold.
+export async function import_playlist_file(): Promise<void> {
+  const path = await page_ipc('pick_playlist_file')
+  if (!path) return
+  try {
+    const imported = await page_ipc('import_playlist_file', path)
+    await library.refresh()
+    open_playlist(imported.playlist.id)
+    const missing = imported.missing.length > 0 ? `; ${plural(imported.missing.length, 'listed file')} not in the library` : ''
+    toast(`${imported.playlist.name}: ${plural(imported.matched, 'track')} imported${missing}.`, { tone: imported.missing.length > 0 ? 'warn' : 'good' })
+  } catch (error) {
+    toast(`Could not import the playlist: ${describe_call_error(error)}`, { tone: 'bad' })
+  }
+}
+
+// Writes the playlist to a file, its format chosen by the extension.
+export async function export_playlist(playlist: PlaylistRow): Promise<void> {
+  const path = await page_ipc('pick_playlist_save_path', playlist.name)
+  if (!path) return
+  try {
+    const { written, skipped } = await page_ipc('save_playlist_file', playlist.id, path)
+    const left_out = skipped > 0 ? `; ${plural(skipped, 'track')} with no file on disk left out` : ''
+    toast(`${plural(written, 'track')} written to ${path}${left_out}.`, { tone: skipped > 0 ? 'warn' : 'good' })
+  } catch (error) {
+    toast(`Could not export the playlist: ${describe_call_error(error)}`, { tone: 'bad' })
+  }
+}
+
 const NEW = ''
 
 // Puts the tracks at the end of a static playlist, or of a new one.
@@ -165,6 +193,7 @@ function open_menu(row: PlaylistRow, event: MouseEvent): void {
   open_context_menu(event, [
     { label: 'Open', run: () => open_playlist(row.id) },
     { label: 'Rename…', run: () => rename_playlist(row) },
+    { label: 'Export…', run: () => void export_playlist(row) },
     { label: 'Delete…', danger: true, separator_before: true, run: () => delete_playlist(row) }
   ])
 }
@@ -179,10 +208,11 @@ export function PlaylistsTab() {
       <div className="panel-head">
         <span className="muted small">{plural(rows.length, 'playlist')}</span>
         <button type="button" onClick={() => new_playlist()}>New playlist…</button>
+        <button type="button" onClick={() => void import_playlist_file()}>Import…</button>
         <button type="button" disabled={!narrowed} title="Keep the library's filters and search as a playlist that follows them" onClick={save_view_as_playlist}>Save view…</button>
       </div>
       {rows.length === 0 ? (
-        <Empty title="No playlists yet." hint="Pick tracks and choose Add to playlist, or narrow the library and choose Save view." />
+        <Empty title="No playlists yet." hint="Pick tracks and choose Add to playlist, narrow the library and choose Save view, or import an M3U, PLS or XSPF file." />
       ) : (
         <DataTable
           caption="Playlists"
