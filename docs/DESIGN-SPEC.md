@@ -1731,7 +1731,9 @@ ReplayGain playback, artwork and move detection.
 4. Playlists and saved searches you can browse and edit, with M3U, PLS and XSPF in and out (M5).
    Browsing and editing are **done**: a Playlists tab beside the queue opens one as a chip on the
    library, and the view saves as a smart playlist. A static playlist shows in its own order until a
-   column is sorted, and rows drag or move with Alt and the arrows. Still open: the files in and out.
+   column is sorted, and rows drag or move with Alt and the arrows. M3U/M3U8, PLS and XSPF import
+   into a static playlist, matching entries to tracks by file path and listing the rest, and any
+   playlist exports by each track's file on disk. **Item 4 is done.**
 5. MPRIS, global media keys, notifications and the tray (M3, M8).
 6. Watching folders for changes, and hiding the tracks of a drive that is not mounted instead of
    calling them missing (M1).

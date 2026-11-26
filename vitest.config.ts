@@ -18,8 +18,8 @@ export default defineConfig({
       thresholds: {
         lines: 92,
         functions: 89,
-        branches: 80,
-        statements: 89,
+        branches: 81,
+        statements: 90,
         autoUpdate: (new_threshold: number) => Math.floor(new_threshold)
       }
     }

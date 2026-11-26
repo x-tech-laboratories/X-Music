@@ -1,5 +1,6 @@
 import { ipcMain, app, dialog, shell, BrowserWindow } from 'electron'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { homedir } from 'node:os'
 
 import type { Implementation, IpcMainEventLike } from '@x-tech-laboratories/x-libs/electron/bridge'
@@ -8,6 +9,7 @@ import { on_path, run_program } from '@x-tech-laboratories/x-libs/agent/programs
 import type { SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { default_gmbrc_path, parse_gmbrc } from '@shared/import/gmbrc'
+import { name_from_path, playlist_extensions, playlist_format, read_playlist_file, write_playlist_file } from '@shared/import/playlist_files'
 import { import_gmbrc } from '@shared/import/gmb_import'
 import {
   x_music_bridge, x_music_events, x_music_history_bridge, x_music_page_bridge,
@@ -21,7 +23,7 @@ import {
 import { list_recent_merges, merge_preview, merge_tracks, unmerge } from '@shared/library/merge'
 import { set_picard_settings } from '@shared/library/picard'
 import {
-  add_to_playlist, create_playlist, delete_playlist, list_playlists, move_in_playlist, playlist_track_ids, remove_from_playlist, rename_playlist
+  add_to_playlist, create_playlist, delete_playlist, export_entries, import_playlist_entries, list_playlists, move_in_playlist, playlist_track_ids, remove_from_playlist, rename_playlist
 } from '@shared/library/playlists'
 import { set_rating } from '@shared/library/ratings'
 import {
@@ -306,6 +308,30 @@ export async function register_ipc(db: SqlDatabase, options: IpcOptions): Promis
         if (outcome.report) emit('changed', null)
       })
       return handoff
+    },
+
+    pick_playlist_file: () => {
+      const picked = dialog.showOpenDialogSync({ title: 'Import a playlist', properties: ['openFile'], filters: [{ name: 'Playlists', extensions: Object.keys(playlist_extensions) }] })
+      return picked?.[0] ?? null
+    },
+
+    import_playlist_file: (path) => {
+      const file = read_playlist_file(readFileSync(path, 'utf8'), path)
+      return import_playlist_entries(db, file.name ?? name_from_path(path), file.entries)
+    },
+
+    pick_playlist_save_path: (name) => dialog.showSaveDialogSync({
+      title: 'Export a playlist',
+      defaultPath: join(app.getPath('music'), `${name.replace(/[\\/:*?"<>|]/g, '_')}.m3u8`),
+      filters: [{ name: 'M3U playlist', extensions: ['m3u8', 'm3u'] }, { name: 'PLS playlist', extensions: ['pls'] }, { name: 'XSPF playlist', extensions: ['xspf'] }]
+    }) ?? null,
+
+    save_playlist_file: (playlist_id, path) => {
+      const format = playlist_format(path)
+      if (!format) throw new Error('a playlist file ends in .m3u, .m3u8, .pls or .xspf')
+      const { name, entries, skipped } = export_entries(db, playlist_id)
+      writeFileSync(path, write_playlist_file(format, name, entries))
+      return { written: entries.length, skipped }
     },
 
     pick_gmbrc_file: () => {

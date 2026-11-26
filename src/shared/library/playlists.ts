@@ -7,9 +7,12 @@ import { leaf, type FilterNode } from '@x-tech-laboratories/x-libs/filter'
 import { in_transaction, type SqlDatabase } from '@x-tech-laboratories/x-libs/sql'
 
 import { upgrade_definition } from '../filter_shapes.ts'
+import type { PlaylistEntry } from '../import/playlist_files.ts'
 import type { PlaylistRow } from '../ipc.ts'
 import { new_id } from './database.ts'
-import { playlist_tracks, playlists } from './schema.ts'
+import { get_player_track, list_playable_files } from './plays.ts'
+import { media, playlist_tracks, playlists } from './schema.ts'
+import { query_tracks } from './store.ts'
 
 // ── Reading ──────────────────────────────────────────────────────────────────
 
@@ -135,4 +138,55 @@ function write_tracks(database: SqlDatabase, playlist_id: string, track_ids: rea
   const db = drizzle_of(database)
   db.delete(playlist_tracks).where(eq(playlist_tracks.playlist_id, playlist_id)).run()
   track_ids.forEach((track_id, position) => db.insert(playlist_tracks).values({ playlist_id, track_id, position }).run())
+}
+
+// ── Files ────────────────────────────────────────────────────────────────────
+
+export interface PlaylistImport {
+  playlist: PlaylistRow
+  matched: number
+  // The entries no track in the library plays from, in the file's order.
+  missing: string[]
+}
+
+// A static playlist of the tracks whose files the entries name, in their order; entries the library does not hold are listed.
+export function import_playlist_entries(database: SqlDatabase, name: string, entries: readonly string[], now = Date.now()): PlaylistImport {
+  const db = drizzle_of(database)
+  const track_ids: string[] = []
+  const missing: string[] = []
+  for (const entry of entries) {
+    const found = db.select({ track_id: media.track_id }).from(media).where(eq(media.uri, entry)).orderBy(asc(media.subtrack_index)).get()
+    if (found) track_ids.push(found.track_id)
+    else missing.push(entry)
+  }
+  return { playlist: create_playlist(database, name, { track_ids }, now), matched: track_ids.length, missing }
+}
+
+export interface PlaylistExport {
+  name: string
+  entries: PlaylistEntry[]
+  // Tracks left out because no file of theirs is on disk.
+  skipped: number
+}
+
+// A playlist's tracks by their best file on disk: a static one in its order, a smart one by album, disc and track.
+export function export_entries(database: SqlDatabase, playlist_id: string): PlaylistExport {
+  const playlist = list_playlists(database).find((row) => row.id === playlist_id)
+  if (!playlist) throw new Error(`there is no playlist ${playlist_id}`)
+  const track_ids = playlist.kind === 'static'
+    ? playlist_track_ids(database, playlist_id)
+    : query_tracks(database, { filter: playlist_filter(playlist), sort: [{ field: 'album' }, { field: 'disc_number' }, { field: 'track_number' }] }).map((row) => row.id)
+
+  const entries: PlaylistEntry[] = []
+  let skipped = 0
+  for (const track_id of track_ids) {
+    const file = list_playable_files(database, track_id).find((candidate) => candidate.present === 1 && candidate.start_ms === null)
+    const track = get_player_track(database, track_id)
+    if (!file || !track) {
+      skipped++
+      continue
+    }
+    entries.push({ path: file.uri, title: track.title, artist: track.artist, length_ms: track.length_ms })
+  }
+  return { name: playlist.name, entries, skipped }
 }

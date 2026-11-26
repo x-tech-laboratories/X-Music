@@ -43,7 +43,7 @@ implemented yet. See the roadmap in DESIGN-SPEC §15.
 | Duplicate detection (hash, MBID, tags, fuzzy) | working |
 | Song properties (identity, sources, raw tags, history) | working |
 | Setting ratings (stars in the list, the player and the selection bar; keys 0–5 on picked rows) | working |
-| Playlists: a Playlists tab that opens one as a filter, new and renamed playlists, adding and removing tracks, the view saved as a smart playlist | working, a static playlist in its own order and rearranged by dragging; M3U, PLS and XSPF import and export not yet |
+| Playlists: a Playlists tab that opens one as a filter, new and renamed playlists, adding and removing tracks, the view saved as a smart playlist | working, a static playlist in its own order and rearranged by dragging, M3U, PLS and XSPF imported and exported |
 | Album art (embedded, folder image, cached) | working |
 | Daily backups of the library database, on X-Libs | working |
 | Picard hand-off for tagging: the picked tracks open in Picard, and their files are read again when it closes | working |

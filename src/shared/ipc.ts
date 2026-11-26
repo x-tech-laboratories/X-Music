@@ -266,11 +266,18 @@ export interface XMusicPageApi {
   set_picard_settings: (changes: Partial<PicardSettings>) => PicardSetup
   // Opens the tracks' files in a Picard window of their own, and answers once it is open.
   tag_with_picard: (track_ids: string[]) => PicardHandoff
+  pick_playlist_file: () => string | null
+  // Makes a static playlist of the tracks a playlist file lists, named as the file names itself or after the file.
+  import_playlist_file: (path: string) => { playlist: PlaylistRow; matched: number; missing: string[] }
+  // Asks where to save a playlist, offering a file named after it; the extension chooses the format.
+  pick_playlist_save_path: (name: string) => string | null
+  save_playlist_file: (playlist_id: string, path: string) => { written: number; skipped: number }
 }
 
 export const page_method_names = [
   'pick_folder', 'pick_gmbrc_file', 'pick_program', 'show_in_folder', 'cache_cover',
-  'get_picard_setup', 'set_picard_settings', 'tag_with_picard'
+  'get_picard_setup', 'set_picard_settings', 'tag_with_picard',
+  'pick_playlist_file', 'import_playlist_file', 'pick_playlist_save_path', 'save_playlist_file'
 ] as const satisfies readonly (keyof XMusicPageApi)[]
 
 // Pushed from the main process; the renderer subscribes rather than polling.

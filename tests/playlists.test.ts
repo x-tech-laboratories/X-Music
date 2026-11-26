@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { leaf } from '@x-tech-laboratories/x-libs/filter'
 import {
-  add_to_playlist, create_playlist, delete_playlist, list_playlists, move_in_playlist, playlist_filter, playlist_track_ids, remove_from_playlist, rename_playlist
+  add_to_playlist, create_playlist, delete_playlist, export_entries, import_playlist_entries, list_playlists, move_in_playlist, playlist_filter, playlist_track_ids, remove_from_playlist, rename_playlist
 } from '@shared/library/playlists'
 import { query_tracks } from '@shared/library/store'
 import { add_track, fresh_db, type TestDb } from './sqlite.ts'
@@ -129,5 +129,54 @@ describe('naming and deleting playlists', () => {
     expect(() => create_playlist(db, '   ', { track_ids: [] })).toThrow(/needs a name/)
     expect(() => rename_playlist(db, 'nope', 'Name')).toThrow(/no playlist nope/)
     expect(() => delete_playlist(db, 'nope')).toThrow(/no playlist nope/)
+  })
+})
+
+// ============================================================================
+// Files
+// ============================================================================
+
+function track_at(title: string, uri: string, extra: { present?: number; start_ms?: number | null } = {}): string {
+  const id = add_track(db, { title, length_ms: 200_000 })
+  db.prepare(`INSERT INTO media (id, track_id, kind, uri, present, subtrack_index, start_ms, added) VALUES (?, ?, 'file', ?, ?, ?, ?, 0)`)
+    .run(`${id}-media`, id, uri, extra.present ?? 1, extra.start_ms === undefined || extra.start_ms === null ? 0 : 1, extra.start_ms ?? null)
+  return id
+}
+
+describe('playlist files', () => {
+  it('imports the tracks a file lists, in its order, and names what the library does not hold', () => {
+    const so_what = track_at('So What', '/music/so-what.flac')
+    const blue = track_at('Blue in Green', '/music/blue.flac')
+
+    const imported = import_playlist_entries(db, 'Kind of Blue', ['/music/blue.flac', '/elsewhere/gone.mp3', '/music/so-what.flac'])
+
+    expect(imported).toMatchObject({ playlist: { name: 'Kind of Blue', kind: 'static', tracks: 2 }, matched: 2, missing: ['/elsewhere/gone.mp3'] })
+    expect(playlist_track_ids(db, imported.playlist.id)).toEqual([blue, so_what])
+  })
+
+  it('exports a static playlist in its order by each track\'s file on disk, leaving out tracks with none', () => {
+    const so_what = track_at('So What', '/music/so-what.flac')
+    const gone = track_at('Gone', '/music/gone.flac', { present: 0 })
+    const blue = track_at('Blue in Green', '/music/blue.flac')
+    const made = create_playlist(db, 'Mix', { track_ids: [blue, gone, so_what] })
+
+    expect(export_entries(db, made.id)).toEqual({
+      name: 'Mix',
+      entries: [
+        { path: '/music/blue.flac', title: 'Blue in Green', artist: null, length_ms: 200_000 },
+        { path: '/music/so-what.flac', title: 'So What', artist: null, length_ms: 200_000 }
+      ],
+      skipped: 1
+    })
+  })
+
+  it('exports a smart playlist\'s tracks, and refuses a playlist that is not there', () => {
+    track_at('So What', '/music/so-what.flac')
+    db.prepare("UPDATE tracks SET rating = 100 WHERE title = 'So What'").run()
+    track_at('Other', '/music/other.flac')
+    const made = create_playlist(db, 'Loved', { filter: leaf('rating', '>=', 80) })
+
+    expect(export_entries(db, made.id).entries.map((entry) => entry.path)).toEqual(['/music/so-what.flac'])
+    expect(() => export_entries(db, 'nope')).toThrow(/no playlist nope/)
   })
 })
