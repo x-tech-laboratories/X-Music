@@ -31,7 +31,7 @@
     "@x-tech-laboratories/x-libs": "^0.90.0",
     "fast-xml-parser": "^5.12.1",
     "fastify": "^5.12.8",
-    "music-metadata": "^12.8.0",
+    "music-metadata": "^13.0.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
