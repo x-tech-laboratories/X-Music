@@ -27,8 +27,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.4.0",
-    "@x-tech-laboratories/halon": "^0.32.1",
-    "@x-tech-laboratories/x-libs": "^0.76.0",
+    "@x-tech-laboratories/halon": "^0.34.0",
+    "@x-tech-laboratories/x-libs": "^0.90.0",
     "fast-xml-parser": "^5.12.1",
     "fastify": "^5.12.8",
     "music-metadata": "^12.8.0",
