@@ -20,7 +20,7 @@ Application Standard or the Design Guidelines (below), the standards win; fix th
   `new_id()`, never an auto-incrementing number.
 - Never open the real library (`~/.config/x-music/library.db` or wherever `X_MUSIC_DB` points) from a test or a
   check; use a scratch database.
-- Filters run through X-Libs `filter` and `filter_sql` over the catalogue in `src/shared/query/catalogue.ts`; keep
+- Filters run through X-App `filter` and `filter_sql` over the catalogue in `src/shared/query/catalogue.ts`; keep
   SQL and in-memory results in agreement there, as `tests/filter_compile.test.ts` checks.
 - Add a test for every behaviour you change, and a failing test first for every bug fix.
 - Prefer settings and extension points over changing behaviour for everyone.
@@ -32,7 +32,7 @@ Application Standard or the Design Guidelines (below), the standards win; fix th
   [Design Guidelines](https://x-tech-laboratories.github.io/standards/design/), whose source is `src/content/docs/standards/`
   in [x-tech-laboratories.github.io](https://github.com/x-tech-laboratories/x-tech-laboratories.github.io). Ask before
   changing either, since a change applies to every X-app.
-- Use [X-Libs](https://github.com/x-tech-laboratories/X-Libs) and Halon ([X-Themes](https://github.com/x-tech-laboratories/X-Themes))
-  before writing your own code: check the module table in the X-Libs README first.
-- A feature another app could use belongs in X-Libs, or Halon for styling, with tests and a README row. If that is out
-  of reach, add it to the candidates in X-Libs' `docs/TODO.md`.
+- Use [X-App](https://github.com/x-tech-laboratories/X-App) and Halon ([X-Themes](https://github.com/x-tech-laboratories/X-Themes))
+  before writing your own code: check the module table in the X-App README first.
+- A feature another app could use belongs in X-App, or Halon for styling, with tests and a README row. If that is out
+  of reach, add it to the candidates in X-App's `docs/TODO.md`.
